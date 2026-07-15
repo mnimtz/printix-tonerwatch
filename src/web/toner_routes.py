@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from .. import auth, bi_client, db
+from .. import auth, bi_client, db, supply_library
 from ..db import customers as customers_tbl, customer_access
 from ..web import printer_icons
 
@@ -103,11 +103,20 @@ def _collect_printer_rows(user: dict) -> tuple[list[dict], list[dict]]:
         warn = int(c["warn_pct"] or 20)
         crit = int(c["critical_pct"] or 5)
         for p in printers:
-            supplies_scored = [{
-                **s,
-                "severity": bi_client.classify_severity(
-                    s["level"], warn_pct=warn, critical_pct=crit),
-            } for s in p["supplies"]]
+            # Enrich each toner slot with the resolved supply record
+            # (override → template → None) so the grid can show SKU and
+            # a one-click order link. Cheap: both tables are small and
+            # a printer has at most 5 slots.
+            supplies_scored = []
+            for s in p["supplies"]:
+                supply = supply_library.resolve_supply(
+                    c["id"], p["id"], p.get("model") or "", s["color"])
+                supplies_scored.append({
+                    **s,
+                    "severity": bi_client.classify_severity(
+                        s["level"], warn_pct=warn, critical_pct=crit),
+                    "supply": supply,
+                })
             printer_rows.append({
                 **p,
                 "supplies": supplies_scored,

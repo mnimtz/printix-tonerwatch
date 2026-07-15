@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}{{ _('supplies.override_title', lang) }} — {{ printer.name }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/toner" data-noloader>{{ _('nav.toner', lang) }}</a> /
+  <a href="/toner?customer={{ customer.id }}" data-noloader>{{ customer.name }}</a> /
+  {{ printer.name }}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .printer-hero {
+    display: flex; align-items: center; gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
+    margin-bottom: var(--sp-4);
+  }
+  .printer-hero .name {
+    font-size: 1.15rem; font-weight: 700; color: var(--tw-primary);
+  }
+  .printer-hero .meta {
+    font-size: 0.85rem; color: var(--tw-muted-blue); margin-top: 3px;
+  }
+  .printer-hero .id {
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--tw-muted-blue);
+  }
+
+  .override-block {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); overflow: hidden; margin-bottom: var(--sp-3);
+    box-shadow: var(--shadow-sm);
+  }
+  .override-block h3 {
+    margin: 0; padding: var(--sp-3) var(--sp-4);
+    background: var(--tw-faint-blue); border-bottom: 1px solid var(--tw-gray-300);
+    color: var(--tw-primary); font-size: 0.95rem; font-weight: 700;
+    display: flex; align-items: center; gap: var(--sp-2);
+  }
+  .override-block h3 .color-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 12px 3px 8px; border-radius: 12px;
+    font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem;
+    background: var(--tw-white);
+  }
+  .override-block h3 .color-chip::before {
+    content: ''; display: inline-block; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--tw-muted-blue);
+  }
+  .override-block h3 .color-chip.K::before { background: #231F20; }
+  .override-block h3 .color-chip.C::before { background: #00A0FB; }
+  .override-block h3 .color-chip.M::before { background: #D030E8; }
+  .override-block h3 .color-chip.Y::before { background: #FFC600; }
+  .override-block h3 .badge {
+    margin-left: auto; font-size: 0.72rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 3px 10px; border-radius: 12px;
+  }
+  .override-block h3 .badge.override {
+    background: #00EB86; color: #002854; font-weight: 700;
+  }
+  .override-block h3 .badge.template {
+    background: var(--tw-gray-200); color: var(--tw-muted-blue);
+  }
+  .override-block h3 .badge.none {
+    background: #FEE2E2; color: #991B1B;
+  }
+  .override-block .body { padding: var(--sp-4) var(--sp-5); }
+  .row-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  }
+  .row-3col {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-3);
+  }
+  @media (max-width: 640px) {
+    .row-2col, .row-3col { grid-template-columns: 1fr; }
+  }
+  .form-actions {
+    display: flex; gap: var(--sp-2); margin-top: var(--sp-4);
+    justify-content: space-between; flex-wrap: wrap;
+  }
+  .form-actions .left  { display: flex; gap: var(--sp-2); }
+  .form-actions .right { display: flex; gap: var(--sp-2); }
+  .form-actions a.cancel {
+    color: var(--tw-muted-blue); padding: 8px 14px; text-decoration: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="printer-hero">
+  <div style="flex: 1;">
+    <div class="name">{{ printer.name }}</div>
+    <div class="meta">
+      {% if printer.model %}{{ printer.model }}{% endif %}
+      {% if printer.location %} · {{ printer.location }}{% endif %}
+    </div>
+    <div class="id">{{ printer.id }}</div>
+  </div>
+  <div style="text-align: right;">
+    <div style="font-size: 0.72rem; color: var(--tw-muted-blue); letter-spacing: 0.08em; text-transform: uppercase;">
+      {{ _('supplies.override.customer', lang) }}
+    </div>
+    <div style="font-weight: 700; color: var(--tw-primary);">{{ customer.name }}</div>
+  </div>
+</div>
+
+<div class="alert alert-info" style="margin-bottom: var(--sp-4);">
+  {{ _('supplies.override.intro', lang) }}
+</div>
+
+{% if info == 'override_saved' %}
+  <div class="alert alert-info">{{ _('supplies.override.saved', lang) }}</div>
+{% elif info == 'override_cleared' %}
+  <div class="alert alert-info">{{ _('supplies.override.cleared', lang) }}</div>
+{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<form method="post" action="/toner/{{ customer.id }}/{{ printer.id }}/supply">
+  {% for row in rows %}
+    {% set c = row.color %}
+    {% set ov = row.override %}
+    {% set tpl = row.template %}
+    <div class="override-block">
+      <h3>
+        <span class="color-chip {{ c }}">{{ c }}</span>
+        {{ _('supplies.override.slot', lang) }}
+        {% if ov %}
+          <span class="badge override">{{ _('supplies.badge.override', lang) }}</span>
+        {% elif tpl %}
+          <span class="badge template">{{ _('supplies.badge.template', lang) }}</span>
+        {% else %}
+          <span class="badge none">{{ _('supplies.badge.none', lang) }}</span>
+        {% endif %}
+      </h3>
+      <div class="body">
+        {% if tpl and not ov %}
+          <div style="font-size: 0.83rem; color: var(--tw-muted-blue); margin-bottom: var(--sp-3);">
+            {{ _('supplies.override.template_note', lang) }}
+            {% if tpl.sku %}<code>{{ tpl.sku }}</code>{% endif %}
+            {% if tpl.description %} — {{ tpl.description }}{% endif %}
+          </div>
+        {% endif %}
+
+        <div class="row-2col">
+          <div class="form-group">
+            <label for="sku_{{ c }}">{{ _('supplies.col.sku', lang) }}</label>
+            <input type="text" id="sku_{{ c }}" name="sku_{{ c }}"
+                   value="{{ ov.sku if ov else '' }}"
+                   placeholder="{{ tpl.sku if tpl else '' }}">
+          </div>
+          <div class="form-group">
+            <label for="manufacturer_{{ c }}">{{ _('supplies.col.manufacturer', lang) }}</label>
+            <input type="text" id="manufacturer_{{ c }}" name="manufacturer_{{ c }}"
+                   value="{{ ov.manufacturer if ov else '' }}"
+                   placeholder="{{ tpl.manufacturer if tpl else '' }}">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="description_{{ c }}">{{ _('supplies.col.description', lang) }}</label>
+          <input type="text" id="description_{{ c }}" name="description_{{ c }}"
+                 value="{{ ov.description if ov else '' }}"
+                 placeholder="{{ tpl.description if tpl else '' }}">
+        </div>
+
+        <div class="row-2col">
+          <div class="form-group">
+            <label for="supplier_{{ c }}">{{ _('supplies.col.supplier', lang) }}</label>
+            <input type="text" id="supplier_{{ c }}" name="supplier_{{ c }}"
+                   value="{{ ov.supplier if ov else '' }}"
+                   placeholder="{{ tpl.supplier if tpl else '' }}">
+          </div>
+          <div class="form-group">
+            <label for="supplier_url_{{ c }}">{{ _('supplies.col.supplier_url', lang) }}</label>
+            <input type="url" id="supplier_url_{{ c }}" name="supplier_url_{{ c }}"
+                   value="{{ ov.supplier_url if ov else '' }}"
+                   placeholder="{{ tpl.supplier_url if tpl else '' }}">
+          </div>
+        </div>
+
+        <div class="row-3col">
+          <div class="form-group">
+            <label for="default_quantity_{{ c }}">{{ _('supplies.col.default_quantity', lang) }}</label>
+            <input type="number" id="default_quantity_{{ c }}" name="default_quantity_{{ c }}" min="1"
+                   value="{{ ov.default_quantity if ov else (tpl.default_quantity if tpl else 1) }}">
+          </div>
+          <div class="form-group">
+            <label for="unit_price_cents_{{ c }}">{{ _('supplies.col.price_cents', lang) }}</label>
+            <input type="number" id="unit_price_cents_{{ c }}" name="unit_price_cents_{{ c }}" min="0"
+                   value="{{ ov.unit_price_cents if (ov and ov.unit_price_cents) else '' }}"
+                   placeholder="{{ tpl.unit_price_cents if (tpl and tpl.unit_price_cents) else '' }}">
+          </div>
+          <div class="form-group">
+            <label for="notes_{{ c }}">{{ _('supplies.col.notes', lang) }}</label>
+            <input type="text" id="notes_{{ c }}" name="notes_{{ c }}"
+                   value="{{ ov.notes if ov else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="form-actions">
+    <div class="left">
+      <button type="submit" formaction="/toner/{{ customer.id }}/{{ printer.id }}/supply/clear"
+              class="btn btn-secondary"
+              formnovalidate
+              onclick="return confirm('{{ _('supplies.override.confirm_clear', lang) }}')">
+        {{ _('supplies.override.clear_all', lang) }}
+      </button>
+    </div>
+    <div class="right">
+      <a href="/toner?customer={{ customer.id }}" class="cancel" data-noloader>{{ _('common.cancel', lang) }}</a>
+      <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

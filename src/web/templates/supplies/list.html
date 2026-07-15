@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ _('supplies.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('supplies.title', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .supplies-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--sp-4); margin-bottom: var(--sp-3); flex-wrap: wrap;
+  }
+  .supplies-header .actions { display: flex; gap: var(--sp-2); }
+
+  .model-group {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); overflow: hidden; margin-bottom: var(--sp-4);
+    box-shadow: var(--shadow-sm);
+  }
+  .model-group h3 {
+    margin: 0; padding: var(--sp-3) var(--sp-4);
+    background: var(--tw-faint-blue); color: var(--tw-primary);
+    font-size: 0.95rem; font-weight: 700;
+    display: flex; align-items: center; gap: var(--sp-2);
+    border-bottom: 1px solid var(--tw-gray-300);
+  }
+  .model-group h3 .count {
+    font-size: 0.72rem; color: var(--tw-muted-blue); font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    margin-left: auto;
+  }
+  .supplies-table {
+    width: 100%; border-collapse: collapse; font-size: 0.87rem;
+  }
+  .supplies-table th, .supplies-table td {
+    padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid var(--tw-gray-200); vertical-align: middle;
+  }
+  .supplies-table tbody tr:last-child td { border-bottom: none; }
+  .supplies-table th {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+    background: var(--tw-gray-100);
+  }
+  .supplies-table .color-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 10px 2px 6px; border-radius: 12px;
+    font-family: var(--font-mono); font-weight: 700;
+    font-size: 0.82rem; background: var(--tw-gray-100);
+    color: var(--tw-primary);
+  }
+  .supplies-table .color-chip::before {
+    content: ''; display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--tw-muted-blue);
+  }
+  .supplies-table .color-chip.K::before { background: #231F20; }
+  .supplies-table .color-chip.C::before { background: #00A0FB; }
+  .supplies-table .color-chip.M::before { background: #D030E8; }
+  .supplies-table .color-chip.Y::before { background: #FFC600; }
+
+  .supplies-table .sku { font-family: var(--font-mono); font-weight: 700; }
+  .supplies-table .price { text-align: right; font-variant-numeric: tabular-nums; }
+  .supplies-table td.actions {
+    text-align: right; white-space: nowrap;
+  }
+  .supplies-table td.actions form { display: inline; margin: 0; }
+  .supplies-table td.actions .btn-link {
+    background: none; border: none; padding: 4px 8px; margin: 0;
+    color: var(--tw-muted-blue); cursor: pointer; font: inherit;
+  }
+  .supplies-table td.actions .btn-link:hover { color: var(--tw-primary); }
+  .supplies-table td.actions .btn-link.danger:hover { color: var(--status-critical); }
+
+  .empty-state {
+    text-align: center; padding: var(--sp-12) var(--sp-6);
+    color: var(--tw-muted-blue);
+    background: var(--tw-white); border: 1px dashed var(--tw-gray-300);
+    border-radius: var(--r-lg);
+  }
+  .empty-state p { font-size: 1.05rem; margin-bottom: var(--sp-4); }
+  .empty-state .btn-group {
+    display: flex; gap: var(--sp-2); justify-content: center; flex-wrap: wrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="supplies-header">
+  <div>
+    <h1>{{ _('supplies.title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: 4px; font-size: 0.9rem;">
+      {{ _('supplies.intro', lang) }}
+    </p>
+  </div>
+  <div class="actions">
+    <a href="/supplies/new" class="btn">+ {{ _('supplies.new', lang) }}</a>
+  </div>
+</div>
+
+{% if info == 'template_saved' %}
+  <div class="alert alert-info">{{ _('supplies.saved', lang) }}</div>
+{% elif info == 'template_deleted' %}
+  <div class="alert alert-info">{{ _('supplies.deleted', lang) }}</div>
+{% elif info and info.startswith('seeded_') %}
+  <div class="alert alert-info">
+    {{ _('supplies.seeded', lang) }} ({{ info[len('seeded_'):] }})
+  </div>
+{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+{% if grouped %}
+  {% for model, rows in grouped.items() %}
+    <div class="model-group">
+      <h3>
+        <span>{{ model }}</span>
+        <span class="count">{{ rows|length }} {{ _('supplies.colors_short', lang) }}</span>
+      </h3>
+      <table class="supplies-table">
+        <thead>
+          <tr>
+            <th style="width: 80px;">{{ _('supplies.col.color', lang) }}</th>
+            <th style="width: 140px;">{{ _('supplies.col.sku', lang) }}</th>
+            <th>{{ _('supplies.col.description', lang) }}</th>
+            <th style="width: 120px;">{{ _('supplies.col.manufacturer', lang) }}</th>
+            <th style="width: 90px; text-align:right;">{{ _('supplies.col.yield', lang) }}</th>
+            <th style="width: 100px; text-align:right;">{{ _('supplies.col.price', lang) }}</th>
+            <th style="width: 120px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in rows %}
+          <tr>
+            <td><span class="color-chip {{ t.color }}">{{ t.color }}</span></td>
+            <td class="sku">{{ t.sku or '—' }}</td>
+            <td>
+              {{ t.description or '—' }}
+              {% if t.supplier_url %}
+                <a href="{{ t.supplier_url }}" target="_blank" rel="noopener"
+                   title="{{ _('supplies.open_supplier', lang) }}"
+                   style="text-decoration: none; margin-left: 4px;" data-noloader>↗</a>
+              {% endif %}
+            </td>
+            <td>{{ t.manufacturer or '—' }}</td>
+            <td style="text-align:right;">
+              {% if t.yield_pages %}{{ '{:,}'.format(t.yield_pages) }}{% else %}—{% endif %}
+            </td>
+            <td class="price">
+              {% if t.unit_price_cents %}
+                {{ '%.2f'|format(t.unit_price_cents / 100) }} €
+              {% else %}—{% endif %}
+            </td>
+            <td class="actions">
+              <a href="/supplies/{{ t.id }}/edit" class="btn-link">{{ _('common.edit', lang) }}</a>
+              <form method="post" action="/supplies/{{ t.id }}/delete"
+                    onsubmit="return confirm('{{ _('supplies.confirm_delete', lang) }}')"
+                    data-noloader>
+                <button type="submit" class="btn-link danger">{{ _('common.delete', lang) }}</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="empty-state">
+    <p>{{ _('supplies.empty', lang) }}</p>
+    <div class="btn-group">
+      <a href="/supplies/new" class="btn">+ {{ _('supplies.new', lang) }}</a>
+      <form method="post" action="/supplies/seed" style="margin: 0;">
+        <button type="submit" class="btn btn-secondary"
+                onclick="return confirm('{{ _('supplies.confirm_seed', lang) }}')">
+          {{ _('supplies.seed_button', lang) }}
+        </button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

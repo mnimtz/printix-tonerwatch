@@ -124,15 +124,40 @@
     font-size: 0.72rem; font-weight: 700;
     letter-spacing: 0.04em;
   }
+  .printer-header .supply-edit {
+    align-self: flex-start;
+    padding: 4px 8px; border-radius: 6px;
+    background: transparent;
+    color: var(--tw-muted-blue);
+    font-size: 0.72rem; font-weight: 600;
+    text-decoration: none; white-space: nowrap;
+    border: 1px solid transparent;
+    transition: all var(--t-fast);
+  }
+  .printer-header .supply-edit:hover {
+    background: var(--tw-faint-blue);
+    color: var(--tw-primary);
+    border-color: rgba(0, 40, 84, 0.15);
+  }
 
   .toner-bars { display: flex; flex-direction: column; gap: 6px; }
   .toner-bar-row {
     display: grid;
-    grid-template-columns: 20px 1fr 42px 24px;
+    grid-template-columns: 20px 1fr 42px 24px 24px;
     align-items: center;
     gap: 10px;
     font-size: 0.85rem;
   }
+  .toner-bar-row .order-link {
+    text-align: center; color: var(--tw-muted-blue);
+    text-decoration: none; font-size: 1rem; line-height: 1;
+    opacity: 0.55; transition: opacity var(--t-fast), color var(--t-fast);
+  }
+  .toner-bar-row .order-link:hover {
+    opacity: 1; color: var(--tw-accent);
+  }
+  .toner-bar-row.critical .order-link,
+  .toner-bar-row.warn     .order-link { opacity: 0.85; }
   .toner-bar-row .lbl {
     font-weight: 700; color: var(--tw-primary); text-align: center;
   }
@@ -326,6 +351,11 @@
               </a>
             {% endif %}
           </div>
+          <a href="/toner/{{ p.customer_id }}/{{ p.id }}/supply"
+             class="supply-edit"
+             title="{{ _('supplies.link.edit', lang) }}">
+            📦 {{ _('supplies.link.edit', lang) }}
+          </a>
         </div>
 
         <div class="toner-bars">
@@ -341,6 +371,16 @@
                   {% if s.severity == 'CRITICAL' %}🔴
                   {% elif s.severity == 'WARN' %}⚠
                   {% endif %}
+                </div>
+                <div>
+                {% if s.supply and s.supply.supplier_url %}
+                  <a href="{{ s.supply.supplier_url }}" target="_blank" rel="noopener"
+                     class="order-link" data-noloader
+                     title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">🛒</a>
+                {% elif s.supply and s.supply.sku %}
+                  <span class="order-link" style="cursor: help;"
+                        title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">📦</span>
+                {% endif %}
                 </div>
               </div>
             {% endfor %}

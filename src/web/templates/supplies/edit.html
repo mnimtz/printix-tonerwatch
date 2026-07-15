@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if template %}{{ _('supplies.edit_title', lang) }}{% else %}{{ _('supplies.new', lang) }}{% endif %}
+  · {{ _('brand.product_name', lang) }}
+{% endblock %}
+{% block breadcrumb %}
+  <a href="/supplies" data-noloader>{{ _('supplies.title', lang) }}</a> /
+  {% if template %}{{ template.printer_model }} — {{ template.color }}{% else %}{{ _('supplies.new', lang) }}{% endif %}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .supply-form {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-5) var(--sp-6);
+    box-shadow: var(--shadow-sm); max-width: 720px;
+  }
+  .row-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);
+  }
+  .row-3col {
+    display: grid; grid-template-columns: 100px 1fr 140px; gap: var(--sp-4);
+  }
+  @media (max-width: 640px) {
+    .row-2col, .row-3col { grid-template-columns: 1fr; }
+  }
+  .form-hint {
+    font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;
+  }
+  .form-actions {
+    display: flex; gap: var(--sp-2); margin-top: var(--sp-5);
+    padding-top: var(--sp-4); border-top: 1px solid var(--tw-gray-200);
+    justify-content: flex-end;
+  }
+  .form-actions .cancel {
+    color: var(--tw-muted-blue); padding: 8px 14px;
+    text-decoration: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-4);">
+  {% if template %}{{ _('supplies.edit_title', lang) }}{% else %}{{ _('supplies.new', lang) }}{% endif %}
+</h1>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ form_action }}" class="supply-form">
+  <div class="row-3col">
+    <div class="form-group">
+      <label for="color">{{ _('supplies.col.color', lang) }} *</label>
+      <select id="color" name="color" required>
+        <option value="K" {{ 'selected' if (template and template.color == 'K') else '' }}>K — Black</option>
+        <option value="C" {{ 'selected' if (template and template.color == 'C') else '' }}>C — Cyan</option>
+        <option value="M" {{ 'selected' if (template and template.color == 'M') else '' }}>M — Magenta</option>
+        <option value="Y" {{ 'selected' if (template and template.color == 'Y') else '' }}>Y — Yellow</option>
+        <option value="other" {{ 'selected' if (template and template.color == 'other') else '' }}>{{ _('supplies.other', lang) }}</option>
+      </select>
+    </div>
+    <div class="form-group" style="grid-column: span 2;">
+      <label for="printer_model">{{ _('supplies.col.printer_model', lang) }} *</label>
+      <input type="text" id="printer_model" name="printer_model" required
+             value="{{ template.printer_model if template else prefill_model or '' }}"
+             placeholder="HP LaserJet Pro M479">
+      <div class="form-hint">{{ _('supplies.hint.printer_model', lang) }}</div>
+    </div>
+  </div>
+
+  <div class="row-2col">
+    <div class="form-group">
+      <label for="sku">{{ _('supplies.col.sku', lang) }}</label>
+      <input type="text" id="sku" name="sku"
+             value="{{ template.sku if template else '' }}" placeholder="W2030A">
+    </div>
+    <div class="form-group">
+      <label for="manufacturer">{{ _('supplies.col.manufacturer', lang) }}</label>
+      <input type="text" id="manufacturer" name="manufacturer"
+             value="{{ template.manufacturer if template else '' }}" placeholder="HP">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="description">{{ _('supplies.col.description', lang) }}</label>
+    <input type="text" id="description" name="description"
+           value="{{ template.description if template else '' }}"
+           placeholder="HP 415A Original LaserJet Toner (Black)">
+  </div>
+
+  <div class="row-2col">
+    <div class="form-group">
+      <label for="supplier">{{ _('supplies.col.supplier', lang) }}</label>
+      <input type="text" id="supplier" name="supplier"
+             value="{{ template.supplier if template else '' }}" placeholder="Group24 / Bechtle / …">
+    </div>
+    <div class="form-group">
+      <label for="supplier_url">{{ _('supplies.col.supplier_url', lang) }}</label>
+      <input type="url" id="supplier_url" name="supplier_url"
+             value="{{ template.supplier_url if template else '' }}"
+             placeholder="https://shop.example.com/…">
+      <div class="form-hint">{{ _('supplies.hint.supplier_url', lang) }}</div>
+    </div>
+  </div>
+
+  <div class="row-3col">
+    <div class="form-group">
+      <label for="default_quantity">{{ _('supplies.col.default_quantity', lang) }}</label>
+      <input type="number" id="default_quantity" name="default_quantity" min="1"
+             value="{{ template.default_quantity if template else 1 }}">
+    </div>
+    <div class="form-group">
+      <label for="yield_pages">{{ _('supplies.col.yield', lang) }}</label>
+      <input type="number" id="yield_pages" name="yield_pages" min="0"
+             value="{{ template.yield_pages if template and template.yield_pages else '' }}"
+             placeholder="2400">
+      <div class="form-hint">{{ _('supplies.hint.yield', lang) }}</div>
+    </div>
+    <div class="form-group">
+      <label for="unit_price_cents">{{ _('supplies.col.price_cents', lang) }}</label>
+      <input type="number" id="unit_price_cents" name="unit_price_cents" min="0"
+             value="{{ template.unit_price_cents if template and template.unit_price_cents else '' }}"
+             placeholder="11500">
+      <div class="form-hint">{{ _('supplies.hint.price_cents', lang) }}</div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="notes">{{ _('supplies.col.notes', lang) }}</label>
+    <textarea id="notes" name="notes" rows="3">{{ template.notes if template else '' }}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <a href="/supplies" class="cancel" data-noloader>{{ _('common.cancel', lang) }}</a>
+    <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+  </div>
+</form>
+{% endblock %}
