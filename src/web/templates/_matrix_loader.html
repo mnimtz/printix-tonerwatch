@@ -1,0 +1,287 @@
+{# Global Matrix-Loader overlay — ported from mysecureprint's proven build.
+
+   Auto-hooks every <a> click and form-submit to show the loader between
+   the click and the next page render. Session-storage handoff makes the
+   loader visible immediately on the *next* page too, so long navigations
+   never show an empty white gap.
+
+   API on window:
+     matrixShow(msg?, mode?)   — mode = 'overlay' (default) | 'splash'
+     matrixHide()              — hide immediately (respects min-display-time)
+     matrixWith(promise, msg?) — show, run promise, hide
+
+   Opt-outs:
+     <a data-noloader>…</a>            — link skips loader
+     <a data-matrix-splash>…</a>       — link forces full splash
+     <a data-matrix-msg="…">…</a>      — link sets custom message
+     <form data-noloader>              — form skips loader
+     <form data-matrix-splash>         — form forces splash (login uses this)
+     <body data-matrix-hold="1">       — page keeps loader visible until it
+                                          calls matrixHide() itself
+#}
+<div id="global-matrix-loader" class="global-matrix-loader" style="display:none;"
+     data-min-ms="400">
+  <canvas id="global-matrix-canvas" class="global-matrix-canvas"></canvas>
+  <div class="global-matrix-msg">
+    <div class="global-matrix-title" id="global-matrix-title">Printix TonerWatch</div>
+    <div class="global-matrix-sub" id="global-matrix-sub">{{ _('matrix.loading_default', lang) }}</div>
+  </div>
+</div>
+
+<style>
+  .global-matrix-loader {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .3s;
+    pointer-events: none;
+  }
+  .global-matrix-loader.visible { opacity: 1; pointer-events: auto; }
+
+  /* Overlay mode — transparent, page shows through */
+  .global-matrix-loader.mode-overlay {
+    background: rgba(0, 18, 59, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  .global-matrix-loader.mode-overlay .global-matrix-canvas { opacity: .35; }
+  .global-matrix-loader.mode-overlay .global-matrix-msg {
+    padding: 20px 32px;
+    background: rgba(0, 18, 59, 0.7);
+    border-radius: 14px;
+    border: 1px solid rgba(0, 160, 251, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .global-matrix-loader.mode-overlay .global-matrix-title { font-size: 1.1em; }
+  .global-matrix-loader.mode-overlay .global-matrix-sub   { font-size: .85em; }
+
+  /* Splash mode — full opaque, like an app startup */
+  .global-matrix-loader.mode-splash {
+    background: #00123B;
+  }
+  .global-matrix-loader.mode-splash .global-matrix-canvas { opacity: .8; }
+  .global-matrix-loader.mode-splash .global-matrix-title  { font-size: 1.8em; }
+
+  .global-matrix-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block;
+  }
+  .global-matrix-msg {
+    position: relative; z-index: 2; text-align: center;
+    color: #fff; font-family: 'Red Hat Display', Arial, sans-serif;
+    text-shadow: 0 2px 20px rgba(0,0,0,.5);
+    padding: 40px;
+    pointer-events: none;
+  }
+  .global-matrix-title {
+    font-weight: 700; color: #00EB86;
+    text-shadow: 0 0 20px rgba(0,235,134,.5);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .global-matrix-sub { color: #9DDDF9; font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .global-matrix-canvas { display: none; }
+  }
+</style>
+
+<script>
+(function() {
+  const overlay = document.getElementById('global-matrix-loader');
+  const canvas  = document.getElementById('global-matrix-canvas');
+  const sub     = document.getElementById('global-matrix-sub');
+  if (!overlay || !canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Line-icon set — printer, doc, mail, lock, cloud, check, person, qr,
+  // upload, envelope, key. Rendered twice (green head + blue tail).
+  const ICONS = {
+    printer:  '<path d="M6 9V4h12v5M6 18h12v-8H6zM4 9h16v6h-4v-2H8v2H4z"/><rect x="8" y="15" width="8" height="6" rx="1"/>',
+    document: '<path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3M8 10h8M8 13h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+    mail:     '<path d="M3 6h18v12H3z"/><path d="M3 6l9 7 9-7" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+    lock:     '<path d="M6 10V7a6 6 0 0112 0v3"/><rect x="4" y="10" width="16" height="12" rx="2"/><circle cx="12" cy="16" r="1.5" fill="#000"/>',
+    cloud:    '<path d="M7 18a4 4 0 010-8h.5A5 5 0 0117 10.5a3.5 3.5 0 010 7z"/>',
+    check:    '<circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>',
+    person:   '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+    qr:       '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+    upload:   '<path d="M12 15V3M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 15v4a2 2 0 002 2h10a2 2 0 002-2v-4"/>',
+    envelope: '<path d="M4 5h16v14H4z"/><path d="M4 5l8 7 8-7" fill="none" stroke="#000" stroke-width="1.5"/>',
+    key:      '<circle cx="8" cy="12" r="4"/><path d="M12 12h8v2h-2v2h-2v-2h-4"/>',
+  };
+  const iconNames = Object.keys(ICONS);
+  const iconImages = {green: {}, blue: {}};
+  const colors = {green: '#00EB86', blue: '#00A0FB'};
+
+  function preloadIcons() {
+    for (const [colName, colHex] of Object.entries(colors)) {
+      for (const name of iconNames) {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${colHex}">${ICONS[name]}</svg>`;
+        const img = new Image();
+        img.src = 'data:image/svg+xml;base64,' +
+                  btoa(unescape(encodeURIComponent(svg)));
+        iconImages[colName][name] = img;
+      }
+    }
+  }
+  preloadIcons();
+
+  const CELL = 22;
+  let cols = 0, drops = [];
+  let animId = null;
+  let visibleSince = 0;
+  let pendingHide = null;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = overlay.getBoundingClientRect();
+    canvas.width  = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    cols = Math.floor(rect.width / CELL);
+    drops = Array(cols).fill(0).map(() => ({
+      y: Math.random() * -30,
+      // 0.08-0.16 cells/frame = ~5-10 cells/s at 60fps — slow enough
+      // that a viewer can actually recognise each icon.
+      speed: 0.08 + Math.random() * 0.08,
+      icons: Array(60).fill(0).map(() => iconNames[Math.floor(Math.random() * iconNames.length)]),
+    }));
+  }
+
+  function draw() {
+    const rect = overlay.getBoundingClientRect();
+    ctx.fillStyle = 'rgba(0, 18, 59, 0.10)';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    for (let i = 0; i < cols; i++) {
+      const col = drops[i];
+      const x = i * CELL + 3;
+      const yPx = col.y * CELL;
+      const iconIdx = Math.floor(col.y) % col.icons.length;
+      const iconName = col.icons[Math.abs(iconIdx)];
+      const headImg = iconImages.green[iconName];
+      if (headImg && headImg.complete) {
+        ctx.globalAlpha = 1;
+        ctx.drawImage(headImg, x, yPx, 16, 16);
+      }
+      for (let t = 1; t < 4; t++) {
+        const tailName = col.icons[Math.abs((iconIdx - t + col.icons.length) % col.icons.length)];
+        const tailImg = iconImages.blue[tailName];
+        if (tailImg && tailImg.complete) {
+          ctx.globalAlpha = 0.7 - t * 0.15;
+          ctx.drawImage(tailImg, x, yPx - t * CELL, 16, 16);
+        }
+      }
+      ctx.globalAlpha = 1;
+      col.y += col.speed;
+      if (col.y * CELL > rect.height + 100 && Math.random() > 0.97) {
+        col.y = -Math.random() * 20;
+        col.icons = Array(60).fill(0).map(() => iconNames[Math.floor(Math.random() * iconNames.length)]);
+      }
+    }
+    animId = requestAnimationFrame(draw);
+  }
+
+  window.matrixShow = function(msg, mode) {
+    if (pendingHide) { clearTimeout(pendingHide); pendingHide = null; }
+    if (msg && sub) sub.textContent = msg;
+    overlay.classList.remove('mode-overlay', 'mode-splash');
+    overlay.classList.add(mode === 'splash' ? 'mode-splash' : 'mode-overlay');
+    // Session-storage handoff — the next page will read this on load and
+    // show the loader immediately, so full page navigations don't flash
+    // a white gap.
+    try {
+      sessionStorage.setItem('matrix_pending', mode || 'overlay');
+      sessionStorage.setItem('matrix_pending_msg', msg || '');
+    } catch (e) {}
+    if (overlay.style.display === 'flex') return;
+    overlay.style.display = 'flex';
+    overlay.offsetHeight;  // force reflow so the CSS transition triggers
+    overlay.classList.add('visible');
+    visibleSince = Date.now();
+    if (!animId) {
+      resize();
+      draw();
+      window.addEventListener('resize', resize);
+    }
+  };
+  window.matrixHide = function() {
+    try {
+      sessionStorage.removeItem('matrix_pending');
+      sessionStorage.removeItem('matrix_pending_msg');
+    } catch (e) {}
+    if (!overlay.classList.contains('visible')) {
+      overlay.style.display = 'none';
+      return;
+    }
+    const minMs = parseInt(overlay.dataset.minMs || '400', 10);
+    const elapsed = Date.now() - visibleSince;
+    const wait = Math.max(0, minMs - elapsed);
+    pendingHide = setTimeout(() => {
+      overlay.classList.remove('visible');
+      setTimeout(() => {
+        if (!overlay.classList.contains('visible')) {
+          overlay.style.display = 'none';
+          if (animId) { cancelAnimationFrame(animId); animId = null; }
+          window.removeEventListener('resize', resize);
+        }
+      }, 350);
+    }, wait);
+  };
+  window.matrixWith = async function(promise, msg) {
+    window.matrixShow(msg);
+    try { return await promise; }
+    finally { window.matrixHide(); }
+  };
+
+  // Handoff: pick up a pending loader that the previous page armed
+  try {
+    const pendingMode = sessionStorage.getItem('matrix_pending');
+    if (pendingMode) {
+      const pendingMsg = sessionStorage.getItem('matrix_pending_msg') || '';
+      window.matrixShow(pendingMsg, pendingMode);
+    }
+  } catch (e) {}
+
+  // ── Auto-hook: <a> click ──────────────────────────────────────────
+  document.addEventListener('click', (e) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    let el = e.target;
+    while (el && el.tagName !== 'A') el = el.parentElement;
+    if (!el) return;
+    if (el.dataset.noloader !== undefined) return;
+    if (el.target && el.target === '_blank') return;
+    if (el.hasAttribute('download')) return;
+    const href = el.getAttribute('href') || '';
+    if (!href) return;
+    if (href.startsWith('#')) return;
+    if (href.startsWith('mailto:') || href.startsWith('tel:')
+        || href.startsWith('javascript:')) return;
+    try {
+      const url = new URL(el.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+    } catch { return; }
+    const mode = el.dataset.matrixSplash !== undefined ? 'splash' : 'overlay';
+    window.matrixShow(el.dataset.matrixMsg, mode);
+  }, true);
+
+  // ── Auto-hook: form submit ────────────────────────────────────────
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!form || !(form instanceof HTMLFormElement)) return;
+    if (form.dataset.noloader !== undefined) return;
+    const target = form.getAttribute('target');
+    if (target && target === '_blank') return;
+    const mode = form.dataset.matrixSplash !== undefined ? 'splash' : 'overlay';
+    window.matrixShow(form.dataset.matrixMsg, mode);
+  }, true);
+
+  // ── Auto-hide on page-load ───────────────────────────────────────
+  function _autoHideIfNotHeld() {
+    if (document.body && document.body.dataset.matrixHold === '1') return;
+    window.matrixHide();
+  }
+  window.addEventListener('pageshow', _autoHideIfNotHeld);
+  window.addEventListener('DOMContentLoaded', _autoHideIfNotHeld);
+})();
+</script>

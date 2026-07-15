@@ -67,7 +67,9 @@
     {% if info %}
       <div class="alert alert-info">{{ info }}</div>
     {% endif %}
-    <form method="post" action="/login" autocomplete="on">
+    <form method="post" action="/login" autocomplete="on"
+          data-matrix-splash
+          data-matrix-msg="{{ _('matrix.signing_in', lang) }}">
       {% if form and form.next %}
         <input type="hidden" name="next" value="{{ form.next }}">
       {% endif %}

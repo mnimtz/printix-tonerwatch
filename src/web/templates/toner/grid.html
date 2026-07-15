@@ -33,6 +33,9 @@
   .toner-filters {
     display: flex; flex-wrap: wrap; align-items: center;
     gap: var(--sp-2); margin-bottom: var(--sp-5);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
   }
   .toner-filters .chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -45,12 +48,34 @@
     background: var(--tw-primary); border-color: var(--tw-primary);
     color: var(--tw-white);
   }
+  .toner-filters .customer-picker {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: auto;
+  }
+  .toner-filters .customer-picker label {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--tw-muted-blue);
+  }
   .toner-filters select {
-    padding: 5px 10px; border-radius: 16px;
+    padding: 6px 30px 6px 12px; border-radius: 16px;
     border: 1px solid var(--tw-gray-300); background: var(--tw-white);
     font-family: inherit; font-size: 0.85rem; color: var(--tw-primary);
+    font-weight: 600;
+    /* Small down-chevron via inline SVG so we don't need a font-icon */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23002854' d='M0 0l5 6 5-6z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    appearance: none; -webkit-appearance: none;
   }
-  .toner-filters form { display: inline-flex; margin-left: auto; }
+  .toner-filters select:focus {
+    outline: none; border-color: var(--tw-accent);
+    box-shadow: 0 0 0 3px rgba(0, 160, 251, 0.15);
+  }
+  .toner-filters .reset-link {
+    font-size: 0.78rem; color: var(--tw-muted-blue);
+    text-decoration: underline; padding: 2px 6px;
+  }
+  .toner-filters .reset-link:hover { color: var(--tw-primary); }
 
   .toner-grid {
     display: grid;
@@ -136,13 +161,36 @@
   .printer-footer {
     display: flex; flex-wrap: wrap; gap: 6px;
     padding-top: var(--sp-2); border-top: 1px solid var(--tw-gray-200);
-    font-size: 0.75rem; color: var(--tw-muted-blue);
+    font-size: 0.78rem;
     align-items: center;
   }
-  .printer-footer .err {
-    padding: 2px 8px; border-radius: 4px;
-    background: #FEF2F2; color: #991B1B; font-weight: 700;
-    font-family: var(--font-mono);
+
+  /* Human-friendly status badges — one visual language for every
+     detected_error_state and printer_reported_state. Icon + short
+     label; colour follows the severity (critical/warn/info). */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600;
+    line-height: 1.25;
+    border: 1px solid transparent;
+    max-width: 100%;
+  }
+  .status-badge .ico { font-size: 0.95em; line-height: 1; }
+  .status-badge.sev-critical {
+    background: #FEE2E2; color: #991B1B; border-color: #FCA5A5;
+  }
+  .status-badge.sev-warn {
+    background: #FEF3C7; color: #92400E; border-color: #FCD34D;
+  }
+  .status-badge.sev-info {
+    background: var(--tw-faint-blue); color: var(--tw-primary);
+    border-color: rgba(0, 40, 84, 0.15);
+  }
+  .status-badge.sev-unknown {
+    background: var(--tw-gray-100); color: var(--tw-muted-blue);
+    border-color: var(--tw-gray-300);
+    font-family: var(--font-mono); font-weight: 700;
   }
 
   .error-banner {
@@ -214,25 +262,36 @@
   </div>
 {% endfor %}
 
-<!-- Filter bar -->
+<!-- Filter bar — severity chips on the left, customer picker on the right.
+     Both filters compose (customer AND severity). Customer picker is
+     always shown when the operator has access to any customer, so the
+     filter is discoverable even with a single-tenant view. -->
 {% if counts.total or customer_choices %}
   <div class="toner-filters">
-    <a href="/toner" class="chip {{ 'active' if not filter_severity else '' }}">
+    <a href="/toner{% if filter_customer %}?customer={{ filter_customer }}{% endif %}"
+       class="chip {{ 'active' if not filter_severity else '' }}" data-noloader>
       {{ _('toner.filter.all', lang) }}
     </a>
     <a href="/toner?severity=CRITICAL{% if filter_customer %}&customer={{ filter_customer }}{% endif %}"
        class="chip {{ 'active' if filter_severity == 'CRITICAL' else '' }}"
-       style="{% if filter_severity == 'CRITICAL' %}background: var(--status-critical); border-color: var(--status-critical);{% endif %}">
+       style="{% if filter_severity == 'CRITICAL' %}background: var(--status-critical); border-color: var(--status-critical);{% endif %}"
+       data-noloader>
       🔴 {{ _('toner.filter.critical_only', lang) }}
     </a>
     <a href="/toner?severity=WARN{% if filter_customer %}&customer={{ filter_customer }}{% endif %}"
-       class="chip {{ 'active' if filter_severity == 'WARN' else '' }}">
+       class="chip {{ 'active' if filter_severity == 'WARN' else '' }}" data-noloader>
       ⚠ {{ _('toner.filter.warn_up', lang) }}
     </a>
-    {% if customer_choices|length > 1 %}
-      <form method="get" action="/toner" style="margin: 0;">
+
+    {% if filter_customer or filter_severity %}
+      <a href="/toner" class="reset-link" data-noloader>{{ _('toner.filter.reset', lang) }}</a>
+    {% endif %}
+
+    {% if customer_choices %}
+      <form method="get" action="/toner" class="customer-picker" data-noloader>
         {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
-        <select name="customer" onchange="this.form.submit()">
+        <label for="customer-select">{{ _('toner.filter.customer_label', lang) }}</label>
+        <select id="customer-select" name="customer" onchange="this.form.submit()">
           <option value="">{{ _('toner.filter.all_customers', lang) }}</option>
           {% for cid, cname in customer_choices %}
             <option value="{{ cid }}" {% if filter_customer == cid|string %}selected{% endif %}>
@@ -293,17 +352,25 @@
           {% endif %}
         </div>
 
-        {% if p.error_states or p.reported_state and p.reported_state not in ('IDLE', 'PRINTING', '') %}
+        {% if p.error_states or (p.reported_state and not is_hidden_state(p.reported_state)) %}
           <div class="printer-footer">
-            {% if p.reported_state and p.reported_state not in ('IDLE', 'PRINTING') %}
-              <span style="font-family: var(--font-mono);
-                           padding: 2px 8px; border-radius: 4px;
-                           background: var(--tw-gray-200);">
-                {{ p.reported_state }}
+            {# printer_reported_state → nice badge (IDLE/PRINTING skipped) #}
+            {% if p.reported_state and not is_hidden_state(p.reported_state) %}
+              {% set sev, icon, tkey = reported_state_meta(p.reported_state) %}
+              <span class="status-badge sev-{{ sev }}"
+                    title="{{ p.reported_state }}">
+                <span class="ico">{{ icon }}</span>
+                {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ p.reported_state }}{% endif %}
               </span>
             {% endif %}
+            {# detected_error_states → colored pill each #}
             {% for e in p.error_states %}
-              <span class="err">{{ e }}</span>
+              {% set sev, icon, tkey = error_state_meta(e) %}
+              <span class="status-badge sev-{{ sev if tkey else 'unknown' }}"
+                    title="{{ e }}">
+                <span class="ico">{{ icon }}</span>
+                {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ e }}{% endif %}
+              </span>
             {% endfor %}
           </div>
         {% endif %}

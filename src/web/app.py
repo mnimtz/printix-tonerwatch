@@ -137,6 +137,14 @@ def create_app() -> FastAPI:
     templates.env.globals["LANG_LABELS"] = i18n.LANG_LABELS
     templates.env.globals["SUPPORTED_LANGS"] = i18n.SUPPORTED_LANGS
 
+    # Printer-status label helper — used by the toner grid to turn raw
+    # SNMP codes (NO_PAPER, LOW_TONER, ...) into badges with an icon
+    # and a translated caption.
+    from . import labels as _labels
+    templates.env.globals["error_state_meta"]    = _labels.error_state_meta
+    templates.env.globals["reported_state_meta"] = _labels.reported_state_meta
+    templates.env.globals["is_hidden_state"]     = _labels.is_hidden_reported_state
+
     app.state.templates = templates
 
     # Routers.
