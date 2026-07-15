@@ -1,12 +1,54 @@
 {% extends "base.html" %}
 {% block title %}{{ _('nav.settings', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
 {% block breadcrumb %}{{ _('nav.settings', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  /* v0.15: settings tab navigation — 5 buckets so the page doesn't
+     read like an endless scroll. Active tab picked from URL hash
+     (so `?info=...#backup` deep-links keep working) with fallback to
+     the first tab. */
+  .settings-tabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    margin: 0 0 var(--sp-4);
+    padding: 0; list-style: none;
+    border-bottom: 2px solid var(--tw-gray-200);
+  }
+  .settings-tabs li { margin: 0; }
+  .settings-tabs a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 16px;
+    color: var(--tw-muted-blue); text-decoration: none;
+    font-weight: 700; font-size: 0.88rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color var(--t-fast), border-color var(--t-fast);
+    white-space: nowrap;
+  }
+  .settings-tabs a:hover { color: var(--tw-primary); }
+  .settings-tabs a.active {
+    color: var(--tw-primary);
+    border-bottom-color: var(--tw-accent);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+{% endblock %}
 {% block content %}
 <div style="max-width: 820px;">
   <h1>{{ _('settings.title', lang) }}</h1>
-  <p style="color: var(--tw-muted-blue); margin-top: 4px; margin-bottom: var(--sp-6);">
+  <p style="color: var(--tw-muted-blue); margin-top: 4px; margin-bottom: var(--sp-5);">
     {{ _('settings.intro', lang) }}
   </p>
+
+  {# Tab navigation — grouped by concern. Data-first, presentation-second. #}
+  <ul class="settings-tabs" role="tablist">
+    <li><a href="#mail"    data-tab="mail"    role="tab">✉ {{ _('settings.mail.section', lang) }}</a></li>
+    <li><a href="#runner"  data-tab="runner"  role="tab">⏱ {{ _('settings.runner.section', lang) }}</a></li>
+    <li><a href="#llm"     data-tab="llm"     role="tab">🤖 {{ _('settings.llm.section', lang) }}</a></li>
+    <li><a href="#entra"   data-tab="entra"   role="tab">🔐 {{ _('settings.entra.section', lang) }}</a></li>
+    <li><a href="#graph"   data-tab="graph"   role="tab">☁ {{ _('settings.graph.section', lang) }}</a></li>
+    <li><a href="#backup"  data-tab="backup"  role="tab">💾 {{ _('settings.backup.section', lang) }}</a></li>
+  </ul>
 
   {% if info == 'mail_saved' %}
     <div class="alert alert-ok">{{ _('settings.info.mail_saved', lang) }}</div>
@@ -17,7 +59,8 @@
     <div class="alert alert-error">{{ error }}</div>
   {% endif %}
 
-  <div class="card">
+  <div class="tab-panel" data-tab-panel="mail">
+  <div class="card" id="mail">
     <div style="display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-4);">
       <h3>{{ _('settings.mail.section', lang) }}</h3>
       <form method="post" action="/settings/mail/test" style="margin: 0;">
@@ -126,7 +169,10 @@
     </form>
   </div>
 
-  <div class="card">
+  </div><!-- /tab-panel: mail -->
+
+  <div class="tab-panel" data-tab-panel="runner">
+  <div class="card" id="runner">
     <h3>{{ _('settings.runner.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
       {{ _('settings.runner.intro', lang) }}
@@ -141,7 +187,10 @@
     </p>
   </div>
 
+  </div><!-- /tab-panel: runner -->
+
   <!-- v0.14: M365 Copilot Connector -->
+  <div class="tab-panel" data-tab-panel="graph">
   <div class="card" id="graph">
     <h3>{{ _('settings.graph.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
@@ -238,7 +287,10 @@
     {% endif %}
   </div>
 
+  </div><!-- /tab-panel: graph -->
+
   <!-- v0.13: LLM provider (AI features) -->
+  <div class="tab-panel" data-tab-panel="llm">
   <div class="card" id="llm">
     <h3>{{ _('settings.llm.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
@@ -314,7 +366,10 @@
     {% endif %}
   </div>
 
+  </div><!-- /tab-panel: llm -->
+
   <!-- v0.12: Entra ID SSO -->
+  <div class="tab-panel" data-tab-panel="entra">
   <div class="card" id="entra">
     <h3>{{ _('settings.entra.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
@@ -402,7 +457,10 @@
     {% endif %}
   </div>
 
+  </div><!-- /tab-panel: entra -->
+
   <!-- v0.10: backup -->
+  <div class="tab-panel" data-tab-panel="backup">
   <div class="card" id="backup">
     <h3>{{ _('settings.backup.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
@@ -524,5 +582,56 @@
       </div>
     {% endif %}
   </div>
+  </div><!-- /tab-panel: backup -->
 </div>
+
+<script>
+// v0.15: settings tab switcher. Picks the active tab from the URL
+// hash so form-save redirects like `?info=…#backup` still land on
+// the right tab. Falls back to the first tab. No dependency, no
+// framework; the panels stay in the DOM so browser Find still works
+// across all sections (Cmd-F for the win).
+(function() {
+  var tabs   = Array.prototype.slice.call(document.querySelectorAll('.settings-tabs a[data-tab]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.tab-panel[data-tab-panel]'));
+  if (!tabs.length || !panels.length) return;
+
+  function activate(name) {
+    var found = false;
+    tabs.forEach(function(a) {
+      var on = a.dataset.tab === name;
+      a.classList.toggle('active', on);
+      if (on) found = true;
+    });
+    panels.forEach(function(p) {
+      p.classList.toggle('active', p.dataset.tabPanel === name);
+    });
+    return found;
+  }
+
+  function pickFromHash() {
+    var h = (location.hash || '').replace(/^#/, '').split('?')[0];
+    // If the URL hash targets a sub-anchor inside a panel (e.g.
+    // /settings?info=graph_saved#graph — set by the graph_config_save
+    // route) we still activate the panel that owns that anchor.
+    var byName = h && activate(h);
+    if (byName) return;
+    // Fallback: activate first tab
+    activate(tabs[0].dataset.tab);
+  }
+
+  tabs.forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var name = a.dataset.tab;
+      activate(name);
+      // Update hash without scrolling — history entry keeps the tab
+      // stable on page reload.
+      history.replaceState(null, '', '#' + name);
+    });
+  });
+  window.addEventListener('hashchange', pickFromHash);
+  pickFromHash();
+})();
+</script>
 {% endblock %}

@@ -390,8 +390,33 @@ def seed_templates_if_empty(admin_user_id: int) -> int:
     if existing is not None:
         return 0
 
+    # v0.14.3: catch per-row IntegrityError (FK on updated_by_user_id
+    # when the DB has been cleaned up under us, duplicate on
+    # model+color if half the seed already ran and got interrupted)
+    # so a single bad row doesn't take down the whole batch. Also
+    # fall back to updated_by_user_id=None if the admin_user_id
+    # doesn't exist — happens when the DB got restored from a backup
+    # into a fresh instance and the calling user was recreated with
+    # a new PK.
+    from sqlalchemy.exc import IntegrityError as _IE
+    from sqlalchemy import select as _sel
+    # Sanity-check: does that user actually exist? If not, don't
+    # FK-fail every insert — fall back to NULL owner (column is
+    # ondelete=SET NULL, so NULL is a legal value).
+    with db.get_conn() as conn:
+        exists = conn.execute(
+            _sel(db.users.c.id).where(db.users.c.id == admin_user_id).limit(1)
+        ).first()
+    effective_owner = admin_user_id if exists else None
+
     n = 0
     for row in SEED_TEMPLATES:
-        upsert_template(None, row, updated_by_user_id=admin_user_id)
-        n += 1
+        try:
+            upsert_template(None, row, updated_by_user_id=effective_owner)
+            n += 1
+        except (_IE, Exception) as e:  # noqa: BLE001 — seed must survive one bad row
+            import logging
+            logging.getLogger(__name__).warning(
+                "seed_templates_if_empty: skipping %s / %s: %s",
+                row.get("printer_model"), row.get("color"), str(e)[:200])
     return n

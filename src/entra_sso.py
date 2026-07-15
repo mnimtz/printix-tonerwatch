@@ -38,10 +38,21 @@ logger = logging.getLogger(__name__)
 
 SETTINGS_KEY = "entra_sso"
 
-# Microsoft's standard authority + scopes for OIDC. We only need
-# openid + email + profile — no access to Graph or other resources.
+# Microsoft's standard authority + scopes.
+# ``User.Read`` unlocks Graph /v1.0/me — we fetch the profile from
+# there rather than trusting the ID-token claims, because different
+# Entra tenant configurations emit different subsets of claims
+# (v4.x of mysecureprint learned this the hard way — `oid` and
+# `email` are frequently absent depending on tenant policy).
+# ``offline_access`` also gets a refresh_token so future syncs can
+# renew silently without prompting the user again.
 _AUTHORITY_TMPL = "https://login.microsoftonline.com/{tenant}"
-_SCOPES: list[str] = ["User.Read"]   # implicit openid+profile+email
+_SCOPES: list[str] = ["User.Read", "offline_access"]
+
+# Fallback authority for multi-tenant apps that accept sign-ins
+# from any Entra tenant. Used when the operator leaves tenant_id
+# empty — Microsoft handles home-tenant discovery on their side.
+_MULTI_TENANT_AUTHORITY = "https://login.microsoftonline.com/common"
 
 # Session key for the state token (guards against CSRF on the
 # callback) and the redirect-target after successful login.
@@ -132,12 +143,17 @@ def is_configured() -> bool:
 
 def _msal_app(cfg: dict[str, Any]):
     """Lazy MSAL import — the package is ~4 MB and never needed if
-    SSO isn't configured."""
+    SSO isn't configured. Uses `common` when tenant_id is empty so
+    an admin can enable multi-tenant sign-in without picking a
+    specific home tenant."""
     import msal
+    tenant = (cfg.get("tenant_id") or "").strip()
+    authority = (_AUTHORITY_TMPL.format(tenant=tenant)
+                 if tenant else _MULTI_TENANT_AUTHORITY)
     return msal.ConfidentialClientApplication(
         client_id=cfg["client_id"],
         client_credential=cfg["client_secret"],
-        authority=_AUTHORITY_TMPL.format(tenant=cfg["tenant_id"]),
+        authority=authority,
     )
 
 
@@ -194,13 +210,46 @@ def handle_callback(request, code: str, state: str) -> dict[str, Any]:
         raise EntraSSOError(
             f"{result.get('error')}: {result.get('error_description', '')[:200]}")
 
-    id_claims = result.get("id_token_claims") or {}
-    email = (id_claims.get("email")
-             or id_claims.get("preferred_username") or "").strip().lower()
-    oid = (id_claims.get("oid") or "").strip()
-    name = (id_claims.get("name") or "").strip()
+    # v0.15: fetch the profile from Graph /me rather than trusting
+    # id_token_claims. Different tenants emit different claim
+    # subsets (some suppress `oid`, some emit `email` only for
+    # accounts with a validated email, etc.). Graph /me is
+    # consistent — id, mail (or userPrincipalName as fallback),
+    # displayName. If Graph fails, fall back to whatever claims
+    # ARE present so a barebones tenant can still sign in.
+    access_token = result.get("access_token") or ""
+    email = ""
+    oid = ""
+    name = ""
+    if access_token:
+        try:
+            import httpx as _httpx
+            r = _httpx.get(
+                "https://graph.microsoft.com/v1.0/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10.0)
+            if r.status_code == 200:
+                me = r.json()
+                oid = (me.get("id") or "").strip()
+                email = (me.get("mail")
+                         or me.get("userPrincipalName") or "").strip().lower()
+                name = (me.get("displayName") or "").strip()
+        except Exception as e:  # noqa: BLE001
+            logger.info("Graph /me fetch failed, falling back to claims: %s", e)
+
+    if not (email and oid):
+        # Fallback: parse claims (old behaviour) — better than nothing
+        id_claims = result.get("id_token_claims") or {}
+        email = email or (id_claims.get("email")
+                          or id_claims.get("preferred_username") or "").strip().lower()
+        oid = oid or (id_claims.get("oid") or id_claims.get("sub") or "").strip()
+        name = name or (id_claims.get("name") or "").strip()
+
     if not email or not oid:
-        raise EntraSSOError("token missing email/oid claim")
+        raise EntraSSOError(
+            "SSO succeeded but Microsoft returned no email/oid — "
+            "check the App Registration has 'User.Read' permission "
+            "granted (admin consent may be required).")
 
     return {"email": email, "oid": oid, "name": name}
 

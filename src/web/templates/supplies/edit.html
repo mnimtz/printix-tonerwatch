@@ -61,7 +61,11 @@
       <label for="printer_model">{{ _('supplies.col.printer_model', lang) }} *</label>
       <input type="text" id="printer_model" name="printer_model" required
              value="{{ template.printer_model if template else prefill_model or '' }}"
-             placeholder="HP LaserJet Pro M479">
+             placeholder="HP LaserJet Pro M479"
+             list="known-models" autocomplete="off">
+      {# v0.15: pre-populate from every BI-reported model so the operator
+         can pick an exact string instead of guessing punctuation. #}
+      <datalist id="known-models"></datalist>
       <div class="form-hint">{{ _('supplies.hint.printer_model', lang) }}</div>
     </div>
   </div>
@@ -142,6 +146,28 @@
 </form>
 
 <script>
+// v0.15: populate the printer-model <datalist> with every distinct
+// model observed across all active customers' BI feeds — avoids the
+// operator typing "HP LJ Pro M479" vs "HP LaserJet Pro M479" and
+// creating a template that matches no printer.
+(function() {
+  fetch('/supplies/models', {credentials: 'same-origin'})
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (!j || !j.models) return;
+      var dl = document.getElementById('known-models');
+      if (!dl) return;
+      var frag = document.createDocumentFragment();
+      j.models.forEach(function(m) {
+        var opt = document.createElement('option');
+        opt.value = m;
+        frag.appendChild(opt);
+      });
+      dl.appendChild(frag);
+    })
+    .catch(function() { /* silent — the input still works as free text */ });
+})();
+
 (function() {
   var btn = document.getElementById('btn-ai-suggest');
   if (!btn) return;

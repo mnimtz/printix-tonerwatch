@@ -143,6 +143,49 @@ async def supplies_delete(tpl_id: int, request: Request):
     return RedirectResponse("/supplies?info=template_deleted", status_code=303)
 
 
+@router.get("/supplies/models", include_in_schema=False)
+async def supplies_known_models(request: Request):
+    """Return a JSON list of distinct printer_model strings observed
+    across every active customer's BI feed the user can see. Used by
+    the supply-template edit form to power the model-autocomplete
+    datalist so the operator picks a real BI-reported model instead
+    of typing a slightly-wrong name that no printer matches."""
+    user = auth.require_admin(request)
+    from sqlalchemy import select as _sel
+    from .. import bi_client as _bi
+    with db.get_conn() as conn:
+        customers = [db._row_to_dict(r) for r in conn.execute(
+            _sel(customers_tbl).where(customers_tbl.c.active == 1)
+        ).all()]
+    models: set[str] = set()
+    for c in customers:
+        # Only customers that actually have BI creds
+        if not (c.get("sql_server") and c.get("sql_database")
+                and c.get("sql_username")):
+            continue
+        try:
+            bi_c = _bi.customer_for_bi(c)
+            # Read-only from cache when possible; fall back to fresh
+            # fetch when the cache is cold. We use the same call the
+            # /toner grid uses so we hit the same cache entry.
+            rows = _bi.fetch_all_printer_supplies_cached_only(bi_c)
+            if rows is None:
+                rows = _bi.fetch_all_printer_supplies(bi_c) or []
+        except Exception:
+            continue
+        for r in rows or ():
+            m = (r.get("model") or "").strip()
+            if m:
+                models.add(m)
+    # Also merge in every model that already has a template — the
+    # operator might have entered one for a printer that isn't
+    # in BI yet.
+    for t in supply_library.list_templates():
+        if t.get("printer_model"):
+            models.add(t["printer_model"])
+    return JSONResponse({"models": sorted(models, key=str.lower)})
+
+
 @router.post("/supplies/ai/suggest", include_in_schema=False)
 async def supplies_ai_suggest(request: Request):
     """Ask the configured LLM for a SKU + description + yield given
