@@ -248,7 +248,11 @@ def _chat_gemini(system: str, user: str, cfg: dict[str, Any],
     model = cfg.get("model") or "gemini-1.5-flash"
     endpoint = (cfg.get("endpoint")
                 or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-    url = f"{endpoint}/models/{model}:generateContent?key={key}"
+    # v0.17.1: send the key as a header, not a query parameter. Query-
+    # string keys leak into httpx exception messages (which then reach
+    # /settings?error=... and the admin's browser history) and into any
+    # HTTP proxy log between the app and Google.
+    url = f"{endpoint}/models/{model}:generateContent"
     body = {
         "system_instruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": user}]}],
@@ -258,7 +262,9 @@ def _chat_gemini(system: str, user: str, cfg: dict[str, Any],
         },
     }
     try:
-        r = httpx.post(url, json=body, timeout=timeout)
+        r = httpx.post(url,
+                       headers={"x-goog-api-key": key} if key else {},
+                       json=body, timeout=timeout)
     except httpx.HTTPError as e:
         raise LLMError(f"gemini: {e.__class__.__name__}: {e}") from e
     if r.status_code >= 400:

@@ -236,7 +236,12 @@ def handle_callback(request, code: str, state: str) -> dict[str, Any]:
         expected_state = request.session.pop(_SESSION_STATE_KEY, None)
     except AssertionError:
         expected_state = None
-    if not expected_state or expected_state != state:
+    # v0.17.1: constant-time compare (theoretical timing attack; state
+    # is 24 random bytes so real exploit is impractical, but hmac
+    # keeps the code style consistent with token compares elsewhere).
+    import hmac as _hmac
+    if not expected_state or not _hmac.compare_digest(
+            str(expected_state), str(state)):
         raise EntraSSOError("state mismatch — possible CSRF")
 
     redirect_uri = cfg["redirect_uri"] or _default_redirect(request)

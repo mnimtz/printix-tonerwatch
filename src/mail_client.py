@@ -61,11 +61,20 @@ def load_config() -> dict:
             .where(db.settings.c.key == SETTINGS_KEY)
         ).first()
     raw = json.loads(row[0]) if row else {}
-    # Decrypt the two secret fields on read
+    # v0.17.1: guard both decrypts. Rotated Fernet key / restored-from-
+    # backup instance shouldn't take down the mail runner every 15 min.
+    # Silent fallback to empty means the send will fail cleanly (no
+    # provider creds) rather than raising CryptoError up the stack.
     if raw.get("resend_api_key_enc"):
-        raw["resend_api_key"] = crypto.decrypt(raw["resend_api_key_enc"])
+        try:
+            raw["resend_api_key"] = crypto.decrypt(raw["resend_api_key_enc"])
+        except crypto.CryptoError:
+            raw["resend_api_key"] = ""
     if raw.get("smtp_password_enc"):
-        raw["smtp_password"] = crypto.decrypt(raw["smtp_password_enc"])
+        try:
+            raw["smtp_password"] = crypto.decrypt(raw["smtp_password_enc"])
+        except crypto.CryptoError:
+            raw["smtp_password"] = ""
     return {
         "provider":       raw.get("provider", "disabled"),
         "from_email":     raw.get("from_email", ""),

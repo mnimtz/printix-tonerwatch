@@ -310,8 +310,10 @@ def _printer_or_none(customer: dict, printer_id: str) -> dict | None:
         rows = bi_client.fetch_all_printer_supplies(bi_c)
     except Exception:
         return None
-    for r in rows:
-        if r.get("id") == printer_id:
+    # v0.17.1: fetch_all_printer_supplies returns None on BI-DB errors
+    # (asleep Azure SQL, wrong creds). Guard against iterating None.
+    for r in rows or ():
+        if r.get("id") == printer_id or r.get("printer_id") == printer_id:
             return r
     return None
 

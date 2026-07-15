@@ -72,9 +72,10 @@ async def switch_language(request: Request, lang: str = "en", next: str = "/"):
                 conn.execute(
                     update(users).where(users.c.id == user["id"]).values(lang=lang)
                 )
-    if not next.startswith("/"):
-        next = "/"
-    return RedirectResponse(next, status_code=303)
+    # v0.17.1: block open-redirect via protocol-relative URLs. `_safe_next`
+    # rejects both non-`/` prefixes and the `//evil.com` shape which a
+    # naive startswith("/") check would let through.
+    return RedirectResponse(_safe_next(next), status_code=303)
 
 
 # --------------------------------------------------------------------------
@@ -199,9 +200,16 @@ async def login_submit(request: Request,
         )
 
     _reset_login_throttle(request, email)
+    # v0.17.1: drop any pre-login state (e.g. entra_state, matrix_pending)
+    # before setting user_id, so a fixation attempt via a shared pre-auth
+    # session dies here. Language pref survives — set again below.
+    saved_lang = request.session.get("lang", "")
+    request.session.clear()
     request.session["user_id"] = user["id"]
     if user["lang"] in i18n.SUPPORTED_LANGS:
         request.session["lang"] = user["lang"]
+    elif saved_lang in i18n.SUPPORTED_LANGS:
+        request.session["lang"] = saved_lang
     db.touch_last_login(user["id"])
     db.audit(user["id"], "user.login",
              target_type="user", target_id=str(user["id"]))
@@ -294,16 +302,19 @@ async def entra_callback(request: Request,
         )
 
     # Log the user in — same session shape as the local login path.
+    # v0.17.1: read+clear+restore, same rationale as local login.
+    saved_lang = request.session.get("lang", "")
+    saved_next = request.session.get("entra_next", "/dashboard")
+    request.session.clear()
     request.session["user_id"] = user["id"]
     if user["lang"] in i18n.SUPPORTED_LANGS:
         request.session["lang"] = user["lang"]
+    elif saved_lang in i18n.SUPPORTED_LANGS:
+        request.session["lang"] = saved_lang
 
     # Redirect to the URL we stashed at the start of the flow (or
     # dashboard as a safe default).
-    try:
-        next_url = _safe_next(request.session.pop("entra_next", "/dashboard"))
-    except AssertionError:
-        next_url = "/dashboard"
+    next_url = _safe_next(saved_next)
 
     db.audit(user["id"], "user.login.entra_sso",
              target_type="user", target_id=str(user["id"]))

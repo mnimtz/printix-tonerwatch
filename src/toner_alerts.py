@@ -34,7 +34,7 @@ from . import graph_connector as _graph
 logger = logging.getLogger(__name__)
 
 
-SEVERITY_RANK = {"OK": 0, "UNKNOWN": 0, "WARN": 1, "CRITICAL": 2}
+SEVERITY_RANK = {"OK": 0, "UNKNOWN": 0, "INFO": 0, "WARN": 1, "CRITICAL": 2}
 COLOR_LABEL = {"K": "Black", "C": "Cyan", "M": "Magenta", "Y": "Yellow"}
 
 
@@ -178,7 +178,10 @@ def evaluate_and_notify(customer: dict, *,
             row = {
                 "printer_id":   p["printer_id"],
                 "printer_name": p["printer_name"] or "",
-                "printer_model": p.get("printer_model") or "",
+                # v0.17.1: was `printer_model` — BI emits `model`, so
+                # every auto-draft got sku="" and every alert-mail row
+                # lost its Order button.
+                "printer_model": p.get("model") or "",
                 "location":     p["location"] or "",
                 "color":        color, "color_label": COLOR_LABEL.get(color, color),
                 "level":        level, "severity":    severity,
@@ -191,10 +194,16 @@ def evaluate_and_notify(customer: dict, *,
             elif (SEVERITY_RANK[severity] < SEVERITY_RANK[prev_sev]
                     and SEVERITY_RANK[prev_sev] >= min_rank):
                 transitions_recover.append(row)
-
-            # Always keep state fresh (level might change without crossing)
-            _upsert_state(customer["id"], p["printer_id"], color, level,
-                          severity, notified=False)
+            else:
+                # No threshold crossing → free to persist the fresh level.
+                # v0.17.1: previously we persisted for EVERY slot even
+                # on a crossing, which meant that if quiet-hours or a
+                # missing-recipient abort came next, the DB was already
+                # advanced and the transition would never fire again.
+                # Now transition slots get their state written only
+                # after the send decision (see below).
+                _upsert_state(customer["id"], p["printer_id"], color, level,
+                              severity, notified=False)
 
     result["transitions"] = len(transitions_up) + len(transitions_recover)
     if not transitions_up and not transitions_recover:
@@ -218,6 +227,12 @@ def evaluate_and_notify(customer: dict, *,
         t["order_id"] = order_id
         t["order_token"] = orders.sign_action_token(order_id, "ordered")
 
+    # v0.17.1: when the alert is suppressed (quiet hours, no recipients),
+    # DO NOT advance toner_state for the transitioning slots. Otherwise
+    # the next tick sees prev_sev == curr_sev, treats it as no-crossing,
+    # and the alert is lost forever. State for these slots stays at the
+    # PREVIOUS severity so the transition re-fires when the suppression
+    # condition clears.
     if _in_quiet_hours(customer) and not force_send:
         _log_event(customer["id"], "alert.quiet_hours_skipped",
                    meta={"transitions": result["transitions"]})

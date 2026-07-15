@@ -351,13 +351,23 @@ async def test_connection(request: Request):
     password = form.get("sql_password") or ""
     port = _parse_int(form.get("sql_port"), default=1433, lo=1, hi=65535)
 
-    # Handle "keep existing" case: password field is empty but the
-    # customer already has one stored. If a customer_id was posted,
-    # decrypt and use it.
+    # v0.17.1 (security): if the admin ticked "use the stored password"
+    # (password field left empty on an existing customer), the ENTIRE
+    # connection identity must come from the stored row. Otherwise a
+    # rogue admin session could point sql_server at their own SQL
+    # host, exfiltrating every stored BI password by trying to auth
+    # against it. Fresh passwords typed into the form use the form's
+    # host normally.
     if not password and (form.get("customer_id") or "").isdigit():
         row = _customer_row(int(form["customer_id"]))
         if row and row["sql_password_enc"]:
             password = crypto.decrypt(row["sql_password_enc"])
+            # Override attacker-supplied identity with the stored one
+            server = row["sql_server"] or server
+            database = row["sql_database"] or database
+            username = row["sql_username"] or username
+            if row.get("sql_port"):
+                port = int(row["sql_port"])
 
     result = bi_client.test_connection(server, database, username, password,
                                        port=port)
