@@ -19,7 +19,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import quote as _urlquote
 
 from .. import auth, db
-from . import access_routes, auth_routes, customer_routes, i18n, user_routes
+from . import (access_routes, auth_routes, customer_routes, dashboard_routes,
+               i18n, toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -143,6 +144,8 @@ def create_app() -> FastAPI:
     app.include_router(customer_routes.router)
     app.include_router(user_routes.router)
     app.include_router(access_routes.router)
+    app.include_router(dashboard_routes.router)   # P2: real /dashboard
+    app.include_router(toner_routes.router)       # P2: /toner grid + /toner/refresh
 
     # Root → dashboard when logged in, otherwise setup/login.
     @app.get("/", include_in_schema=False)
@@ -155,11 +158,10 @@ def create_app() -> FastAPI:
 
     # Coming-soon stubs — one route per sidebar entry that hasn't
     # landed yet. Keeps the nav from producing dead JSON-404s while
-    # phases roll out incrementally. Each stub declares which phase
-    # the real implementation lives in.
+    # phases roll out incrementally. /dashboard and /toner have been
+    # replaced with real implementations by their own routers above;
+    # /orders and /settings remain stubs until P4b / P3.
     _STUBS = (
-        ("/dashboard",  "nav.dashboard",   "P2"),
-        ("/toner",      "nav.toner",       "P2"),
         ("/orders",     "nav.orders",      "P4b"),
         ("/settings",   "nav.settings",    "P3"),
     )

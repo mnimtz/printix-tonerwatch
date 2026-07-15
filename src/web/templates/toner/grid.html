@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block title %}{{ _('nav.toner', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('nav.toner', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .toner-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-5);
+  }
+  .toner-stat {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r);
+    padding: var(--sp-4);
+    text-align: center;
+  }
+  .toner-stat .num {
+    font-size: 1.6rem; font-weight: 900; line-height: 1;
+    color: var(--tw-primary); letter-spacing: -0.02em;
+  }
+  .toner-stat .lbl {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--tw-muted-blue);
+    margin-top: 6px;
+  }
+  .toner-stat.critical .num { color: var(--status-critical); }
+  .toner-stat.warn     .num { color: #B45309; }
+  .toner-stat.ok       .num { color: var(--status-ok); }
+  .toner-stat.unknown  .num { color: var(--tw-muted-blue); }
+
+  .toner-filters {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--sp-2); margin-bottom: var(--sp-5);
+  }
+  .toner-filters .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 12px; border-radius: 16px;
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    color: var(--tw-primary); font-size: 0.85rem; font-weight: 500;
+    text-decoration: none; cursor: pointer;
+  }
+  .toner-filters .chip.active {
+    background: var(--tw-primary); border-color: var(--tw-primary);
+    color: var(--tw-white);
+  }
+  .toner-filters select {
+    padding: 5px 10px; border-radius: 16px;
+    border: 1px solid var(--tw-gray-300); background: var(--tw-white);
+    font-family: inherit; font-size: 0.85rem; color: var(--tw-primary);
+  }
+  .toner-filters form { display: inline-flex; margin-left: auto; }
+
+  .toner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: var(--sp-4);
+  }
+  .printer-card {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg);
+    padding: var(--sp-4) var(--sp-5) var(--sp-5);
+    box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: var(--sp-3);
+    position: relative;
+    transition: box-shadow var(--t-fast), transform var(--t-fast);
+  }
+  .printer-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+  .printer-card.sev-CRITICAL { border-left: 4px solid var(--status-critical); }
+  .printer-card.sev-WARN     { border-left: 4px solid var(--status-warn); }
+  .printer-card.sev-OK       { border-left: 4px solid var(--status-ok); }
+  .printer-card.sev-UNKNOWN  { border-left: 4px solid var(--status-unknown); }
+
+  .printer-header {
+    display: flex; align-items: flex-start; gap: var(--sp-3);
+  }
+  .printer-header img {
+    width: 42px; height: 42px; flex-shrink: 0;
+    padding: 4px; background: var(--tw-gray-100);
+    border-radius: var(--r-sm);
+  }
+  .printer-header .meta { flex: 1; min-width: 0; }
+  .printer-header .name {
+    font-weight: 700; color: var(--tw-primary);
+    font-size: 1rem; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .printer-header .sub {
+    font-size: 0.78rem; color: var(--tw-muted-blue);
+    margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .printer-header .customer-badge {
+    display: inline-block; margin-top: 4px;
+    padding: 1px 8px; border-radius: 8px;
+    background: var(--tw-faint-blue); color: var(--tw-primary);
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .toner-bars { display: flex; flex-direction: column; gap: 6px; }
+  .toner-bar-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 42px 24px;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+  }
+  .toner-bar-row .lbl {
+    font-weight: 700; color: var(--tw-primary); text-align: center;
+  }
+  .toner-bar {
+    height: 12px; background: var(--tw-gray-200);
+    border-radius: 6px; position: relative; overflow: hidden;
+  }
+  .toner-bar .fill {
+    height: 100%; border-radius: 6px;
+    transition: width var(--t);
+  }
+  .toner-bar.K .fill { background: linear-gradient(90deg, #000, #231F20); }
+  .toner-bar.C .fill { background: linear-gradient(90deg, #00A0FB, #0090E0); }
+  .toner-bar.M .fill { background: linear-gradient(90deg, #D030E8, #B821CE); }
+  .toner-bar.Y .fill { background: linear-gradient(90deg, #FFC600, #E5B300); }
+  .toner-bar-row .pct {
+    text-align: right; font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-size: 0.82rem;
+    color: var(--tw-primary); font-weight: 700;
+  }
+  .toner-bar-row .sev { text-align: center; font-size: 0.9rem; }
+  .toner-bar-row.critical .pct { color: var(--status-critical); }
+  .toner-bar-row.warn     .pct { color: #B45309; }
+  .toner-bar-row.unknown  .pct { color: var(--tw-muted-blue); }
+
+  .printer-footer {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding-top: var(--sp-2); border-top: 1px solid var(--tw-gray-200);
+    font-size: 0.75rem; color: var(--tw-muted-blue);
+    align-items: center;
+  }
+  .printer-footer .err {
+    padding: 2px 8px; border-radius: 4px;
+    background: #FEF2F2; color: #991B1B; font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  .error-banner {
+    padding: var(--sp-3) var(--sp-4);
+    background: #FFFBEB; border: 1px solid #FDE68A;
+    border-radius: var(--r-sm); color: #92400E;
+    font-size: 0.9rem; margin-bottom: var(--sp-3);
+    display: flex; align-items: center; gap: var(--sp-3);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: baseline; justify-content: space-between;
+            gap: var(--sp-4); margin-bottom: var(--sp-3); flex-wrap: wrap;">
+  <div>
+    <h1>{{ _('toner.grid_title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: 4px; font-size: 0.9rem;">
+      {{ _('toner.grid_intro', lang) }}
+    </p>
+  </div>
+  <form method="post" action="/toner/refresh" style="margin: 0;">
+    <button type="submit" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem;">
+      ↻ {{ _('toner.refresh', lang) }}
+    </button>
+  </form>
+</div>
+
+<!-- Summary tiles -->
+<div class="toner-summary">
+  <div class="toner-stat">
+    <div class="num">{{ counts.total }}</div>
+    <div class="lbl">{{ _('toner.stat.printers', lang) }}</div>
+  </div>
+  <div class="toner-stat critical">
+    <div class="num">{{ counts.critical }}</div>
+    <div class="lbl">{{ _('toner.stat.critical', lang) }}</div>
+  </div>
+  <div class="toner-stat warn">
+    <div class="num">{{ counts.warn }}</div>
+    <div class="lbl">{{ _('toner.stat.warn', lang) }}</div>
+  </div>
+  <div class="toner-stat ok">
+    <div class="num">{{ counts.ok }}</div>
+    <div class="lbl">{{ _('toner.stat.ok', lang) }}</div>
+  </div>
+  {% if counts.unknown %}
+  <div class="toner-stat unknown">
+    <div class="num">{{ counts.unknown }}</div>
+    <div class="lbl">{{ _('toner.stat.unknown', lang) }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Per-customer errors -->
+{% for err in errors %}
+  <div class="error-banner">
+    <span style="font-size: 1.1rem;">⚠</span>
+    <strong>{{ err.customer_name }}</strong>
+    {% if err.reason == 'no_credentials' %}
+      — {{ _('toner.error.no_credentials', lang) }}
+      {% if user.role == 'admin' %}
+        <a href="/customers/{{ err.customer_id }}/edit"
+           style="margin-left: auto;">{{ _('common.edit', lang) }} →</a>
+      {% endif %}
+    {% elif err.reason == 'fetch_failed' %}
+      — {{ _('toner.error.fetch_failed', lang) }}
+    {% endif %}
+  </div>
+{% endfor %}
+
+<!-- Filter bar -->
+{% if counts.total or customer_choices %}
+  <div class="toner-filters">
+    <a href="/toner" class="chip {{ 'active' if not filter_severity else '' }}">
+      {{ _('toner.filter.all', lang) }}
+    </a>
+    <a href="/toner?severity=CRITICAL{% if filter_customer %}&customer={{ filter_customer }}{% endif %}"
+       class="chip {{ 'active' if filter_severity == 'CRITICAL' else '' }}"
+       style="{% if filter_severity == 'CRITICAL' %}background: var(--status-critical); border-color: var(--status-critical);{% endif %}">
+      🔴 {{ _('toner.filter.critical_only', lang) }}
+    </a>
+    <a href="/toner?severity=WARN{% if filter_customer %}&customer={{ filter_customer }}{% endif %}"
+       class="chip {{ 'active' if filter_severity == 'WARN' else '' }}">
+      ⚠ {{ _('toner.filter.warn_up', lang) }}
+    </a>
+    {% if customer_choices|length > 1 %}
+      <form method="get" action="/toner" style="margin: 0;">
+        {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
+        <select name="customer" onchange="this.form.submit()">
+          <option value="">{{ _('toner.filter.all_customers', lang) }}</option>
+          {% for cid, cname in customer_choices %}
+            <option value="{{ cid }}" {% if filter_customer == cid|string %}selected{% endif %}>
+              {{ cname }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- Printer grid -->
+{% if printers %}
+  <div class="toner-grid">
+    {% for p in printers %}
+      <div class="printer-card sev-{{ p.worst_severity }}">
+        <div class="printer-header">
+          <img src="/assets/printers/{{ p.icon_key }}.svg" alt="" width="42" height="42">
+          <div class="meta">
+            <div class="name" title="{{ p.printer_name }}">
+              {{ p.printer_name or _('toner.printer.unnamed', lang) }}
+            </div>
+            <div class="sub">
+              {% if p.location %}{{ p.location }}{% else %}—{% endif %}
+              {% if p.model %} · {{ p.model }}{% endif %}
+            </div>
+            {% if customer_choices|length > 1 %}
+              <a href="/toner?customer={{ p.customer_id }}"
+                 class="customer-badge" style="text-decoration: none;">
+                {{ p.customer_name }}
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="toner-bars">
+          {% if p.supplies %}
+            {% for s in p.supplies %}
+              <div class="toner-bar-row {{ s.severity|lower if s.severity != 'OK' else '' }}">
+                <div class="lbl">{{ s.color }}</div>
+                <div class="toner-bar {{ s.color }}">
+                  <div class="fill" style="width: {{ s.level }}%;"></div>
+                </div>
+                <div class="pct">{{ s.level }}%</div>
+                <div class="sev">
+                  {% if s.severity == 'CRITICAL' %}🔴
+                  {% elif s.severity == 'WARN' %}⚠
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div style="color: var(--tw-muted-blue); font-size: 0.85rem;
+                        padding: var(--sp-2) 0; text-align: center;">
+              {{ _('toner.printer.no_marker_data', lang) }}
+            </div>
+          {% endif %}
+        </div>
+
+        {% if p.error_states or p.reported_state and p.reported_state not in ('IDLE', 'PRINTING', '') %}
+          <div class="printer-footer">
+            {% if p.reported_state and p.reported_state not in ('IDLE', 'PRINTING') %}
+              <span style="font-family: var(--font-mono);
+                           padding: 2px 8px; border-radius: 4px;
+                           background: var(--tw-gray-200);">
+                {{ p.reported_state }}
+              </span>
+            {% endif %}
+            {% for e in p.error_states %}
+              <span class="err">{{ e }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);
+                          color: var(--tw-muted-blue);">
+    {% if not customer_choices %}
+      <p style="font-size: 1.05rem;">{{ _('toner.empty.no_customers', lang) }}</p>
+      {% if user.role == 'admin' %}
+        <a href="/customers/new" class="btn" style="margin-top: var(--sp-5);">
+          + {{ _('customer.new_button', lang) }}
+        </a>
+      {% endif %}
+    {% elif filter_severity or filter_customer %}
+      <p>{{ _('toner.empty.filtered', lang) }}</p>
+      <a href="/toner" class="btn btn-secondary" style="margin-top: var(--sp-4);">
+        {{ _('toner.filter.clear', lang) }}
+      </a>
+    {% else %}
+      <p>{{ _('toner.empty.no_readings_yet', lang) }}</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

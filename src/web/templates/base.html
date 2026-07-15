@@ -478,6 +478,12 @@
     /* ── Rhombus decorative frame (65° signature) ─────────────────── */
     .rhombus-frame { clip-path: polygon(28% 0, 100% 0, 72% 100%, 0 100%); }
 
+    /* Mobile overlay is hidden by default in ALL viewports; only
+       revealed when JS toggles .visible on it in the mobile drawer flow.
+       Without this default rule, on desktop the div would take a grid
+       cell and shove the content column into a second row. */
+    .sidebar-overlay { display: none; }
+
     /* ── Responsive ───────────────────────────────────────────────── */
     @media (max-width: 900px) {
       .app-shell {
@@ -492,7 +498,6 @@
       }
       .sidebar.open { left: 0; box-shadow: 0 0 40px rgba(0,0,0,.4); }
       .sidebar-overlay {
-        display: none;
         position: fixed; inset: 0;
         background: rgba(0, 18, 59, .5);
         z-index: 999;

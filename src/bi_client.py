@@ -1,18 +1,39 @@
-"""Printix BI database client (thin stub for P1).
+"""Printix BI-DB (Azure SQL) client — read-only queries for supply / status data.
 
-P2 will grow this into a proper query layer that mirrors the queries
-in the reference mysecureprint-server (device supplies, printer
-inventory, network topology, etc.). For P1 we only need one thing:
-the ability to open a connection to the customer's BI-DB with the
-credentials they entered, and confirm that we got past the auth /
-network handshake.
+Every Printix tenant has an Analytics database on Azure SQL. The customer's
+BI credentials (server/database/username/password) live in TonerWatch's own
+`customers` table, Fernet-encrypted at rest. Callers decrypt the password
+before invoking anything here — this module never touches the keyring.
+
+The module is deliberately small and defensive:
+
+* **Short-lived in-memory cache** per (customer_id, printer_id). Azure SQL
+  auto-pauses after idle, so a cold first query can take 15–25 seconds;
+  identical calls right after (e.g. opening a detail view twice) should
+  reuse the cached result.
+* **Timeouts and exceptions are swallowed** and return ``None``. Toner data
+  is a nice-to-have — a temporary BI-DB outage must NEVER 500 the request
+  handler that renders the toner grid.
+* **Test-connection** helper used by the customer edit form (unchanged
+  from earlier — kept here so all BI-DB touchpoints live in one file).
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import threading
+import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Test-connection (used by /customers/test-connection)
+# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ConnectionResult:
@@ -21,23 +42,12 @@ class ConnectionResult:
     server_version: str = ""
 
 
-# The Printix BI database is Microsoft SQL Server. We use pymssql
-# rather than pyodbc — no ODBC driver install required, it's a pure
-# ctypes wrapper over FreeTDS which is already in the runtime image.
 def test_connection(server: str, database: str, username: str,
                     password: str, *, timeout: int = 5) -> ConnectionResult:
-    """Attempt a `SELECT @@VERSION` against the customer BI-DB.
-
-    Returns a :class:`ConnectionResult` with a short human-readable
-    message. Any exception is caught — we never let a bad customer
-    credential set take down the request handler.
-    """
+    """Open a socket to the BI-DB and run `SELECT @@VERSION`."""
     if not server or not database or not username:
         return ConnectionResult(False,
                                 "server, database and username are required")
-
-    # Import lazily so a machine without pymssql installed (e.g. a
-    # unit-test sandbox) can still import this module.
     try:
         import pymssql  # type: ignore
     except Exception as exc:  # pragma: no cover
@@ -46,26 +56,16 @@ def test_connection(server: str, database: str, username: str,
     conn: Any = None
     try:
         conn = pymssql.connect(
-            server=server,
-            user=username,
-            password=password or "",
-            database=database,
-            timeout=timeout,
-            login_timeout=timeout,
+            server=server, user=username, password=password or "",
+            database=database, timeout=timeout, login_timeout=timeout,
         )
         cur = conn.cursor()
         cur.execute("SELECT @@VERSION")
         version = (cur.fetchone() or ("",))[0]
         cur.close()
-        # Keep only the first line and cap at 100 chars — @@VERSION is
-        # a multi-line string with build metadata; the first line is
-        # enough to prove we got a real handshake.
         first = version.splitlines()[0].strip() if version else ""
         return ConnectionResult(True, "Connection successful", first[:100])
     except Exception as exc:
-        # pymssql surfaces LoginError, InterfaceError, OperationalError…
-        # all of them subclass Exception; a short truncated message is
-        # what the admin actually wants to see in the UI.
         msg = str(exc).strip().splitlines()[0][:200]
         return ConnectionResult(False, msg or exc.__class__.__name__)
     finally:
@@ -74,3 +74,403 @@ def test_connection(server: str, database: str, username: str,
                 conn.close()
             except Exception:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Marker parsing
+# ---------------------------------------------------------------------------
+
+# Printix stores per-marker fill levels in `device_readings.additional_readings`
+# as a JSON blob keyed by SNMP-style names. Map them to short colour codes.
+_MARKER_TO_COLOR = {
+    "MARKER_BLACK":   "K",
+    "MARKER_CYAN":    "C",
+    "MARKER_MAGENTA": "M",
+    "MARKER_YELLOW":  "Y",
+}
+_COLOR_ORDER = ["K", "C", "M", "Y"]
+
+
+def _parse_markers(raw: Optional[str]) -> list[dict]:
+    """Extract MARKER_* percentages from the additional_readings JSON."""
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+
+    supplies: list[dict] = []
+    for marker_key, color in _MARKER_TO_COLOR.items():
+        val = data.get(marker_key)
+        if val is None:
+            continue
+        try:
+            percent = int(str(val).strip())
+        except (ValueError, TypeError):
+            continue
+        if 0 <= percent <= 100:
+            supplies.append({"color": color, "level": percent})
+    supplies.sort(key=lambda s: _COLOR_ORDER.index(s["color"]))
+    return supplies
+
+
+def _parse_error_states(raw: Any) -> list[str]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [str(x) for x in data if x]
+    except (ValueError, TypeError):
+        pass
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Credentials guard
+# ---------------------------------------------------------------------------
+
+def _has_creds(customer: dict) -> bool:
+    return bool(
+        customer.get("sql_server")
+        and customer.get("sql_database")
+        and customer.get("sql_username")
+        # Empty password is legal for some Windows-auth setups
+    )
+
+
+def customer_for_bi(customer: dict) -> dict:
+    """Return a copy of the customer dict with ``sql_password`` decrypted
+    from ``sql_password_enc``. Idempotent — if ``sql_password`` is already
+    set, the customer is returned unchanged. Empty password stays empty.
+
+    Callers use this helper to decouple bi_client from the Fernet keyring:
+    the query functions only ever see plaintext passwords, and route
+    handlers do the one-line decrypt at the boundary.
+    """
+    if customer.get("sql_password"):
+        return customer
+    enc = customer.get("sql_password_enc") or ""
+    if not enc:
+        return {**customer, "sql_password": ""}
+    from . import crypto
+    try:
+        return {**customer, "sql_password": crypto.decrypt(enc)}
+    except crypto.CryptoError:
+        # A rotated Fernet key or corrupted ciphertext should not take
+        # down the toner grid — surface as an empty password (queries
+        # will fail auth and be caught by the query try/except).
+        logger.warning("customer_for_bi: could not decrypt sql_password_enc "
+                       "for customer %s", customer.get("id"))
+        return {**customer, "sql_password": ""}
+
+
+def _connect(customer: dict, *, login_timeout: int = 30, timeout: int = 60):
+    """Open a pymssql connection. Raises on failure — callers wrap in try/except.
+    """
+    import pymssql  # noqa: WPS433 — lazy import
+    return pymssql.connect(
+        server=customer["sql_server"],
+        user=customer["sql_username"],
+        password=customer.get("sql_password") or "",
+        database=customer["sql_database"],
+        port=1433,
+        tds_version="7.4",
+        login_timeout=login_timeout,
+        timeout=timeout,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Single-printer supplies (with cache)
+# ---------------------------------------------------------------------------
+
+_PRINTER_SUPPLIES_CACHE: dict[tuple[int, str], tuple[float, list, float]] = {}
+_PRINTER_SUPPLIES_TTL_SEC = 300   # 5 min for successful reads
+_PRINTER_SUPPLIES_NEG_TTL = 60    # 1 min for empty reads (silent printers)
+_CACHE_LOCK = threading.Lock()
+
+
+def fetch_printer_supplies(customer: dict, printer_id: str) -> Optional[list[dict]]:
+    """Latest CMYK levels for one printer — cached for 5 min.
+
+    Returns ``[{"color":"K","level":63}, ...]`` or ``None`` on error / no data.
+    """
+    if not _has_creds(customer) or not printer_id:
+        return None
+
+    key = (int(customer["id"]), str(printer_id))
+    now = time.time()
+    with _CACHE_LOCK:
+        entry = _PRINTER_SUPPLIES_CACHE.get(key)
+        if entry and (now - entry[0]) < entry[2]:
+            return entry[1] or None
+
+    result = _query_printer_supplies(customer, printer_id)
+    ttl = _PRINTER_SUPPLIES_TTL_SEC if result else _PRINTER_SUPPLIES_NEG_TTL
+    with _CACHE_LOCK:
+        _PRINTER_SUPPLIES_CACHE[key] = (now, result or [], ttl)
+    return result
+
+
+def _query_printer_supplies(customer: dict,
+                            printer_id: str) -> Optional[list[dict]]:
+    try:
+        import pymssql  # noqa
+    except ImportError:
+        logger.debug("pymssql not available — skipping BI query")
+        return None
+    conn = None
+    try:
+        conn = _connect(customer, login_timeout=8, timeout=8)
+        cur = conn.cursor(as_dict=True)
+        cur.execute(
+            """SELECT TOP 1 additional_readings
+                 FROM dbo.device_readings
+                WHERE printer_id = %s
+                  AND additional_readings IS NOT NULL
+             ORDER BY received_time DESC""",
+            (printer_id,),
+        )
+        row = cur.fetchone()
+        return _parse_markers(row["additional_readings"]) if row else None
+    except Exception as exc:  # noqa: BLE001
+        logger.info("fetch_printer_supplies failed (printer=%s): %s",
+                    printer_id, str(exc)[:200])
+        return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# All-printers snapshot (used by /toner grid + alerts runner)
+# ---------------------------------------------------------------------------
+
+_ALL_SUPPLIES_CACHE: dict[int, tuple[float, list]] = {}
+_ALL_SUPPLIES_TTL_SEC = 600  # 10 min
+
+
+def fetch_all_printer_supplies_cached_only(customer: dict) -> Optional[list[dict]]:
+    """Only read from the cache — return ``None`` if nothing is stored."""
+    if not _has_creds(customer):
+        return None
+    key = int(customer["id"])
+    now = time.time()
+    with _CACHE_LOCK:
+        entry = _ALL_SUPPLIES_CACHE.get(key)
+        if entry and (now - entry[0]) < _ALL_SUPPLIES_TTL_SEC:
+            return entry[1]
+    return None
+
+
+def fetch_all_printer_supplies(customer: dict) -> Optional[list[dict]]:
+    """Latest reading for every active printer in the customer's tenant.
+
+    Returns::
+
+        [{
+          "printer_id":     "…-uuid-…",
+          "printer_name":   "Kyocera-EG",
+          "location":       "3rd floor",
+          "model":          "Kyocera ECOSYS M2540dn",
+          "vendor":         "Kyocera",
+          "supplies":       [{"color":"K","level":26}, …],
+          "error_states":   ["LOW_TONER"],
+          "reported_state": "IDLE",
+          "received_time":  datetime,
+        }, …]
+
+    Cached for 10 minutes per customer. Returns ``None`` on error or when
+    the customer has no BI credentials.
+    """
+    if not _has_creds(customer):
+        return None
+
+    key = int(customer["id"])
+    now = time.time()
+    with _CACHE_LOCK:
+        entry = _ALL_SUPPLIES_CACHE.get(key)
+        if entry and (now - entry[0]) < _ALL_SUPPLIES_TTL_SEC:
+            return entry[1]
+
+    result = _query_all_supplies(customer)
+    if result is not None:
+        with _CACHE_LOCK:
+            _ALL_SUPPLIES_CACHE[key] = (now, result)
+    return result
+
+
+def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
+    try:
+        import pymssql  # noqa
+    except ImportError:
+        return None
+
+    conn = None
+    try:
+        conn = _connect(customer, login_timeout=30, timeout=60)
+        cur = conn.cursor(as_dict=True)
+
+        # Two-stage query — a global JOIN over device_readings (potentially
+        # hundreds of thousands of rows) times out; per-printer TOP 1 hits
+        # the (printer_id, received_time) index cleanly instead.
+        cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
+                              model_name AS model, vendor_name AS vendor
+                         FROM dbo.printers
+                        WHERE meta_status = 'ACTIVE'""")
+        printers = cur.fetchall()
+
+        rows: list[dict] = []
+        for p in printers:
+            pid = p["printer_id"]
+            try:
+                cur.execute("""SELECT TOP 1 additional_readings,
+                                      detected_error_states,
+                                      printer_reported_state,
+                                      received_time
+                                 FROM dbo.device_readings
+                                WHERE printer_id = %s
+                             ORDER BY received_time DESC""", (pid,))
+                reading = cur.fetchone()
+            except Exception:
+                reading = None
+            rows.append({
+                "printer_id":   str(pid),
+                "printer_name": p.get("printer_name") or "",
+                "location":     p.get("location") or "",
+                "model":        p.get("model") or "",
+                "vendor":       p.get("vendor") or "",
+                "supplies":       _parse_markers(reading.get("additional_readings") if reading else None),
+                "error_states":   _parse_error_states(reading.get("detected_error_states") if reading else None),
+                "reported_state": (reading.get("printer_reported_state") if reading else "") or "",
+                "received_time":  reading.get("received_time") if reading else None,
+            })
+    except Exception as exc:  # noqa: BLE001
+        logger.info("fetch_all_printer_supplies failed for customer %s: %s",
+                    customer.get("id"), str(exc)[:200])
+        return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Days-until-empty estimate
+# ---------------------------------------------------------------------------
+
+def estimate_days_until_empty(customer: dict, printer_id: str, color: str,
+                              current_level: int) -> Optional[float]:
+    """Rough linear extrapolation over the last 14 days.
+
+    Defensive: returns None when the toner was refilled inside the window
+    (level went up), when the sample window is < 1 day, or when the
+    consumption rate is 0. Capped at 999 days.
+    """
+    if current_level is None or current_level <= 0 or not _has_creds(customer):
+        return None
+    marker_key = _color_to_marker(color)
+    if not marker_key:
+        return None
+    try:
+        import pymssql  # noqa
+    except ImportError:
+        return None
+
+    conn = None
+    try:
+        conn = _connect(customer, login_timeout=6, timeout=10)
+        cur = conn.cursor(as_dict=True)
+        cur.execute("""
+            SELECT TOP 1 additional_readings, received_time
+              FROM dbo.device_readings
+             WHERE printer_id = %s
+               AND additional_readings LIKE %s
+               AND received_time <= DATEADD(day, -1, SYSUTCDATETIME())
+               AND received_time >= DATEADD(day, -14, SYSUTCDATETIME())
+          ORDER BY received_time ASC
+        """, (printer_id, f"%{marker_key}%"))
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            old = json.loads(row["additional_readings"])
+            old_level = int(str(old.get(marker_key, "")).strip())
+        except (ValueError, TypeError, KeyError):
+            return None
+        from datetime import datetime, timezone
+        received = row["received_time"]
+        if received.tzinfo is None:
+            received = received.replace(tzinfo=timezone.utc)
+        delta_days = (datetime.now(timezone.utc) - received).total_seconds() / 86400.0
+        if delta_days < 1.0:
+            return None
+        consumed = old_level - current_level
+        if consumed <= 0:
+            return None
+        rate_per_day = consumed / delta_days
+        if rate_per_day <= 0:
+            return None
+        return min(999.0, max(0.0, current_level / rate_per_day))
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("estimate_days_until_empty failed: %s", str(exc)[:200])
+        return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _color_to_marker(color: str) -> Optional[str]:
+    inv = {v: k for k, v in _MARKER_TO_COLOR.items()}
+    return inv.get((color or "").upper())
+
+
+# ---------------------------------------------------------------------------
+# Severity classification (matches the alert-runner thresholds in P3)
+# ---------------------------------------------------------------------------
+
+def classify_severity(level: Optional[int], *, warn_pct: int,
+                      critical_pct: int) -> str:
+    """Return 'OK' | 'WARN' | 'CRITICAL' | 'UNKNOWN' for a supply level."""
+    if level is None:
+        return "UNKNOWN"
+    if level <= critical_pct:
+        return "CRITICAL"
+    if level <= warn_pct:
+        return "WARN"
+    return "OK"
+
+
+# ---------------------------------------------------------------------------
+# Cache management (used by /toner refresh endpoint and by tests)
+# ---------------------------------------------------------------------------
+
+def invalidate_customer_cache(customer_id: int) -> None:
+    """Drop cached readings for one customer — used after config change."""
+    with _CACHE_LOCK:
+        _ALL_SUPPLIES_CACHE.pop(int(customer_id), None)
+        for k in list(_PRINTER_SUPPLIES_CACHE.keys()):
+            if k[0] == int(customer_id):
+                del _PRINTER_SUPPLIES_CACHE[k]
+
+
+def cache_stats() -> dict:
+    with _CACHE_LOCK:
+        return {
+            "printer_cache_size": len(_PRINTER_SUPPLIES_CACHE),
+            "all_supplies_cache_size": len(_ALL_SUPPLIES_CACHE),
+            "customers_cached": list(_ALL_SUPPLIES_CACHE.keys()),
+        }

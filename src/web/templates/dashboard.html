@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}{{ _('nav.dashboard', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('nav.dashboard', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+  }
+  .stat-tile {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg);
+    padding: var(--sp-5);
+    position: relative; overflow: hidden;
+  }
+  .stat-tile .value {
+    font-size: 2.4rem; font-weight: 900;
+    color: var(--tw-primary); letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .stat-tile .label {
+    font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--tw-muted-blue); margin-top: var(--sp-3);
+  }
+  .stat-tile.critical .value { color: var(--status-critical); }
+  .stat-tile.warn     .value { color: #B45309; }
+  .stat-tile.critical::before,
+  .stat-tile.warn::before {
+    content: '';
+    position: absolute; top: 0; right: 0; bottom: 0; width: 4px;
+  }
+  .stat-tile.critical::before { background: var(--status-critical); }
+  .stat-tile.warn::before     { background: var(--status-warn); }
+
+  .customer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--sp-3);
+  }
+  .customer-tile {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r);
+    padding: var(--sp-4);
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow var(--t-fast), transform var(--t-fast);
+    display: block;
+  }
+  .customer-tile:hover {
+    box-shadow: var(--shadow); transform: translateY(-1px);
+    color: inherit;
+  }
+  .customer-tile .name {
+    font-weight: 700; color: var(--tw-primary);
+    font-size: 1rem; margin-bottom: 2px;
+  }
+  .customer-tile .sub {
+    font-size: 0.78rem; color: var(--tw-muted-blue);
+    margin-bottom: var(--sp-3);
+    font-family: var(--font-mono);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .customer-tile .stats {
+    display: flex; gap: var(--sp-2); flex-wrap: wrap;
+    font-size: 0.78rem;
+  }
+  .customer-tile .stats .pill {
+    padding: 2px 8px; border-radius: 10px;
+    background: var(--tw-gray-200); color: var(--tw-muted-blue);
+    font-weight: 600;
+  }
+  .customer-tile .stats .pill.critical {
+    background: #FEF2F2; color: #991B1B;
+  }
+  .customer-tile .stats .pill.warn {
+    background: #FFFBEB; color: #92400E;
+  }
+  .customer-tile .stats .pill.ok {
+    background: #ECFDF5; color: #065F46;
+  }
+  .customer-tile .hint {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    margin-top: var(--sp-2); font-style: italic;
+  }
+
+  .activity {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r);
+    padding: var(--sp-4) var(--sp-5);
+    margin-top: var(--sp-6);
+  }
+  .activity ul { list-style: none; margin: 0; padding: 0; }
+  .activity li {
+    padding: var(--sp-2) 0;
+    display: flex; justify-content: space-between; gap: var(--sp-4);
+    border-bottom: 1px solid var(--tw-gray-200);
+    font-size: 0.9rem;
+  }
+  .activity li:last-child { border-bottom: 0; }
+  .activity code {
+    background: var(--tw-gray-200); padding: 2px 6px;
+    border-radius: 4px; font-size: 0.82em;
+  }
+  .activity time {
+    color: var(--tw-muted-blue); font-family: var(--font-mono);
+    font-size: 0.82em; white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ _('dashboard.title', lang) }}</h1>
+<p style="color: var(--tw-muted-blue); margin: 4px 0 var(--sp-6);">
+  {{ _('dashboard.intro', lang) }}
+</p>
+
+<!-- Top-line stats -->
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="value">{{ counts.customers }}</div>
+    <div class="label">{{ _('dashboard.stat.customers', lang) }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="value">{{ counts.printers }}</div>
+    <div class="label">{{ _('dashboard.stat.printers', lang) }}</div>
+  </div>
+  <div class="stat-tile {{ 'critical' if counts.critical else '' }}">
+    <div class="value">{{ counts.critical }}</div>
+    <div class="label">{{ _('dashboard.stat.critical', lang) }}</div>
+  </div>
+  <div class="stat-tile {{ 'warn' if counts.warn else '' }}">
+    <div class="value">{{ counts.warn }}</div>
+    <div class="label">{{ _('dashboard.stat.warn', lang) }}</div>
+  </div>
+</div>
+
+{% if counts.critical or counts.warn %}
+  <div style="margin: var(--sp-3) 0 var(--sp-6); text-align: right;">
+    <a href="/toner?severity=WARN" class="btn btn-primary">
+      → {{ _('dashboard.jump_to_toner', lang) }}
+    </a>
+  </div>
+{% endif %}
+
+<!-- Per-customer overview -->
+{% if per_customer %}
+  <h2 style="margin-bottom: var(--sp-4);">{{ _('nav.customers', lang) }}</h2>
+  <div class="customer-grid">
+    {% for c in per_customer %}
+      <a href="/customers/{{ c.id }}" class="customer-tile">
+        <div class="name">{{ c.name }}</div>
+        {% if c.tenant_url %}
+          <div class="sub">{{ c.tenant_url }}</div>
+        {% endif %}
+        {% if c.creds_missing %}
+          <div class="hint">⚠ {{ _('dashboard.customer.no_credentials', lang) }}</div>
+        {% elif not c.has_data %}
+          <div class="hint">— {{ _('dashboard.customer.no_snapshot_yet', lang) }}</div>
+        {% else %}
+          <div class="stats">
+            <span class="pill">{{ c.printers }} {{ _('dashboard.customer.printers', lang) }}</span>
+            {% if c.critical %}
+              <span class="pill critical">🔴 {{ c.critical }}</span>
+            {% endif %}
+            {% if c.warn %}
+              <span class="pill warn">⚠ {{ c.warn }}</span>
+            {% endif %}
+            {% if c.ok and not c.critical and not c.warn %}
+              <span class="pill ok">● {{ _('dashboard.customer.all_ok', lang) }}</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);">
+    <h2 style="margin-bottom: var(--sp-3);">
+      {{ _('dashboard.empty.title', lang) }}
+    </h2>
+    <p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-6);">
+      {{ _('dashboard.empty.intro', lang) }}
+    </p>
+    {% if user.role == 'admin' %}
+      <a href="/customers/new" class="btn">+ {{ _('customer.new_button', lang) }}</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+<!-- Recent activity -->
+{% if recent_events %}
+  <div class="activity">
+    <h3 style="margin-bottom: var(--sp-3);">
+      {{ _('dashboard.recent_activity', lang) }}
+    </h3>
+    <ul>
+      {% for e in recent_events %}
+        <li>
+          <span><code>{{ e.action }}</code>
+            {% if e.target_type %}
+              → {{ e.target_type }}:{{ e.target_id }}
+            {% endif %}
+          </span>
+          <time>{{ e.created_at }}</time>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% endblock %}
