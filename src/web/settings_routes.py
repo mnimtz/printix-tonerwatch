@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import auth, backup, bi_client, db, mail_client, toner_alerts
+from .. import auth, backup, bi_client, db, entra_sso, mail_client, toner_alerts
 from ..db import customers as customers_tbl
 
 
@@ -32,6 +32,7 @@ async def settings_page(request: Request):
             "user": user,
             "mail":   mail_client.load_config(),
             "backup": backup.load_config(),
+            "entra":  entra_sso.load_config(),
             "info":   request.query_params.get("info", ""),
             "error":  request.query_params.get("error", ""),
         },
@@ -64,6 +65,28 @@ async def settings_mail_save(request: Request):
              meta_json=json.dumps({"provider": provider,
                                    "from_email": cfg["from_email"]}))
     return RedirectResponse("/settings?info=mail_saved", status_code=303)
+
+
+@router.post("/settings/entra", include_in_schema=False)
+async def settings_entra_save(request: Request):
+    admin = auth.require_admin(request)
+    form = await request.form()
+    cfg = {
+        "enabled":            bool(form.get("enabled")),
+        "tenant_id":          form.get("tenant_id") or "",
+        "client_id":          form.get("client_id") or "",
+        "client_secret":      form.get("client_secret") or "",
+        "redirect_uri":       form.get("redirect_uri") or "",
+        "allow_auto_provision": bool(form.get("allow_auto_provision")),
+        "auto_provision_domain": form.get("auto_provision_domain") or "",
+        "default_role":       form.get("default_role") or "technician",
+    }
+    entra_sso.save_config(cfg)
+    db.audit(admin["id"], "settings.entra_updated",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({"enabled": cfg["enabled"],
+                                    "tenant_id": cfg["tenant_id"]}))
+    return RedirectResponse("/settings?info=entra_saved#entra", status_code=303)
 
 
 @router.post("/settings/mail/test", include_in_schema=False)

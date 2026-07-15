@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import insert, update
 
-from .. import auth, db
+from .. import auth, db, entra_sso
 from ..db import users
 from . import i18n
 
@@ -162,6 +162,7 @@ async def login_form(request: Request, next: str = "/dashboard"):
         "login.html",
         {"request": request, "lang": request.state.lang,
          "error": None, "info": None,
+         "sso_configured": entra_sso.is_configured(),
          "form": {"email": "", "next": _safe_next(next)}},
     )
 
@@ -192,6 +193,7 @@ async def login_submit(request: Request,
             {"request": request, "lang": lang,
              "error": i18n.t("auth.invalid_credentials", lang),
              "info": None,
+             "sso_configured": entra_sso.is_configured(),
              "form": {"email": email, "next": next_path}},
             status_code=401,
         )
@@ -221,3 +223,88 @@ async def logout_get():
     # Some clients still follow GET; treat it the same way but discourage
     # in-app usage — the base template posts a form.
     raise HTTPException(status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+# ---------------------------------------------------------------------------
+# Entra SSO — kick off the OAuth2 code flow + handle Microsoft's callback
+# ---------------------------------------------------------------------------
+
+@router.get("/auth/entra/login", include_in_schema=False)
+async def entra_login(request: Request, next: str = "/dashboard"):
+    """Redirect the browser to Microsoft's /authorize."""
+    if not entra_sso.is_configured():
+        return RedirectResponse("/login?error=sso_not_configured",
+                                status_code=303)
+    try:
+        url = entra_sso.build_auth_url(request, _safe_next(next))
+    except entra_sso.EntraSSOError as e:
+        return RedirectResponse(
+            f"/login?error={str(e)[:200].replace('&','')}",
+            status_code=303)
+    return RedirectResponse(url, status_code=303)
+
+
+@router.get("/auth/entra/callback", include_in_schema=False)
+async def entra_callback(request: Request,
+                         code: str = "", state: str = "",
+                         error: str = "", error_description: str = ""):
+    """Handle the OAuth2 callback. Log the user in or send them back
+    to /login with a descriptive message."""
+    templates = request.app.state.templates
+    lang = request.state.lang
+
+    if error:
+        # Microsoft rejected the request (user cancelled, admin
+        # consent required, etc.) — surface the reason.
+        msg = (error_description or error)[:200]
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "lang": lang,
+             "error": f"Microsoft: {msg}", "info": None,
+             "sso_configured": True,
+             "form": {"email": "", "next": "/dashboard"}},
+            status_code=401,
+        )
+    if not code or not state:
+        return RedirectResponse(
+            "/login?error=missing_code_or_state", status_code=303)
+
+    try:
+        claims = entra_sso.handle_callback(request, code, state)
+    except entra_sso.EntraSSOError as e:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "lang": lang,
+             "error": f"SSO: {str(e)[:200]}", "info": None,
+             "sso_configured": True,
+             "form": {"email": "", "next": "/dashboard"}},
+            status_code=401,
+        )
+
+    user = entra_sso.resolve_or_create_user(claims)
+    if user is None or not user["active"]:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "lang": lang,
+             "error": i18n.t("auth.sso_no_local_account", lang),
+             "info": None,
+             "sso_configured": True,
+             "form": {"email": "", "next": "/dashboard"}},
+            status_code=401,
+        )
+
+    # Log the user in — same session shape as the local login path.
+    request.session["user_id"] = user["id"]
+    if user["lang"] in i18n.SUPPORTED_LANGS:
+        request.session["lang"] = user["lang"]
+
+    # Redirect to the URL we stashed at the start of the flow (or
+    # dashboard as a safe default).
+    try:
+        next_url = _safe_next(request.session.pop("entra_next", "/dashboard"))
+    except AssertionError:
+        next_url = "/dashboard"
+
+    db.audit(user["id"], "user.login.entra_sso",
+             target_type="user", target_id=str(user["id"]))
+    return RedirectResponse(next_url, status_code=303)

@@ -141,6 +141,94 @@
     </p>
   </div>
 
+  <!-- v0.12: Entra ID SSO -->
+  <div class="card" id="entra">
+    <h3>{{ _('settings.entra.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.entra.intro', lang) }}
+    </p>
+    <form method="post" action="/settings/entra" style="margin-top: var(--sp-3);">
+      <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="entra_enabled" name="enabled"
+               {% if entra.enabled %}checked{% endif %}>
+        <label for="entra_enabled" style="margin: 0;">
+          {{ _('settings.entra.enable', lang) }}
+        </label>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="entra_tenant">{{ _('settings.entra.tenant', lang) }}</label>
+          <input type="text" id="entra_tenant" name="tenant_id"
+                 value="{{ entra.tenant_id or '' }}"
+                 placeholder="12345678-abcd-ef01-2345-abcdef012345">
+        </div>
+        <div class="form-group">
+          <label for="entra_client">{{ _('settings.entra.client_id', lang) }}</label>
+          <input type="text" id="entra_client" name="client_id"
+                 value="{{ entra.client_id or '' }}"
+                 placeholder="12345678-abcd-ef01-2345-abcdef012345">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="entra_secret">{{ _('settings.entra.client_secret', lang) }}</label>
+        <input type="password" id="entra_secret" name="client_secret"
+               placeholder="{% if entra.client_secret_present %}{{ _('settings.entra.secret_kept', lang) }}{% else %}Value from Azure Portal → App registration → Certificates & secrets{% endif %}">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('settings.entra.secret_hint', lang) }}
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="entra_redirect">{{ _('settings.entra.redirect_uri', lang) }}</label>
+        <input type="url" id="entra_redirect" name="redirect_uri"
+               value="{{ entra.redirect_uri or '' }}"
+               placeholder="https://tonerwatch.example.com/auth/entra/callback">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('settings.entra.redirect_hint', lang) }}
+        </div>
+      </div>
+      <h4 style="margin-top: var(--sp-4); margin-bottom: var(--sp-2);">
+        {{ _('settings.entra.provisioning.title', lang) }}
+      </h4>
+      <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="entra_auto" name="allow_auto_provision"
+               {% if entra.allow_auto_provision %}checked{% endif %}>
+        <label for="entra_auto" style="margin: 0;">
+          {{ _('settings.entra.auto_provision', lang) }}
+        </label>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="entra_domain">{{ _('settings.entra.auto_provision_domain', lang) }}</label>
+          <input type="text" id="entra_domain" name="auto_provision_domain"
+                 value="{{ entra.auto_provision_domain or '' }}"
+                 placeholder="acme.com">
+          <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+            {{ _('settings.entra.auto_provision_domain_hint', lang) }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="entra_role">{{ _('settings.entra.default_role', lang) }}</label>
+          <select id="entra_role" name="default_role">
+            <option value="technician" {% if entra.default_role != 'admin' %}selected{% endif %}>
+              {{ _('user.role.technician', lang) }}
+            </option>
+            <option value="admin" {% if entra.default_role == 'admin' %}selected{% endif %}>
+              {{ _('user.role.admin', lang) }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn" style="margin-top: var(--sp-3);">
+        {{ _('common.save', lang) }}
+      </button>
+    </form>
+    {% if info == 'entra_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        {{ _('settings.entra.saved', lang) }}
+      </div>
+    {% endif %}
+  </div>
+
   <!-- v0.10: backup -->
   <div class="card" id="backup">
     <h3>{{ _('settings.backup.section', lang) }}</h3>

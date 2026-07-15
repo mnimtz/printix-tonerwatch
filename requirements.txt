@@ -38,3 +38,8 @@ openpyxl>=3.1.0
 # operator who doesn't configure Blob upload never pays the size
 # penalty at import time).
 azure-storage-blob>=12.19.0
+
+# v0.12: Microsoft Authentication Library for Entra ID (Azure AD)
+# SSO. Also lazy-imported inside src/entra_sso.py — only pulled in
+# when SSO is actually configured.
+msal>=1.28.0
