@@ -117,6 +117,17 @@
     margin-top: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .printer-header .meta-row {
+    display: flex; flex-wrap: wrap; gap: 4px 10px;
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    margin-top: 3px;
+  }
+  .printer-header .meta-row .k {
+    font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .printer-header .meta-row .v {
+    color: var(--tw-primary); font-family: var(--font-mono);
+  }
   .printer-header .customer-badge {
     display: inline-block; margin-top: 4px;
     padding: 1px 8px; border-radius: 8px;
@@ -341,9 +352,15 @@
               {{ p.printer_name or _('toner.printer.unnamed', lang) }}
             </div>
             <div class="sub">
-              {% if p.location %}{{ p.location }}{% else %}—{% endif %}
+              {% if p.location %}📍 {{ p.location }}{% else %}—{% endif %}
               {% if p.model %} · {{ p.model }}{% endif %}
             </div>
+            {% if p.serial_number %}
+              <div class="meta-row">
+                <span><span class="k">{{ _('toner.printer.serial', lang) }}:</span>
+                      <span class="v">{{ p.serial_number }}</span></span>
+              </div>
+            {% endif %}
             {% if customer_choices|length > 1 %}
               <a href="/toner?customer={{ p.customer_id }}"
                  class="customer-badge" style="text-decoration: none;">

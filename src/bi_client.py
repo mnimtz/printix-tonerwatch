@@ -43,7 +43,8 @@ class ConnectionResult:
 
 
 def test_connection(server: str, database: str, username: str,
-                    password: str, *, timeout: int = 5) -> ConnectionResult:
+                    password: str, *, port: int = 1433,
+                    timeout: int = 5) -> ConnectionResult:
     """Open a socket to the BI-DB and run `SELECT @@VERSION`."""
     if not server or not database or not username:
         return ConnectionResult(False,
@@ -57,7 +58,8 @@ def test_connection(server: str, database: str, username: str,
     try:
         conn = pymssql.connect(
             server=server, user=username, password=password or "",
-            database=database, timeout=timeout, login_timeout=timeout,
+            database=database, port=port,
+            timeout=timeout, login_timeout=timeout,
         )
         cur = conn.cursor()
         cur.execute("SELECT @@VERSION")
@@ -172,12 +174,17 @@ def _connect(customer: dict, *, login_timeout: int = 30, timeout: int = 60):
     """Open a pymssql connection. Raises on failure — callers wrap in try/except.
     """
     import pymssql  # noqa: WPS433 — lazy import
+    port_raw = customer.get("sql_port")
+    try:
+        port = int(port_raw) if port_raw else 1433
+    except (TypeError, ValueError):
+        port = 1433
     return pymssql.connect(
         server=customer["sql_server"],
         user=customer["sql_username"],
         password=customer.get("sql_password") or "",
         database=customer["sql_database"],
-        port=1433,
+        port=port,
         tds_version="7.4",
         login_timeout=login_timeout,
         timeout=timeout,
@@ -321,11 +328,26 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
         # Two-stage query — a global JOIN over device_readings (potentially
         # hundreds of thousands of rows) times out; per-printer TOP 1 hits
         # the (printer_id, received_time) index cleanly instead.
-        cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
-                              model_name AS model, vendor_name AS vendor
-                         FROM dbo.printers
-                        WHERE meta_status = 'ACTIVE'""")
-        printers = cur.fetchall()
+        # v0.8.0: pull the serial_number too — Printix populates it via SNMP.
+        # Fall back to empty string if the column isn't in this tenant's
+        # schema (older Printix BI dumps don't expose it), so the caller
+        # never sees a missing key.
+        try:
+            cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
+                                  model_name AS model, vendor_name AS vendor,
+                                  serial_number
+                             FROM dbo.printers
+                            WHERE meta_status = 'ACTIVE'""")
+            printers = cur.fetchall()
+        except Exception:
+            # Legacy schema without serial_number column.
+            cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
+                                  model_name AS model, vendor_name AS vendor
+                             FROM dbo.printers
+                            WHERE meta_status = 'ACTIVE'""")
+            printers = cur.fetchall()
+            for p in printers:
+                p["serial_number"] = ""
 
         rows: list[dict] = []
         for p in printers:
@@ -342,11 +364,12 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
             except Exception:
                 reading = None
             rows.append({
-                "printer_id":   str(pid),
-                "printer_name": p.get("printer_name") or "",
-                "location":     p.get("location") or "",
-                "model":        p.get("model") or "",
-                "vendor":       p.get("vendor") or "",
+                "printer_id":    str(pid),
+                "printer_name":  p.get("printer_name") or "",
+                "location":      p.get("location") or "",
+                "model":         p.get("model") or "",
+                "vendor":        p.get("vendor") or "",
+                "serial_number": p.get("serial_number") or "",
                 "supplies":       _parse_markers(reading.get("additional_readings") if reading else None),
                 "error_states":   _parse_error_states(reading.get("detected_error_states") if reading else None),
                 "reported_state": (reading.get("printer_reported_state") if reading else "") or "",

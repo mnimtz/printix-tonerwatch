@@ -45,7 +45,8 @@ def _customer_form_from_row(row: dict | None) -> dict:
     if row is None:
         return {
             "id": None, "name": "", "tenant_url": "", "notes": "",
-            "sql_server": "", "sql_database": "", "sql_username": "",
+            "sql_server": "", "sql_database": "", "sql_port": 1433,
+            "sql_username": "",
             "sql_password_present": False,
             "alert_recipients_csv": "", "alert_min_level": "WARN",
             "order_recipients_csv": "",
@@ -231,6 +232,7 @@ def _values_from_form(form, *, is_new: bool, existing: dict | None = None) -> di
         "notes":               (form.get("notes") or "").strip(),
         "sql_server":          (form.get("sql_server") or "").strip(),
         "sql_database":        (form.get("sql_database") or "").strip(),
+        "sql_port":     _parse_int(form.get("sql_port"), default=1433, lo=1, hi=65535),
         "sql_username":        (form.get("sql_username") or "").strip(),
         "alert_recipients_csv": (form.get("alert_recipients_csv") or "").strip(),
         "alert_min_level":     (form.get("alert_min_level") or "WARN").upper(),
@@ -347,6 +349,7 @@ async def test_connection(request: Request):
     database = (form.get("sql_database") or "").strip()
     username = (form.get("sql_username") or "").strip()
     password = form.get("sql_password") or ""
+    port = _parse_int(form.get("sql_port"), default=1433, lo=1, hi=65535)
 
     # Handle "keep existing" case: password field is empty but the
     # customer already has one stored. If a customer_id was posted,
@@ -356,7 +359,8 @@ async def test_connection(request: Request):
         if row and row["sql_password_enc"]:
             password = crypto.decrypt(row["sql_password_enc"])
 
-    result = bi_client.test_connection(server, database, username, password)
+    result = bi_client.test_connection(server, database, username, password,
+                                       port=port)
     return JSONResponse(
         {"ok": result.ok, "message": result.message,
          "server_version": result.server_version},

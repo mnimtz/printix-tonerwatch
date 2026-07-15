@@ -483,9 +483,30 @@ def start_runner(interval_minutes: int = 15) -> None:
         next_run_time=_dt.datetime.now(_dt.timezone.utc)
                       + _dt.timedelta(seconds=60),  # wait a bit after boot
     )
+
+    # v0.8.0: Background cache warmer. The BI-DB fetch takes 2–8 s per
+    # customer when the cache is cold, so a fresh /toner or /dashboard
+    # visit blocks that long. Run a refresh every REFRESH_INTERVAL_MINUTES
+    # (default 5) so the cached data is always < ttl old and every user
+    # request reads from memory. Cache TTL for full fetch is 10 min, so
+    # a 5-min tick keeps us comfortably ahead of expiry.
+    refresh_interval = int(os.environ.get("REFRESH_INTERVAL_MINUTES", "5"))
+    if refresh_interval > 0:
+        _scheduler.add_job(
+            _tick_cache_refresh,
+            trigger=IntervalTrigger(minutes=refresh_interval),
+            id="toner_cache_refresh",
+            name="Toner cache warm-up",
+            max_instances=1,
+            coalesce=True,
+            next_run_time=_dt.datetime.now(_dt.timezone.utc)
+                          + _dt.timedelta(seconds=15),
+        )
+
     _scheduler.start()
-    logger.info("toner_alerts: scheduler started, tick every %d min",
-                interval_minutes)
+    logger.info("toner_alerts: scheduler started, alerts every %d min, "
+                "cache refresh every %d min",
+                interval_minutes, refresh_interval)
 
 
 def _tick_all_customers() -> None:
@@ -502,3 +523,30 @@ def _tick_all_customers() -> None:
         except Exception as e:  # noqa: BLE001 — runner mustn't die
             logger.exception("evaluate_and_notify crashed for customer %s: %s",
                              c.get("id"), str(e)[:200])
+
+
+def _tick_cache_refresh() -> None:
+    """Pre-warm the BI-DB cache for every active customer.
+
+    Runs on a shorter interval than the alert evaluator so the dashboard
+    and toner grid always read from memory. Silent no-op for customers
+    without BI credentials.
+    """
+    with db.get_conn() as conn:
+        customers = [db._row_to_dict(r) for r in conn.execute(
+            select(db.customers).where(db.customers.c.active == 1)
+        ).all()]
+    for c in customers:
+        if not (c.get("sql_server") and c.get("sql_database")
+                and c.get("sql_username")):
+            continue
+        try:
+            bi = bi_client.customer_for_bi(c)
+            # force_refresh=False: normal cache-write; on cold cache
+            # this fetches, on warm cache it's a fast returning read
+            # (the fetch function no-ops if the entry is still fresh).
+            bi_client.invalidate_customer_cache(c["id"])
+            bi_client.fetch_all_printer_supplies(bi)
+        except Exception as e:  # noqa: BLE001 — never let the tick die
+            logger.info("cache refresh: customer %s failed: %s",
+                        c.get("id"), str(e)[:120])

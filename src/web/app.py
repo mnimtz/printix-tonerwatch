@@ -105,8 +105,14 @@ def create_app() -> FastAPI:
     )
 
     # Session cookie is Secure by default. Override with
+    # Middleware order matters: Starlette wraps in add-order-REVERSED,
+    # so the LAST add is the OUTERMOST. We want the request path to be
+    # SecurityHeaders → SessionMiddleware → LanguageMiddleware → app,
+    # because LanguageMiddleware reads and writes `request.session`
+    # (needs Session to be set up first). Add in reverse of that path.
     # SESSION_HTTPS_ONLY=false when running behind a plain-HTTP dev
     # environment (docker compose on localhost, for instance).
+    app.add_middleware(LanguageMiddleware)
     app.add_middleware(
         SessionMiddleware,
         secret_key=auth.session_secret(),
@@ -115,7 +121,6 @@ def create_app() -> FastAPI:
         same_site="lax",
         https_only=_env_bool("SESSION_HTTPS_ONLY", True),
     )
-    app.add_middleware(LanguageMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
 
     # Static assets — logo, favicon, printer pictograms.

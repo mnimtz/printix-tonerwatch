@@ -176,6 +176,7 @@ customers = Table(
     # Printix BI database (Azure SQL) — password Fernet-encrypted at rest
     Column("sql_server", Text, nullable=False, server_default=""),
     Column("sql_database", Text, nullable=False, server_default=""),
+    Column("sql_port", Integer, nullable=False, server_default="1433"),
     Column("sql_username", Text, nullable=False, server_default=""),
     Column("sql_password_enc", Text, nullable=False, server_default=""),
 

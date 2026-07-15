@@ -26,6 +26,12 @@
     letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--tw-muted-blue); margin-top: var(--sp-3);
   }
+  .stat-tile { text-decoration: none; display: block; }
+  .stat-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+  }
   .stat-tile.critical .value { color: var(--status-critical); }
   .stat-tile.warn     .value { color: #B45309; }
   .stat-tile.critical::before,
@@ -120,25 +126,39 @@
   {{ _('dashboard.intro', lang) }}
 </p>
 
-<!-- Top-line stats -->
+<!-- Top-line stats — every tile is a clickable link into /toner
+     filtered by that severity. Empty cache is disclosed inline so
+     "0 critical" doesn't get mistaken for "no problems". -->
 <div class="stat-grid">
-  <div class="stat-tile">
+  <a href="/customers" class="stat-tile" data-noloader>
     <div class="value">{{ counts.customers }}</div>
     <div class="label">{{ _('dashboard.stat.customers', lang) }}</div>
-  </div>
-  <div class="stat-tile">
+  </a>
+  <a href="/toner" class="stat-tile" data-noloader>
     <div class="value">{{ counts.printers }}</div>
     <div class="label">{{ _('dashboard.stat.printers', lang) }}</div>
-  </div>
-  <div class="stat-tile {{ 'critical' if counts.critical else '' }}">
+  </a>
+  <a href="/toner?severity=CRITICAL"
+     class="stat-tile {{ 'critical' if counts.critical else '' }}"
+     data-noloader>
     <div class="value">{{ counts.critical }}</div>
     <div class="label">{{ _('dashboard.stat.critical', lang) }}</div>
-  </div>
-  <div class="stat-tile {{ 'warn' if counts.warn else '' }}">
+  </a>
+  <a href="/toner?severity=WARN"
+     class="stat-tile {{ 'warn' if counts.warn else '' }}"
+     data-noloader>
     <div class="value">{{ counts.warn }}</div>
     <div class="label">{{ _('dashboard.stat.warn', lang) }}</div>
-  </div>
+  </a>
 </div>
+{% if counts.printers == 0 and per_customer %}
+  <div class="alert alert-info" style="margin-top: var(--sp-3);">
+    ℹ {{ _('dashboard.cache_cold', lang) }}
+    <a href="/toner" style="margin-left: 6px; font-weight: 700;">
+      → {{ _('dashboard.open_toner_now', lang) }}
+    </a>
+  </div>
+{% endif %}
 
 {% if counts.critical or counts.warn %}
   <div style="margin: var(--sp-3) 0 var(--sp-6); text-align: right;">

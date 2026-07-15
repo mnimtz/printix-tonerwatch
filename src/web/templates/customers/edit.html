@@ -54,11 +54,18 @@
 
     <!-- BI database -->
     <div class="card">
-      <h3 style="margin-bottom: var(--sp-4);">
-        {{ _('customer.section.bi', lang) }}
-      </h3>
+      <div style="display: flex; align-items: baseline;
+                  justify-content: space-between; margin-bottom: var(--sp-4);
+                  flex-wrap: wrap; gap: var(--sp-3);">
+        <h3 style="margin: 0;">{{ _('customer.section.bi', lang) }}</h3>
+        <button type="button" id="btn-printix-preset"
+                class="btn btn-secondary" data-noloader
+                style="padding: 6px 12px; font-size: 0.82rem;">
+          ⚡ {{ _('customer.printix_preset', lang) }}
+        </button>
+      </div>
       <div class="form-row" style="display: grid;
-           grid-template-columns: 2fr 1fr; gap: var(--sp-4);">
+           grid-template-columns: 2fr 1fr 90px; gap: var(--sp-4);">
         <div class="form-group">
           <label for="sql_server">{{ _('customer.field.sql_server', lang) }}</label>
           <input id="sql_server" name="sql_server" type="text"
@@ -69,6 +76,12 @@
           <label for="sql_database">{{ _('customer.field.sql_database', lang) }}</label>
           <input id="sql_database" name="sql_database" type="text"
                  value="{{ form.sql_database or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="sql_port">{{ _('customer.field.sql_port', lang) }}</label>
+          <input id="sql_port" name="sql_port" type="number"
+                 min="1" max="65535"
+                 value="{{ form.sql_port or 1433 }}">
         </div>
       </div>
       <div class="form-row" style="display: grid;
@@ -95,6 +108,29 @@
         <div id="test-conn-result"
              style="font-size: 0.9rem; color: var(--tw-muted-blue);"></div>
       </div>
+      <script>
+        // "Printix Standard" one-click preset. Fills only the fields
+        // that are the same for every Printix Cloud tenant — the
+        // operator still has to enter the tenant-scoped credentials.
+        // If the exact server host differs for your tenant, override
+        // in the field after applying the preset.
+        (function() {
+          var btn = document.getElementById('btn-printix-preset');
+          if (!btn) return;
+          btn.addEventListener('click', function() {
+            var srv = document.getElementById('sql_server');
+            var db  = document.getElementById('sql_database');
+            var pt  = document.getElementById('sql_port');
+            if (srv && (!srv.value || confirm('{{ _('customer.printix_preset_confirm', lang)|e }}'))) {
+              srv.value = 'bi-database.printix.net';
+            }
+            if (db  && !db.value)  db.value  = 'printix';
+            if (pt  && (!pt.value || pt.value === '1433')) pt.value = 1433;
+            var un = document.getElementById('sql_username');
+            if (un) un.focus();
+          });
+        })();
+      </script>
     </div>
 
     <!-- Alerts -->
