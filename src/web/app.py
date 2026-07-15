@@ -18,9 +18,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import quote as _urlquote
 
-from .. import auth, db
+from .. import auth, db, toner_alerts
 from . import (access_routes, auth_routes, customer_routes, dashboard_routes,
-               i18n, toner_routes, user_routes)
+               i18n, settings_routes, toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -146,6 +146,17 @@ def create_app() -> FastAPI:
     app.include_router(access_routes.router)
     app.include_router(dashboard_routes.router)   # P2: real /dashboard
     app.include_router(toner_routes.router)       # P2: /toner grid + /toner/refresh
+    app.include_router(settings_routes.router)    # P3: mail config + test-mail
+
+    # ── Alert runner (P3) ─────────────────────────────────────────────
+    # Env-driven cadence: 0 disables the scheduler entirely (useful for
+    # local dev + integration tests where we don't want background jobs).
+    try:
+        interval = int(os.environ.get("ALERT_INTERVAL_MINUTES", "15"))
+    except (TypeError, ValueError):
+        interval = 15
+    app.state.alert_interval_minutes = interval
+    toner_alerts.start_runner(interval_minutes=interval)
 
     # Root → dashboard when logged in, otherwise setup/login.
     @app.get("/", include_in_schema=False)
@@ -157,13 +168,10 @@ def create_app() -> FastAPI:
         return RedirectResponse("/dashboard", status_code=303)
 
     # Coming-soon stubs — one route per sidebar entry that hasn't
-    # landed yet. Keeps the nav from producing dead JSON-404s while
-    # phases roll out incrementally. /dashboard and /toner have been
-    # replaced with real implementations by their own routers above;
-    # /orders and /settings remain stubs until P4b / P3.
+    # landed yet. /dashboard, /toner and /settings are real now;
+    # only /orders remains a stub until P4b.
     _STUBS = (
         ("/orders",     "nav.orders",      "P4b"),
-        ("/settings",   "nav.settings",    "P3"),
     )
     for _path, _title_key, _phase in _STUBS:
         def _make_stub(path, title_key, phase):

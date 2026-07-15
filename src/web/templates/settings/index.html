@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ _('nav.settings', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('nav.settings', lang) }}{% endblock %}
+{% block content %}
+<div style="max-width: 820px;">
+  <h1>{{ _('settings.title', lang) }}</h1>
+  <p style="color: var(--tw-muted-blue); margin-top: 4px; margin-bottom: var(--sp-6);">
+    {{ _('settings.intro', lang) }}
+  </p>
+
+  {% if info == 'mail_saved' %}
+    <div class="alert alert-ok">{{ _('settings.info.mail_saved', lang) }}</div>
+  {% elif info == 'test_sent' %}
+    <div class="alert alert-ok">{{ _('settings.info.test_sent', lang) }} {{ user.email }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-4);">
+      <h3>{{ _('settings.mail.section', lang) }}</h3>
+      <form method="post" action="/settings/mail/test" style="margin: 0;">
+        <button type="submit" class="btn btn-secondary"
+                style="padding: 6px 12px; font-size: 0.85rem;"
+                {% if mail.provider == 'disabled' %}disabled title="{{ _('settings.mail.enable_first', lang) }}"{% endif %}>
+          ✉ {{ _('settings.mail.test', lang) }}
+        </button>
+      </form>
+    </div>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem;
+              margin-top: 2px; margin-bottom: var(--sp-5);">
+      {{ _('settings.mail.intro', lang) }}
+    </p>
+
+    <form method="post" action="/settings/mail" autocomplete="off">
+      <div class="form-group">
+        <label for="provider">{{ _('settings.mail.provider', lang) }}</label>
+        <select id="provider" name="provider"
+                onchange="document.getElementById('resend-block').style.display = this.value === 'resend' ? '' : 'none';
+                          document.getElementById('smtp-block').style.display = this.value === 'smtp' ? '' : 'none';">
+          <option value="disabled" {% if mail.provider == 'disabled' %}selected{% endif %}>
+            {{ _('settings.mail.provider.disabled', lang) }}
+          </option>
+          <option value="resend"  {% if mail.provider == 'resend' %}selected{% endif %}>
+            Resend (HTTPS · Azure-friendly)
+          </option>
+          <option value="smtp"    {% if mail.provider == 'smtp' %}selected{% endif %}>
+            SMTP
+          </option>
+        </select>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="from_email">{{ _('settings.mail.from_email', lang) }}</label>
+          <input id="from_email" name="from_email" type="email"
+                 placeholder="toner@msp.example"
+                 value="{{ mail.from_email }}">
+        </div>
+        <div class="form-group">
+          <label for="from_name">{{ _('settings.mail.from_name', lang) }}</label>
+          <input id="from_name" name="from_name" type="text"
+                 value="{{ mail.from_name }}">
+        </div>
+      </div>
+
+      <!-- Resend section -->
+      <div id="resend-block"
+           style="display: {{ '' if mail.provider == 'resend' else 'none' }};
+                  padding: var(--sp-4); background: var(--tw-gray-100);
+                  border-radius: var(--r-sm); margin-bottom: var(--sp-4);">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="resend_api_key">{{ _('settings.mail.resend_api_key', lang) }}</label>
+          <input id="resend_api_key" name="resend_api_key" type="password"
+                 autocomplete="off"
+                 placeholder="{{ _('settings.mail.secret_kept', lang) if mail.resend_api_key_present else 're_...' }}">
+          <p style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 6px;">
+            {{ _('settings.mail.resend_hint', lang) }}
+          </p>
+        </div>
+      </div>
+
+      <!-- SMTP section -->
+      <div id="smtp-block"
+           style="display: {{ '' if mail.provider == 'smtp' else 'none' }};
+                  padding: var(--sp-4); background: var(--tw-gray-100);
+                  border-radius: var(--r-sm); margin-bottom: var(--sp-4);">
+        <div style="display: grid; grid-template-columns: 3fr 1fr; gap: var(--sp-4);">
+          <div class="form-group">
+            <label for="smtp_host">{{ _('settings.mail.smtp_host', lang) }}</label>
+            <input id="smtp_host" name="smtp_host" type="text"
+                   placeholder="smtp.example.com" value="{{ mail.smtp_host }}">
+          </div>
+          <div class="form-group">
+            <label for="smtp_port">{{ _('settings.mail.smtp_port', lang) }}</label>
+            <input id="smtp_port" name="smtp_port" type="number"
+                   min="1" max="65535" value="{{ mail.smtp_port }}">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);">
+          <div class="form-group">
+            <label for="smtp_username">{{ _('settings.mail.smtp_username', lang) }}</label>
+            <input id="smtp_username" name="smtp_username" type="text"
+                   value="{{ mail.smtp_username }}">
+          </div>
+          <div class="form-group">
+            <label for="smtp_password">{{ _('settings.mail.smtp_password', lang) }}</label>
+            <input id="smtp_password" name="smtp_password" type="password"
+                   autocomplete="new-password"
+                   placeholder="{{ _('settings.mail.secret_kept', lang) if mail.smtp_password_present else '' }}">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="smtp_starttls" value="1"
+                   {% if mail.smtp_starttls %}checked{% endif %}>
+            {{ _('settings.mail.smtp_starttls', lang) }}
+          </label>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>{{ _('settings.runner.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.runner.intro', lang) }}
+    </p>
+    <p style="margin-top: var(--sp-4); font-family: var(--font-mono);
+              font-size: 0.88rem;">
+      {{ _('settings.runner.interval', lang) }}:
+      <strong>{{ (request.app.state.alert_interval_minutes or 15) }} min</strong>
+      &nbsp;·&nbsp;
+      {{ _('settings.runner.env_hint', lang) }}
+      <code>ALERT_INTERVAL_MINUTES</code>
+    </p>
+  </div>
+</div>
+{% endblock %}
