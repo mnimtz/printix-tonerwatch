@@ -56,6 +56,8 @@ WORKDIR /app
 
 COPY --from=builder --chown=app:app /root/.local /home/app/.local
 COPY --chown=app:app src/          /app/src/
+COPY --chown=app:app alembic/      /app/alembic/
+COPY --chown=app:app alembic.ini   /app/alembic.ini
 COPY --chown=app:app VERSION       /app/VERSION
 COPY --chown=app:app entrypoint.sh /app/entrypoint.sh
 

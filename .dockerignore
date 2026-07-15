@@ -1,6 +1,7 @@
 .git
 .github
 .gitignore
+.claude
 .venv
 venv
 .env
@@ -25,3 +26,6 @@ data
 *.sqlite
 *.sqlite-journal
 *.db
+# NB: alembic/ and alembic.ini are intentionally NOT ignored — they need
+# to be inside the image so `db.init_schema` can find migrations at
+# runtime. Everything below is pytest / dev-only.

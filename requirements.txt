@@ -10,6 +10,12 @@ itsdangerous>=2.1.0
 cryptography>=42.0.0
 bcrypt>=4.1.0
 
+# Database — SQLAlchemy Core + Alembic. Dialect-neutral so the same
+# codebase runs on either sqlite:///data/tonerwatch.sqlite (default)
+# or mssql+pymssql://user:pass@server:1433/db (Azure SQL Database).
+sqlalchemy>=2.0,<3.0
+alembic>=1.13
+
 # HTTP client (Wikidata enrichment, future integrations)
 httpx>=0.25.0
 

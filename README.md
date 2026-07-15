@@ -99,10 +99,12 @@ All configuration is via environment variables — no configuration files.
 |---|---|---|
 | `WEB_HOST` | `0.0.0.0` | Bind address |
 | `WEB_PORT` | `8080` | Bind port |
-| `DB_PATH` | `/data/tonerwatch.sqlite` | SQLite database path |
-| `FERNET_KEY` | auto-generated on first start | Encryption key for BI credentials |
+| `DATABASE_URL` | *(unset — falls back to `sqlite:///${DB_PATH}`)* | SQLAlchemy URL. Set to `mssql+pymssql://user:pass@server:1433/db` for Azure SQL Database. |
+| `DB_PATH` | `/data/tonerwatch.sqlite` | SQLite database path used when `DATABASE_URL` is unset. |
+| `FERNET_KEY` | auto-generated on first start | Encryption key for customer BI credentials |
 | `SESSION_SECRET` | derived from `FERNET_KEY` | Signing key for session cookies |
-| `DEFAULT_LANG` | `en` | Fallback UI language when browser preference cannot be resolved to a supported one |
+| `SESSION_HTTPS_ONLY` | `true` | Set to `false` for local plain-HTTP development. |
+| `DEFAULT_LANG` | `en` | Fallback UI language when the browser preference cannot be resolved to a supported one. |
 
 ## Architecture
 

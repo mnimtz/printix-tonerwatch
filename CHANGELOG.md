@@ -6,6 +6,28 @@ and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## [Unreleased]
 
+### Added
+- **SQLAlchemy Core + Alembic** — the whole database layer is now
+  dialect-neutral. `DATABASE_URL` picks the backend at startup:
+  `sqlite:///data/tonerwatch.sqlite` (default) or
+  `mssql+pymssql://user:pass@server:1433/db` (Azure SQL Database, for
+  operators who prefer external managed storage over the mounted
+  Azure File share). On fresh install the metadata is materialised
+  and the Alembic head is stamped; on every subsequent boot
+  `alembic upgrade head` applies pending migrations transactionally.
+- Post-boot the container will crash-loop with a clear error if the
+  Alembic env cannot import the metadata module, so schema drift
+  surfaces immediately rather than silently.
+- Security headers middleware — `Content-Security-Policy`,
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy` on every response.
+- Very small in-process login throttle — per (client-ip, email) tuple,
+  exponential back-off after 8 fails in a rolling 5 min window,
+  capped at 30 s. Stops the trivial brute-force case without adding
+  a Redis dependency.
+- Docker `HEALTHCHECK` against `/healthz` — App Service liveness
+  probes now gate traffic properly.
+
 ### Changed
 - **Product name settled on "Printix TonerWatch — Print Supply
   Intelligence"** (short logo mark stays "TonerWatch"). Repo renamed on

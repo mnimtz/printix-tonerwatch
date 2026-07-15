@@ -7,8 +7,10 @@ import time
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import insert, update
 
 from .. import auth, db
+from ..db import users
 from . import i18n
 
 
@@ -67,8 +69,9 @@ async def switch_language(request: Request, lang: str = "en", next: str = "/"):
         user = auth.current_user(request)
         if user is not None:
             with db.get_conn() as conn:
-                conn.execute("UPDATE users SET lang = ? WHERE id = ?",
-                             (lang, user["id"]))
+                conn.execute(
+                    update(users).where(users.c.id == user["id"]).values(lang=lang)
+                )
     if not next.startswith("/"):
         next = "/"
     return RedirectResponse(next, status_code=303)
@@ -132,12 +135,13 @@ async def setup_submit(request: Request,
 
     password_hash = auth.hash_password(password)
     with db.get_conn() as conn:
-        cur = conn.execute(
-            "INSERT INTO users(email, password_hash, name, role, lang, active) "
-            "VALUES (?,?,?,?,?,1)",
-            (email, password_hash, name, "admin", lang),
+        result = conn.execute(
+            insert(users).values(
+                email=email, password_hash=password_hash, name=name,
+                role="admin", lang=lang, active=1,
+            )
         )
-        new_id = cur.lastrowid
+        new_id = result.inserted_primary_key[0]
     db.audit(new_id, "user.first_admin_created",
              target_type="user", target_id=str(new_id))
 

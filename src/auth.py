@@ -14,14 +14,15 @@ import base64
 import hashlib
 import hmac
 import os
-import sqlite3
 from typing import Any
 
 import bcrypt
 from fastapi import HTTPException, Request, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from sqlalchemy import select
 
 from . import db
+from .db import customer_access, customers
 
 
 BCRYPT_ROUNDS = 12
@@ -98,7 +99,7 @@ def verify_magic_token(token: str, *, max_age: int = MAGIC_LINK_TTL_SECONDS,
 # Request-side helpers (FastAPI dependencies)
 # ---------------------------------------------------------------------------
 
-def current_user(request: Request) -> sqlite3.Row | None:
+def current_user(request: Request) -> dict | None:
     """Resolve the logged-in user for the current request, or return None."""
     user_id = request.session.get("user_id")
     if not user_id:
@@ -110,34 +111,34 @@ def current_user(request: Request) -> sqlite3.Row | None:
     return row
 
 
-def require_user(request: Request) -> sqlite3.Row:
+def require_user(request: Request) -> dict:
     user = current_user(request)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="login_required")
     return user
 
 
-def require_admin(request: Request) -> sqlite3.Row:
+def require_admin(request: Request) -> dict:
     user = require_user(request)
     if user["role"] != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="admin_required")
     return user
 
 
-def user_can_see_customer(user: sqlite3.Row, customer_id: int) -> bool:
+def user_can_see_customer(user: dict, customer_id: int) -> bool:
     """Admins see all customers; technicians only those with an access row."""
     if user["role"] == "admin":
         return True
     with db.get_conn() as conn:
         row = conn.execute(
-            "SELECT 1 FROM customer_access "
-            "WHERE user_id = ? AND customer_id = ?",
-            (user["id"], customer_id),
-        ).fetchone()
+            select(customer_access.c.user_id)
+            .where(customer_access.c.user_id == user["id"])
+            .where(customer_access.c.customer_id == customer_id)
+        ).first()
     return row is not None
 
 
-def require_customer_access(request: Request, customer_id: int) -> sqlite3.Row:
+def require_customer_access(request: Request, customer_id: int) -> dict:
     user = require_user(request)
     if not user_can_see_customer(user, customer_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN,
@@ -145,16 +146,23 @@ def require_customer_access(request: Request, customer_id: int) -> sqlite3.Row:
     return user
 
 
-def visible_customer_ids(user: sqlite3.Row) -> list[int]:
+def visible_customer_ids(user: dict) -> list[int]:
     """Return the customer ids this user is allowed to see."""
     with db.get_conn() as conn:
         if user["role"] == "admin":
-            rows = conn.execute("SELECT id FROM customers WHERE active = 1").fetchall()
+            rows = conn.execute(
+                select(customers.c.id).where(customers.c.active == 1)
+            ).all()
         else:
             rows = conn.execute(
-                "SELECT c.id FROM customers c "
-                "JOIN customer_access a ON a.customer_id = c.id "
-                "WHERE a.user_id = ? AND c.active = 1",
-                (user["id"],),
-            ).fetchall()
-    return [r["id"] for r in rows]
+                select(customers.c.id)
+                .select_from(
+                    customers.join(
+                        customer_access,
+                        customers.c.id == customer_access.c.customer_id,
+                    )
+                )
+                .where(customer_access.c.user_id == user["id"])
+                .where(customers.c.active == 1)
+            ).all()
+    return [r[0] for r in rows]
