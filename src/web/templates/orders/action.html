@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}{{ _('orders.action.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  main.workspace { padding-top: var(--sp-8); }
+  .action-card {
+    max-width: 520px; margin: 0 auto;
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .action-card .head {
+    padding: var(--sp-6) var(--sp-6) var(--sp-4);
+    text-align: center;
+    border-top: 4px solid transparent;
+    border-image: var(--pillar-gradient-h) 1;
+  }
+  .action-card .head h1 {
+    font-size: 1.25rem; color: var(--tw-primary);
+    margin: 0 0 var(--sp-2);
+  }
+  .action-card .head p {
+    color: var(--tw-muted-blue); font-size: 0.9rem;
+    margin: 0;
+  }
+  .action-card .body {
+    padding: var(--sp-4) var(--sp-6) var(--sp-6);
+  }
+  .facts {
+    background: var(--tw-gray-100); border-radius: var(--r);
+    padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-4);
+    font-size: 0.9rem;
+  }
+  .facts .row {
+    display: flex; justify-content: space-between; gap: var(--sp-3);
+    padding: 4px 0;
+  }
+  .facts .row + .row { border-top: 1px solid var(--tw-gray-200); }
+  .facts .label {
+    color: var(--tw-muted-blue); font-size: 0.78rem;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .facts .value {
+    color: var(--tw-primary); font-weight: 700;
+    font-family: var(--font-mono); font-size: 0.9rem;
+    text-align: right;
+  }
+  .cta {
+    display: flex; justify-content: center; margin-top: var(--sp-4);
+  }
+  .cta .btn.big {
+    padding: 12px 32px; font-size: 1rem;
+    background: var(--tw-primary); color: var(--tw-white);
+    border: none; border-radius: var(--r);
+    font-weight: 700; cursor: pointer;
+  }
+  .cta .btn.big:hover { background: var(--tw-primary-alt); }
+  .state-info { text-align: center; padding: var(--sp-5) 0; }
+  .state-info .icon { font-size: 2.5rem; margin-bottom: var(--sp-3); }
+  .state-info .msg { color: var(--tw-primary); font-weight: 700; font-size: 1.05rem; }
+  .state-info .sub { color: var(--tw-muted-blue); font-size: 0.85rem; margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="action-card">
+  {% if state == 'invalid_token' or state == 'not_found' %}
+    <div class="head">
+      <h1>{{ _('orders.action.invalid_title', lang) }}</h1>
+    </div>
+    <div class="body">
+      <div class="state-info">
+        <div class="icon">🔗</div>
+        <div class="msg">
+          {% if state == 'invalid_token' %}
+            {{ _('orders.action.invalid_msg', lang) }}
+          {% else %}
+            {{ _('orders.action.not_found_msg', lang) }}
+          {% endif %}
+        </div>
+        <div class="sub">{{ _('orders.action.invalid_hint', lang) }}</div>
+      </div>
+    </div>
+
+  {% elif state == 'already_done' %}
+    <div class="head">
+      <h1>{{ _('orders.action.already_done_title', lang) }}</h1>
+    </div>
+    <div class="body">
+      <div class="state-info">
+        <div class="icon">✅</div>
+        <div class="msg">
+          {{ _('orders.action.already_done_msg', lang) }}
+          <strong>{{ _('orders.status.' + order.status, lang) }}</strong>.
+        </div>
+      </div>
+      {% include 'orders/_action_facts.html' %}
+    </div>
+
+  {% elif state == 'closed' %}
+    <div class="head">
+      <h1>{{ _('orders.action.closed_title', lang) }}</h1>
+    </div>
+    <div class="body">
+      <div class="state-info">
+        <div class="icon">🔒</div>
+        <div class="msg">
+          {{ _('orders.action.closed_msg', lang) }}
+          <strong>{{ _('orders.status.' + order.status, lang) }}</strong>.
+        </div>
+      </div>
+      {% include 'orders/_action_facts.html' %}
+    </div>
+
+  {% elif state == 'not_allowed' %}
+    <div class="head">
+      <h1>{{ _('orders.action.blocked_title', lang) }}</h1>
+    </div>
+    <div class="body">
+      <div class="state-info">
+        <div class="icon">⚠</div>
+        <div class="msg">{{ _('orders.action.blocked_msg', lang) }}</div>
+        <div class="sub">
+          {{ _('orders.status.' + order.status, lang) }} →
+          {{ _('orders.status.' + action, lang) }}
+        </div>
+      </div>
+      {% include 'orders/_action_facts.html' %}
+    </div>
+
+  {% elif state == 'confirm' %}
+    <div class="head">
+      <h1>{{ _('orders.action.confirm_title', lang) }}</h1>
+      <p>
+        {{ _('orders.action.confirm_intro', lang) }}
+        <strong>{{ _('orders.status.' + action, lang) }}</strong>?
+      </p>
+    </div>
+    <div class="body">
+      {% include 'orders/_action_facts.html' %}
+      <form method="post" action="/orders/action/{{ token }}/confirm" class="cta">
+        <button type="submit" class="btn big">
+          {% if action == 'ordered' %}✓ {{ _('orders.action.mark_ordered', lang) }}
+          {% elif action == 'delivered' %}📦 {{ _('orders.action.mark_delivered', lang) }}
+          {% elif action == 'installed' %}🔧 {{ _('orders.action.mark_installed', lang) }}
+          {% elif action == 'cancelled' %}✕ {{ _('orders.action.cancel', lang) }}
+          {% endif %}
+        </button>
+      </form>
+    </div>
+
+  {% elif state == 'done' %}
+    <div class="head">
+      <h1>{{ _('orders.action.done_title', lang) }}</h1>
+    </div>
+    <div class="body">
+      <div class="state-info">
+        <div class="icon">✅</div>
+        <div class="msg">
+          {{ _('orders.action.done_msg', lang) }}
+          <strong>{{ _('orders.status.' + order.status, lang) }}</strong>.
+        </div>
+      </div>
+      {% include 'orders/_action_facts.html' %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

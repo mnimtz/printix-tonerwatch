@@ -20,12 +20,13 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import logging
+import os
 from typing import Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, insert, select, update
 
-from . import bi_client, db, mail_client
+from . import bi_client, db, mail_client, orders, supply_library
 
 
 logger = logging.getLogger(__name__)
@@ -175,6 +176,7 @@ def evaluate_and_notify(customer: dict, *,
             row = {
                 "printer_id":   p["printer_id"],
                 "printer_name": p["printer_name"] or "",
+                "printer_model": p.get("printer_model") or "",
                 "location":     p["location"] or "",
                 "color":        color, "color_label": COLOR_LABEL.get(color, color),
                 "level":        level, "severity":    severity,
@@ -196,6 +198,24 @@ def evaluate_and_notify(customer: dict, *,
     if not transitions_up and not transitions_recover:
         return result
 
+    # Auto-draft: for each critical/warn transition, resolve the supply
+    # record and either attach an existing active order or create a new
+    # draft. The mail then carries the SKU + a one-click "Mark as
+    # ordered" magic link per alert row.
+    for t in transitions_up:
+        supply = supply_library.resolve_supply(
+            customer["id"], t["printer_id"],
+            t["printer_model"], t["color"])
+        t["supply"] = supply
+        sku = (supply or {}).get("sku", "")
+        qty = int((supply or {}).get("default_quantity") or 1)
+        order_id, _created = orders.create_draft_if_none(
+            customer["id"], t["printer_id"],
+            t["printer_name"], t["color"],
+            sku=sku, quantity=qty)
+        t["order_id"] = order_id
+        t["order_token"] = orders.sign_action_token(order_id, "ordered")
+
     if _in_quiet_hours(customer) and not force_send:
         _log_event(customer["id"], "alert.quiet_hours_skipped",
                    meta={"transitions": result["transitions"]})
@@ -209,7 +229,9 @@ def evaluate_and_notify(customer: dict, *,
         return result
 
     subject = _compose_subject(customer, transitions_up, transitions_recover)
-    html, text = _compose_body(customer, transitions_up, transitions_recover)
+    public_base_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    html, text = _compose_body(customer, transitions_up, transitions_recover,
+                                public_base_url=public_base_url)
 
     try:
         msg_id = mail_client.send(recipients, subject, html, text)
@@ -246,11 +268,20 @@ def _compose_subject(customer: dict, ups: list[dict],
 
 
 def _compose_body(customer: dict, ups: list[dict],
-                  recoveries: list[dict]) -> tuple[str, str]:
-    """Return (html, plain-text) versions of the alert body."""
+                  recoveries: list[dict], *,
+                  public_base_url: str = "") -> tuple[str, str]:
+    """Return (html, plain-text) versions of the alert body.
+
+    ``public_base_url`` is the origin the app is reachable at from
+    outside (``https://tonerwatch.example.com``). Magic-link buttons
+    fall back to relative paths when it's empty — still clickable from
+    an authenticated browser session, less useful in an email.
+    """
     # HTML — inline styles because most mail clients strip <style> or CSP them
-    html_rows_up = "".join(_alert_row_html(t) for t in ups) or ""
-    html_rows_rec = "".join(_alert_row_html(t, recovered=True) for t in recoveries) or ""
+    html_rows_up = "".join(
+        _alert_row_html(t, public_base_url=public_base_url) for t in ups) or ""
+    html_rows_rec = "".join(
+        _alert_row_html(t, recovered=True) for t in recoveries) or ""
 
     html = f"""<!doctype html>
 <html><body style="font-family:Arial,Helvetica,sans-serif;color:#231F20;
@@ -304,6 +335,15 @@ def _compose_body(customer: dict, ups: list[dict],
             lines.append(f"  [{t['severity']:>8}] {t['printer_name']} "
                          f"({t['location'] or '—'}) — {t['color_label']} "
                          f"at {t['level']}%")
+            supply = t.get("supply") or {}
+            if supply.get("sku"):
+                lines.append(f"           Order: {supply['sku']}"
+                             + (f" — {supply['supplier_url']}"
+                                if supply.get("supplier_url") else ""))
+            if t.get("order_token"):
+                mark_url = _abs_url(public_base_url,
+                                    f"/orders/action/{t['order_token']}")
+                lines.append(f"           Mark as ordered: {mark_url}")
     if recoveries:
         lines.append("\nRECOVERED")
         for t in recoveries:
@@ -315,7 +355,8 @@ def _compose_body(customer: dict, ups: list[dict],
     return html, "\n".join(lines)
 
 
-def _alert_row_html(t: dict, *, recovered: bool = False) -> str:
+def _alert_row_html(t: dict, *, recovered: bool = False,
+                    public_base_url: str = "") -> str:
     if recovered:
         badge_bg, badge_col, badge = "#ECFDF5", "#065F46", "OK"
     elif t["severity"] == "CRITICAL":
@@ -325,6 +366,53 @@ def _alert_row_html(t: dict, *, recovered: bool = False) -> str:
 
     color_hex = {"K": "#231F20", "C": "#00A0FB",
                  "M": "#D030E8", "Y": "#FFC600"}.get(t["color"], "#8094AA")
+
+    # Order-info line — SKU + one-click order flow. Only rendered on
+    # up-transitions (recoveries don't need a buy button).
+    supply = t.get("supply") or {}
+    order_html = ""
+    if not recovered and (supply.get("sku") or t.get("order_token")):
+        parts: list[str] = []
+        if supply.get("sku"):
+            desc = _escape(supply.get("description", ""))
+            parts.append(
+                f"""<span style="font-family:ui-monospace,monospace;
+                              font-weight:700;color:#002854;">
+                    {_escape(supply['sku'])}</span>"""
+                + (f' <span style="color:#8094AA;">— {desc}</span>' if desc else "")
+            )
+        buttons_html = ""
+        if supply.get("supplier_url"):
+            buttons_html += (
+                f'<a href="{_escape(supply["supplier_url"])}" '
+                f'style="display:inline-block;padding:6px 14px;'
+                f'background:#00EB86;color:#002854;'
+                f'border-radius:6px;text-decoration:none;'
+                f'font-weight:700;font-size:12px;'
+                f'margin-right:8px;">🛒 Order now</a>'
+            )
+        if t.get("order_token"):
+            confirm_url = _abs_url(
+                public_base_url, f"/orders/action/{t['order_token']}")
+            buttons_html += (
+                f'<a href="{confirm_url}" '
+                f'style="display:inline-block;padding:6px 14px;'
+                f'background:#002854;color:#fff;border-radius:6px;'
+                f'text-decoration:none;font-weight:700;font-size:12px;">'
+                f'✓ Mark as ordered</a>'
+            )
+        order_html = f"""
+      <tr>
+        <td colspan="2" style="padding:0 10px 10px;">
+          <div style="padding:10px 12px;background:#F8FAFC;
+                      border:1px solid #E2E8F0;border-radius:8px;
+                      font-size:12px;line-height:1.5;">
+            {" · ".join(parts)}
+            <div style="margin-top:8px;">{buttons_html}</div>
+          </div>
+        </td>
+      </tr>"""
+
     return f"""
       <tr>
         <td style="padding:8px 10px;border-bottom:1px solid #F0F0F0;">
@@ -347,7 +435,17 @@ def _alert_row_html(t: dict, *, recovered: bool = False) -> str:
                        color:{badge_col};font-size:11px;font-weight:700;
                        letter-spacing:0.06em;">{badge}</span>
         </td>
-      </tr>"""
+      </tr>{order_html}"""
+
+
+def _abs_url(base: str, path: str) -> str:
+    """Turn a relative path into an absolute URL. Empty base returns
+    the path unchanged so links still work from an authenticated
+    browser tab, just not from mail."""
+    base = (base or "").rstrip("/")
+    if not base:
+        return path
+    return base + path
 
 
 def _escape(s: str) -> str:

@@ -20,7 +20,8 @@ from urllib.parse import quote as _urlquote
 
 from .. import auth, db, toner_alerts
 from . import (access_routes, auth_routes, customer_routes, dashboard_routes,
-               i18n, settings_routes, supply_routes, toner_routes, user_routes)
+               i18n, order_routes, settings_routes, supply_routes,
+               toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -156,6 +157,7 @@ def create_app() -> FastAPI:
     app.include_router(toner_routes.router)       # P2: /toner grid + /toner/refresh
     app.include_router(settings_routes.router)    # P3: mail config + test-mail
     app.include_router(supply_routes.router)      # P4a: model templates + per-printer overrides
+    app.include_router(order_routes.router)       # P4b: kanban + magic-link handlers
 
     # ── Alert runner (P3) ─────────────────────────────────────────────
     # Env-driven cadence: 0 disables the scheduler entirely (useful for
@@ -176,33 +178,9 @@ def create_app() -> FastAPI:
             return RedirectResponse("/login", status_code=303)
         return RedirectResponse("/dashboard", status_code=303)
 
-    # Coming-soon stubs — one route per sidebar entry that hasn't
-    # landed yet. /dashboard, /toner and /settings are real now;
-    # only /orders remains a stub until P4b.
-    _STUBS = (
-        ("/orders",     "nav.orders",      "P4b"),
-    )
-    for _path, _title_key, _phase in _STUBS:
-        def _make_stub(path, title_key, phase):
-            @app.get(path, response_class=HTMLResponse, include_in_schema=False,
-                     name=f"stub_{path.strip('/')}")
-            async def _stub(request: Request):
-                user = auth.require_user(request)
-                # Admin-only sections
-                if path == "/settings":
-                    auth.require_admin(request)
-                return templates.TemplateResponse(
-                    "coming_soon.html",
-                    {
-                        "request": request,
-                        "lang": request.state.lang,
-                        "user": dict(user),
-                        "phase": phase,
-                        "title_key": title_key,
-                    },
-                )
-            return _stub
-        _make_stub(_path, _title_key, _phase)
+    # Every sidebar entry now has a real route — no coming-soon stubs
+    # remain. /dashboard (P2), /toner (P2), /orders (P4b), /customers
+    # (P1), /supplies (P4a), /users (P1), /settings (P3).
 
     # Health check for Azure App Service liveness probes.
     @app.get("/healthz", include_in_schema=False)

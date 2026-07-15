@@ -1,0 +1,65 @@
+{# One kanban card. Consumes: `o` (order dict). Uses the enclosing
+   template's `lang` + `status`. Actions depend on the current status. #}
+<div class="order-card" data-order-id="{{ o.id }}">
+  <div class="printer-name" title="{{ o.printer_id }}">
+    {{ o.printer_name or o.printer_id }}
+  </div>
+  <div class="customer">{{ o.customer_name }}</div>
+
+  <div class="row-color-sku">
+    <span class="color-chip {{ o.color }}">{{ o.color }}</span>
+    {% if o.sku %}
+      <span class="sku">{{ o.sku }}</span>
+    {% else %}
+      <span class="sku missing">{{ _('orders.no_sku', lang) }}</span>
+    {% endif %}
+    <span class="qty">×{{ o.quantity }}</span>
+  </div>
+
+  <div class="footer">
+    <span class="stamp">
+      {% if status == 'draft' %}
+        {{ _('orders.stamp.created', lang) }} {{ o.ordered_at.split('.')[0] if '.' in o.ordered_at else o.ordered_at }}
+      {% else %}
+        {{ o.ordered_at.split('.')[0] if '.' in o.ordered_at else o.ordered_at }}
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="actions">
+    {% if o.supply and o.supply.supplier_url %}
+      <a href="{{ o.supply.supplier_url }}" target="_blank" rel="noopener"
+         class="buy" data-noloader
+         title="{{ _('orders.action.buy', lang) }}">🛒 {{ _('orders.action.buy', lang) }}</a>
+    {% endif %}
+
+    {% if status == 'draft' %}
+      <form method="post" action="/orders/{{ o.id }}/status">
+        <input type="hidden" name="status" value="ordered">
+        <button type="submit" class="primary">✓ {{ _('orders.action.mark_ordered', lang) }}</button>
+      </form>
+      <form method="post" action="/orders/{{ o.id }}/delete"
+            onsubmit="return confirm('{{ _('orders.confirm.delete_draft', lang) }}')">
+        <button type="submit" class="danger">✕ {{ _('common.delete', lang) }}</button>
+      </form>
+    {% elif status == 'ordered' %}
+      <form method="post" action="/orders/{{ o.id }}/status">
+        <input type="hidden" name="status" value="delivered">
+        <button type="submit" class="primary">📦 {{ _('orders.action.mark_delivered', lang) }}</button>
+      </form>
+      <form method="post" action="/orders/{{ o.id }}/status">
+        <input type="hidden" name="status" value="cancelled">
+        <button type="submit" class="danger">✕ {{ _('orders.action.cancel', lang) }}</button>
+      </form>
+    {% elif status == 'delivered' %}
+      <form method="post" action="/orders/{{ o.id }}/status">
+        <input type="hidden" name="status" value="installed">
+        <button type="submit" class="primary">🔧 {{ _('orders.action.mark_installed', lang) }}</button>
+      </form>
+      <form method="post" action="/orders/{{ o.id }}/status">
+        <input type="hidden" name="status" value="cancelled">
+        <button type="submit" class="danger">✕ {{ _('orders.action.cancel', lang) }}</button>
+      </form>
+    {% endif %}
+  </div>
+</div>

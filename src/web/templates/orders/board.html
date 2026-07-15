@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}{{ _('orders.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('orders.title', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .orders-hdr {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--sp-4); margin-bottom: var(--sp-4); flex-wrap: wrap;
+  }
+  .orders-hdr p {
+    color: var(--tw-muted-blue); margin-top: 4px; font-size: 0.9rem;
+  }
+  .orders-hdr .counts {
+    display: flex; gap: var(--sp-2); flex-wrap: wrap;
+  }
+  .count-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 16px;
+    font-size: 0.78rem; font-weight: 700;
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    color: var(--tw-primary);
+  }
+  .count-pill .num { font-family: var(--font-mono); font-weight: 900; }
+
+  .kanban {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-3);
+  }
+  @media (max-width: 1024px) { .kanban { grid-template-columns: 1fr; } }
+
+  .kanban-col {
+    background: var(--tw-gray-100);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg);
+    padding: var(--sp-3);
+    min-height: 200px;
+  }
+  .kanban-col h3 {
+    margin: 0 0 var(--sp-3);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.82rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--tw-primary);
+    font-weight: 800;
+  }
+  .kanban-col h3 .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--tw-muted-blue);
+  }
+  .kanban-col.st-draft h3 .dot     { background: #8094AA; }
+  .kanban-col.st-ordered h3 .dot   { background: var(--tw-accent); }
+  .kanban-col.st-delivered h3 .dot { background: #00EB86; }
+  .kanban-col h3 .count {
+    margin-left: auto; padding: 2px 8px;
+    border-radius: 10px; font-size: 0.72rem;
+    background: var(--tw-white); color: var(--tw-primary);
+    font-family: var(--font-mono); font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .order-card {
+    background: var(--tw-white);
+    border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r);
+    padding: var(--sp-3);
+    margin-bottom: var(--sp-2);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--t-fast), transform var(--t-fast);
+  }
+  .order-card:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+  .order-card .printer-name {
+    font-weight: 700; color: var(--tw-primary);
+    font-size: 0.92rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .order-card .customer {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+  .order-card .row-color-sku {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 0.82rem;
+  }
+  .order-card .color-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px 2px 5px; border-radius: 10px;
+    font-family: var(--font-mono); font-weight: 700; font-size: 0.75rem;
+    background: var(--tw-gray-100); color: var(--tw-primary);
+  }
+  .order-card .color-chip::before {
+    content: ''; display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--tw-muted-blue);
+  }
+  .order-card .color-chip.K::before { background: #231F20; }
+  .order-card .color-chip.C::before { background: #00A0FB; }
+  .order-card .color-chip.M::before { background: #D030E8; }
+  .order-card .color-chip.Y::before { background: #FFC600; }
+  .order-card .sku {
+    font-family: var(--font-mono); font-weight: 700;
+    color: var(--tw-primary);
+  }
+  .order-card .sku.missing { color: var(--tw-muted-blue); font-weight: 400; }
+  .order-card .qty {
+    margin-left: auto; padding: 1px 8px; border-radius: 8px;
+    background: var(--tw-faint-blue); color: var(--tw-primary);
+    font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
+  }
+  .order-card .footer {
+    display: flex; align-items: center; gap: 6px; margin-top: 10px;
+    padding-top: 8px; border-top: 1px solid var(--tw-gray-200);
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+  }
+  .order-card .footer .stamp {
+    flex: 1; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-family: var(--font-mono);
+  }
+  .order-card .actions {
+    display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .order-card .actions form { margin: 0; }
+  .order-card .actions button, .order-card .actions a {
+    padding: 4px 10px; border-radius: 6px;
+    font: inherit; font-size: 0.75rem; font-weight: 700;
+    border: 1px solid var(--tw-gray-300); background: var(--tw-white);
+    color: var(--tw-primary); cursor: pointer;
+    text-decoration: none;
+  }
+  .order-card .actions button:hover, .order-card .actions a:hover {
+    background: var(--tw-faint-blue);
+  }
+  .order-card .actions .primary {
+    background: var(--tw-primary); border-color: var(--tw-primary);
+    color: var(--tw-white);
+  }
+  .order-card .actions .primary:hover {
+    background: var(--tw-primary-alt); border-color: var(--tw-primary-alt);
+  }
+  .order-card .actions .danger {
+    color: #991B1B; border-color: #FCA5A5;
+  }
+  .order-card .actions .danger:hover {
+    background: #FEF2F2; color: #7F1D1D;
+  }
+  .order-card .actions .buy {
+    background: #00EB86; border-color: #00EB86;
+    color: #002854; font-weight: 800;
+  }
+  .order-card .actions .buy:hover { background: #00D178; border-color: #00D178; }
+
+  .kanban-col .empty {
+    padding: var(--sp-4) var(--sp-3); border-radius: var(--r);
+    border: 1px dashed var(--tw-gray-300);
+    text-align: center; color: var(--tw-muted-blue);
+    font-size: 0.85rem;
+  }
+
+  .closed-section {
+    margin-top: var(--sp-6);
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .closed-section > summary {
+    padding: var(--sp-3) var(--sp-4); cursor: pointer;
+    font-weight: 700; color: var(--tw-primary);
+    display: flex; align-items: center; gap: 8px;
+    background: var(--tw-gray-100);
+    border-bottom: 1px solid var(--tw-gray-300);
+  }
+  .closed-section > summary::-webkit-details-marker { display: none; }
+  .closed-section > summary::before {
+    content: '▸'; transition: transform var(--t-fast);
+  }
+  .closed-section[open] > summary::before { transform: rotate(90deg); }
+  .closed-table {
+    width: 100%; border-collapse: collapse; font-size: 0.85rem;
+  }
+  .closed-table th, .closed-table td {
+    padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--tw-gray-200);
+  }
+  .closed-table th {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+    background: var(--tw-gray-100);
+  }
+  .closed-table .st-installed { color: #065F46; font-weight: 700; }
+  .closed-table .st-cancelled { color: #991B1B; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="orders-hdr">
+  <div>
+    <h1>{{ _('orders.title', lang) }}</h1>
+    <p>{{ _('orders.intro', lang) }}</p>
+  </div>
+  <div class="counts">
+    <span class="count-pill">
+      <span class="num">{{ grouped.draft|length }}</span>
+      {{ _('orders.status.draft', lang) }}
+    </span>
+    <span class="count-pill">
+      <span class="num">{{ grouped.ordered|length }}</span>
+      {{ _('orders.status.ordered', lang) }}
+    </span>
+    <span class="count-pill">
+      <span class="num">{{ grouped.delivered|length }}</span>
+      {{ _('orders.status.delivered', lang) }}
+    </span>
+  </div>
+</div>
+
+{% if info %}
+  <div class="alert alert-info">
+    {% if info.startswith('order_') %}{{ _('orders.info.' + info[6:], lang) }}
+    {% elif info == 'order_created' %}{{ _('orders.info.created', lang) }}
+    {% elif info == 'draft_deleted' %}{{ _('orders.info.deleted', lang) }}
+    {% else %}{{ info }}{% endif %}
+  </div>
+{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<div class="kanban">
+  {% for status, orders in [('draft', grouped.draft),
+                             ('ordered', grouped.ordered),
+                             ('delivered', grouped.delivered)] %}
+    <div class="kanban-col st-{{ status }}">
+      <h3><span class="dot"></span>
+        {{ _('orders.status.' + status, lang) }}
+        <span class="count">{{ orders|length }}</span>
+      </h3>
+      {% if orders %}
+        {% for o in orders %}
+          {% include 'orders/_card.html' %}
+        {% endfor %}
+      {% else %}
+        <div class="empty">{{ _('orders.col.empty', lang) }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<details class="closed-section" {{ 'open' if recent_closed else '' }}>
+  <summary>
+    {{ _('orders.closed.title', lang) }} ({{ recent_closed|length }})
+  </summary>
+  {% if recent_closed %}
+    <table class="closed-table">
+      <thead>
+        <tr>
+          <th>{{ _('orders.col.printer', lang) }}</th>
+          <th>{{ _('orders.col.customer', lang) }}</th>
+          <th>{{ _('orders.col.color', lang) }}</th>
+          <th>{{ _('orders.col.sku', lang) }}</th>
+          <th style="text-align:right;">{{ _('orders.col.qty', lang) }}</th>
+          <th>{{ _('orders.col.status', lang) }}</th>
+          <th>{{ _('orders.col.closed_at', lang) }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in recent_closed %}
+          <tr>
+            <td>{{ o.printer_name or o.printer_id }}</td>
+            <td>{{ o.customer_name }}</td>
+            <td><span class="color-chip {{ o.color }}" style="display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 5px; border-radius:10px; font-family:var(--font-mono); font-size:0.75rem;">{{ o.color }}</span></td>
+            <td style="font-family: var(--font-mono);">{{ o.sku or '—' }}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">{{ o.quantity }}</td>
+            <td class="st-{{ o.status }}">{{ _('orders.status.' + o.status, lang) }}</td>
+            <td style="font-family:var(--font-mono); font-size:0.78rem;">
+              {{ o.closed_at.split('.')[0] if '.' in o.closed_at else o.closed_at }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div style="padding: var(--sp-4); text-align:center; color: var(--tw-muted-blue);">
+      {{ _('orders.closed.empty', lang) }}
+    </div>
+  {% endif %}
+</details>
+{% endblock %}
