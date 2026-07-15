@@ -10,7 +10,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .. import (auth, backup, bi_client, db, entra_sso, graph_connector,
-                 llm_client, mail_client, toner_alerts)
+                 llm_client, mail_client, runner_config, toner_alerts)
 from ..db import customers as customers_tbl
 
 
@@ -36,6 +36,7 @@ async def settings_page(request: Request):
             "entra":  entra_sso.load_config(),
             "llm":    llm_client.load_config(),
             "graph":  graph_connector.load_config(),
+            "runner": runner_config.load_config(),
             "info":   request.query_params.get("info", ""),
             "error":  request.query_params.get("error", ""),
         },
@@ -68,6 +69,27 @@ async def settings_mail_save(request: Request):
              meta_json=json.dumps({"provider": provider,
                                    "from_email": cfg["from_email"]}))
     return RedirectResponse("/settings?info=mail_saved", status_code=303)
+
+
+@router.post("/settings/runner", include_in_schema=False)
+async def settings_runner_save(request: Request):
+    admin = auth.require_admin(request)
+    form = await request.form()
+    try:
+        alert_min = int(form.get("alert_interval_minutes") or 15)
+    except ValueError:
+        alert_min = 15
+    try:
+        refresh_min = int(form.get("refresh_interval_minutes") or 5)
+    except ValueError:
+        refresh_min = 5
+    runner_config.save_config(alert_min, refresh_min)
+    db.audit(admin["id"], "settings.runner_updated",
+             target_type="settings", target_id="runner",
+             meta_json=json.dumps({"alert_min": alert_min,
+                                    "refresh_min": refresh_min}))
+    return RedirectResponse("/settings?info=runner_saved#runner",
+                            status_code=303)
 
 
 @router.post("/settings/entra", include_in_schema=False)

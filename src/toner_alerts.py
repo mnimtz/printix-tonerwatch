@@ -461,11 +461,46 @@ def _escape(s: str) -> str:
 _scheduler = None
 
 
-def start_runner(interval_minutes: int = 15) -> None:
-    """Kick off the APScheduler background runner. No-op if already started
-    or if the interval is <= 0 (feature-flag off)."""
+def reschedule_intervals(alert_minutes: int, refresh_minutes: int) -> None:
+    """Apply new intervals to the already-running scheduler jobs.
+    Called by runner_config.save_config() after the settings form is
+    saved, so an operator's edit takes effect without a server restart.
+    Silent no-op if the scheduler hasn't started yet or if the requested
+    interval is invalid."""
+    if _scheduler is None:
+        return
+    try:
+        from apscheduler.triggers.interval import IntervalTrigger
+    except ImportError:
+        return
+    alert_minutes   = max(1, int(alert_minutes or 0))
+    refresh_minutes = max(1, int(refresh_minutes or 0))
+    try:
+        _scheduler.reschedule_job(
+            "toner_alerts_tick",
+            trigger=IntervalTrigger(minutes=alert_minutes))
+        logger.info("alert-runner rescheduled: every %d min", alert_minutes)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("reschedule alert runner failed: %s", e)
+    try:
+        _scheduler.reschedule_job(
+            "toner_cache_refresh",
+            trigger=IntervalTrigger(minutes=refresh_minutes))
+        logger.info("cache-refresh rescheduled: every %d min", refresh_minutes)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("reschedule cache refresh failed: %s", e)
+
+
+def start_runner(interval_minutes: int | None = None) -> None:
+    """Kick off the APScheduler background runner. No-op if already started.
+
+    ``interval_minutes`` is now an OVERRIDE — when omitted (or ``None``),
+    the config is loaded from the settings table via ``runner_config``,
+    which itself falls back to env vars and then to defaults. Kept as
+    a parameter so tests can force a value without touching the DB.
+    """
     global _scheduler
-    if _scheduler is not None or interval_minutes <= 0:
+    if _scheduler is not None:
         return
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
@@ -474,10 +509,18 @@ def start_runner(interval_minutes: int = 15) -> None:
         logger.warning("APScheduler not installed — runner disabled")
         return
 
+    # Late import — runner_config imports us back for reschedule.
+    from . import runner_config
+    cfg = runner_config.load_config()
+    alert_min = int(interval_minutes) if interval_minutes else cfg["alert_interval_minutes"]
+    refresh_min = cfg["refresh_interval_minutes"]
+    if alert_min <= 0:
+        return
+
     _scheduler = BackgroundScheduler(timezone="UTC")
     _scheduler.add_job(
         _tick_all_customers,
-        trigger=IntervalTrigger(minutes=interval_minutes),
+        trigger=IntervalTrigger(minutes=alert_min),
         id="toner_alerts_tick",
         name="Toner alert evaluation",
         max_instances=1,
@@ -486,17 +529,12 @@ def start_runner(interval_minutes: int = 15) -> None:
                       + _dt.timedelta(seconds=60),  # wait a bit after boot
     )
 
-    # v0.8.0: Background cache warmer. The BI-DB fetch takes 2–8 s per
-    # customer when the cache is cold, so a fresh /toner or /dashboard
-    # visit blocks that long. Run a refresh every REFRESH_INTERVAL_MINUTES
-    # (default 5) so the cached data is always < ttl old and every user
-    # request reads from memory. Cache TTL for full fetch is 10 min, so
-    # a 5-min tick keeps us comfortably ahead of expiry.
-    refresh_interval = int(os.environ.get("REFRESH_INTERVAL_MINUTES", "5"))
-    if refresh_interval > 0:
+    # v0.8: Background BI-cache warmer.
+    # v0.15: interval now editable in Settings (was env-only).
+    if refresh_min > 0:
         _scheduler.add_job(
             _tick_cache_refresh,
-            trigger=IntervalTrigger(minutes=refresh_interval),
+            trigger=IntervalTrigger(minutes=refresh_min),
             id="toner_cache_refresh",
             name="Toner cache warm-up",
             max_instances=1,
@@ -536,8 +574,7 @@ def start_runner(interval_minutes: int = 15) -> None:
 
     _scheduler.start()
     logger.info("toner_alerts: scheduler started, alerts every %d min, "
-                "cache refresh every %d min",
-                interval_minutes, refresh_interval)
+                "cache refresh every %d min", alert_min, refresh_min)
 
 
 def _tick_all_customers() -> None:

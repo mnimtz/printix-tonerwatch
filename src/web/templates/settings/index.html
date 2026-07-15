@@ -177,14 +177,66 @@
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
       {{ _('settings.runner.intro', lang) }}
     </p>
-    <p style="margin-top: var(--sp-4); font-family: var(--font-mono);
-              font-size: 0.88rem;">
-      {{ _('settings.runner.interval', lang) }}:
-      <strong>{{ (request.app.state.alert_interval_minutes or 15) }} min</strong>
-      &nbsp;·&nbsp;
-      {{ _('settings.runner.env_hint', lang) }}
-      <code>ALERT_INTERVAL_MINUTES</code>
-    </p>
+
+    <form method="post" action="/settings/runner" style="margin-top: var(--sp-4);">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="alert_interval">{{ _('settings.runner.alert_interval', lang) }}</label>
+          <input type="number" id="alert_interval" name="alert_interval_minutes"
+                 min="1" max="1440" value="{{ runner.alert_interval_minutes }}">
+          <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+            {{ _('settings.runner.alert_interval_hint', lang) }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="refresh_interval">{{ _('settings.runner.refresh_interval', lang) }}</label>
+          <input type="number" id="refresh_interval" name="refresh_interval_minutes"
+                 min="1" max="1440" value="{{ runner.refresh_interval_minutes }}">
+          <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+            {{ _('settings.runner.refresh_interval_hint', lang) }}
+          </div>
+        </div>
+      </div>
+
+      {# Show which source the current values come from so an operator
+         who set an env var doesn't wonder why their DB edit "does
+         nothing". Env var wins on the very first start; after a save,
+         DB always wins. #}
+      {% if runner.alert_source != 'db' or runner.refresh_source != 'db' %}
+      <div style="margin-top: var(--sp-3); padding: var(--sp-3);
+                  background: var(--tw-gray-100); border-radius: var(--r);
+                  font-size: 0.82rem;">
+        {% if runner.alert_source == 'env' %}
+          <div>
+            ℹ {{ _('settings.runner.env_active', lang) }}
+            <code>ALERT_INTERVAL_MINUTES = {{ runner.env_alert_minutes }}</code>
+            — {{ _('settings.runner.env_note', lang) }}
+          </div>
+        {% endif %}
+        {% if runner.refresh_source == 'env' %}
+          <div style="margin-top: 4px;">
+            ℹ {{ _('settings.runner.env_active', lang) }}
+            <code>REFRESH_INTERVAL_MINUTES = {{ runner.env_refresh_minutes }}</code>
+            — {{ _('settings.runner.env_note', lang) }}
+          </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn" style="margin-top: var(--sp-3);">
+        {{ _('common.save', lang) }}
+      </button>
+      <span style="margin-left: var(--sp-3); font-size: 0.82rem;
+                   color: var(--tw-muted-blue);">
+        {{ _('settings.runner.live_hint', lang) }}
+      </span>
+    </form>
+
+    {% if info == 'runner_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        {{ _('settings.runner.saved', lang) }}
+      </div>
+    {% endif %}
   </div>
 
   </div><!-- /tab-panel: runner -->
