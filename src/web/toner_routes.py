@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from .. import auth, bi_client, db, supply_library
+from .. import auth, bi_client, db, printer_info, supply_library
 from ..db import customers as customers_tbl, customer_access
 from ..web import printer_icons
 
@@ -102,11 +102,10 @@ def _collect_printer_rows(user: dict) -> tuple[list[dict], list[dict]]:
 
         warn = int(c["warn_pct"] or 20)
         crit = int(c["critical_pct"] or 5)
+        # v0.9: bulk-load per-printer overrides for this customer so
+        # every row can be enriched without an N+1 SELECT.
+        info_map = printer_info.list_info_for_customer(c["id"])
         for p in printers:
-            # Enrich each toner slot with the resolved supply record
-            # (override → template → None) so the grid can show SKU and
-            # a one-click order link. Cheap: both tables are small and
-            # a printer has at most 5 slots.
             supplies_scored = []
             for s in p["supplies"]:
                 supply = supply_library.resolve_supply(
@@ -117,8 +116,13 @@ def _collect_printer_rows(user: dict) -> tuple[list[dict], list[dict]]:
                         s["level"], warn_pct=warn, critical_pct=crit),
                     "supply": supply,
                 })
+            # Merge BI row with our own overrides (location, serial,
+            # group, asset-tag, contact, notes). Location + serial
+            # take precedence over BI when non-empty; the rest are
+            # passthrough fields not exposed by BI at all.
+            enriched = printer_info.enrich(p, info_map.get(p["id"]))
             printer_rows.append({
-                **p,
+                **enriched,
                 "supplies": supplies_scored,
                 "worst_severity": _worst_supply_severity(
                     p["supplies"], warn, crit),
@@ -150,6 +154,22 @@ async def toner_grid(request: Request):
     q = request.query_params
     filter_customer = q.get("customer", "")
     filter_severity = q.get("severity", "")
+    filter_group    = q.get("group", "")
+    filter_search   = q.get("q", "").strip().lower()
+    # View mode — persist in session so page reloads / navigation keep it.
+    view_mode = q.get("view", "").strip().lower()
+    if view_mode in ("grid", "list"):
+        try:
+            request.session["toner_view"] = view_mode
+        except AssertionError:
+            pass
+    else:
+        try:
+            view_mode = request.session.get("toner_view", "grid")
+        except AssertionError:
+            view_mode = "grid"
+    if view_mode not in ("grid", "list"):
+        view_mode = "grid"
 
     filtered = rows
     if filter_customer.isdigit():
@@ -160,11 +180,28 @@ async def toner_grid(request: Request):
         # cares about criticals too
         wanted = {"CRITICAL"} if filter_severity == "CRITICAL" else {"CRITICAL", "WARN"}
         filtered = [r for r in filtered if r["worst_severity"] in wanted]
+    if filter_group:
+        filtered = [r for r in filtered
+                    if (r.get("group_name") or "") == filter_group]
+    if filter_search:
+        # Case-insensitive substring match on the most useful fields.
+        def _matches(r: dict) -> bool:
+            hay = " ".join(str(r.get(k) or "") for k in
+                           ("printer_name", "location", "model", "vendor",
+                            "serial_number", "asset_tag", "notes")).lower()
+            return filter_search in hay
+        filtered = [r for r in filtered if _matches(r)]
 
     # Distinct customer list for the dropdown
     customer_choices = sorted(
         {(r["customer_id"], r["customer_name"]) for r in rows},
         key=lambda t: t[1].lower(),
+    )
+    # Distinct group list for the group filter (over the whole,
+    # unfiltered set of rows the user can see).
+    group_choices = sorted(
+        {(r.get("group_name") or "") for r in rows if r.get("group_name")},
+        key=str.lower,
     )
 
     # Summary counters (over the UNFILTERED set)
@@ -177,8 +214,9 @@ async def toner_grid(request: Request):
     }
 
     templates = request.app.state.templates
+    template_name = "toner/list.html" if view_mode == "list" else "toner/grid.html"
     return templates.TemplateResponse(
-        "toner/grid.html",
+        template_name,
         {
             "request": request,
             "lang": request.state.lang,
@@ -186,9 +224,13 @@ async def toner_grid(request: Request):
             "printers": filtered,
             "errors": errors,
             "customer_choices": customer_choices,
+            "group_choices": group_choices,
             "counts": counts,
             "filter_customer": filter_customer,
             "filter_severity": filter_severity,
+            "filter_group":    filter_group,
+            "filter_search":   filter_search,
+            "view_mode":       view_mode,
         },
     )
 

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}{{ _('printer_info.title', lang) }} — {{ printer.printer_name or printer.id }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/toner" data-noloader>{{ _('nav.toner', lang) }}</a> /
+  <a href="/toner?customer={{ customer.id }}" data-noloader>{{ customer.name }}</a> /
+  {{ printer.printer_name or printer.id }}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .info-hero {
+    display: flex; align-items: center; gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
+    margin-bottom: var(--sp-4); flex-wrap: wrap;
+  }
+  .info-hero .name {
+    font-size: 1.15rem; font-weight: 700; color: var(--tw-primary);
+  }
+  .info-hero .sub {
+    font-size: 0.85rem; color: var(--tw-muted-blue); margin-top: 3px;
+  }
+  .info-hero .id {
+    font-family: var(--font-mono); font-size: 0.72rem;
+    color: var(--tw-muted-blue);
+  }
+  .info-card {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); overflow: hidden; margin-bottom: var(--sp-3);
+    box-shadow: var(--shadow-sm);
+  }
+  .info-card h3 {
+    margin: 0; padding: var(--sp-3) var(--sp-4);
+    background: var(--tw-faint-blue); border-bottom: 1px solid var(--tw-gray-300);
+    color: var(--tw-primary); font-size: 0.95rem; font-weight: 700;
+  }
+  .info-card .body { padding: var(--sp-4) var(--sp-5); }
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+  .row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-3); }
+  @media (max-width: 640px) {
+    .row-2col, .row-3col { grid-template-columns: 1fr; }
+  }
+  .field-hint {
+    font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;
+  }
+  .form-actions {
+    display: flex; gap: var(--sp-2); margin-top: var(--sp-4);
+    justify-content: space-between; flex-wrap: wrap;
+  }
+  .form-actions .left  { display: flex; gap: var(--sp-2); }
+  .form-actions .right { display: flex; gap: var(--sp-2); }
+  .form-actions a.cancel {
+    color: var(--tw-muted-blue); padding: 8px 14px; text-decoration: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="info-hero">
+  <div style="flex: 1; min-width: 200px;">
+    <div class="name">{{ printer.printer_name or printer.id }}</div>
+    <div class="sub">
+      {% if printer.model %}{{ printer.model }}{% endif %}
+      {% if printer.vendor %} · {{ printer.vendor }}{% endif %}
+    </div>
+    <div class="id">{{ printer.printer_id or printer.id }}</div>
+  </div>
+  <div style="text-align: right;">
+    <div style="font-size: 0.72rem; color: var(--tw-muted-blue);
+                letter-spacing: 0.08em; text-transform: uppercase;">
+      {{ _('printer_info.customer', lang) }}
+    </div>
+    <div style="font-weight: 700; color: var(--tw-primary);">{{ customer.name }}</div>
+  </div>
+</div>
+
+<div class="alert alert-info" style="margin-bottom: var(--sp-4);">
+  {{ _('printer_info.intro', lang) }}
+</div>
+
+{% if form_info == 'saved' %}
+  <div class="alert alert-info">{{ _('printer_info.saved', lang) }}</div>
+{% elif form_info == 'deleted' %}
+  <div class="alert alert-info">{{ _('printer_info.deleted', lang) }}</div>
+{% endif %}
+{% if form_error %}<div class="alert alert-error">{{ form_error }}</div>{% endif %}
+
+<form method="post" action="/toner/{{ customer.id }}/{{ printer.printer_id or printer.id }}/info">
+  <!-- Location + serial (with BI fallback shown as placeholder) -->
+  <div class="info-card">
+    <h3>{{ _('printer_info.section.identity', lang) }}</h3>
+    <div class="body">
+      <div class="row-2col">
+        <div class="form-group">
+          <label for="location_override">{{ _('printer_info.field.location', lang) }}</label>
+          <input type="text" id="location_override" name="location_override"
+                 value="{{ info.location_override or '' }}"
+                 placeholder="{{ printer.location or _('printer_info.placeholder.no_bi_value', lang) }}">
+          <div class="field-hint">{{ _('printer_info.hint.location', lang) }}</div>
+        </div>
+        <div class="form-group">
+          <label for="serial_override">{{ _('printer_info.field.serial', lang) }}</label>
+          <input type="text" id="serial_override" name="serial_override"
+                 value="{{ info.serial_override or '' }}"
+                 placeholder="{{ printer.serial_number or _('printer_info.placeholder.no_bi_value', lang) }}">
+          <div class="field-hint">{{ _('printer_info.hint.serial', lang) }}</div>
+        </div>
+      </div>
+      <div class="row-2col">
+        <div class="form-group">
+          <label for="asset_tag">{{ _('printer_info.field.asset_tag', lang) }}</label>
+          <input type="text" id="asset_tag" name="asset_tag"
+                 value="{{ info.asset_tag or '' }}"
+                 placeholder="INV-12345">
+        </div>
+        <div class="form-group">
+          <label for="group_name">{{ _('printer_info.field.group', lang) }}</label>
+          <input type="text" id="group_name" name="group_name"
+                 value="{{ info.group_name or '' }}"
+                 list="group-suggestions"
+                 placeholder="{{ _('printer_info.placeholder.group', lang) }}">
+          {% if known_groups %}
+            <datalist id="group-suggestions">
+              {% for g in known_groups %}<option value="{{ g }}">{% endfor %}
+            </datalist>
+          {% endif %}
+          <div class="field-hint">{{ _('printer_info.hint.group', lang) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact + warranty -->
+  <div class="info-card">
+    <h3>{{ _('printer_info.section.contract', lang) }}</h3>
+    <div class="body">
+      <div class="form-group">
+        <label for="contact_email">{{ _('printer_info.field.contact_email', lang) }}</label>
+        <input type="email" id="contact_email" name="contact_email"
+               value="{{ info.contact_email or '' }}"
+               placeholder="pcs@example.com">
+        <div class="field-hint">{{ _('printer_info.hint.contact_email', lang) }}</div>
+      </div>
+      <div class="row-2col">
+        <div class="form-group">
+          <label for="purchased_at">{{ _('printer_info.field.purchased_at', lang) }}</label>
+          <input type="date" id="purchased_at" name="purchased_at"
+                 value="{{ info.purchased_at or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="warranty_until">{{ _('printer_info.field.warranty_until', lang) }}</label>
+          <input type="date" id="warranty_until" name="warranty_until"
+                 value="{{ info.warranty_until or '' }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Free-form notes -->
+  <div class="info-card">
+    <h3>{{ _('printer_info.section.notes', lang) }}</h3>
+    <div class="body">
+      <div class="form-group">
+        <textarea id="notes" name="notes" rows="4"
+                  placeholder="{{ _('printer_info.placeholder.notes', lang) }}">{{ info.notes or '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <div class="left">
+      {% if info_present %}
+        <button type="submit"
+                formaction="/toner/{{ customer.id }}/{{ printer.printer_id or printer.id }}/info/delete"
+                class="btn btn-secondary" formnovalidate
+                onclick="return confirm('{{ _('printer_info.confirm_delete', lang) }}')">
+          {{ _('printer_info.delete', lang) }}
+        </button>
+      {% endif %}
+    </div>
+    <div class="right">
+      <a href="/toner?customer={{ customer.id }}" class="cancel" data-noloader>
+        {{ _('common.cancel', lang) }}
+      </a>
+      <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

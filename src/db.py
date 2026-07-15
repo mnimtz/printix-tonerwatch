@@ -246,6 +246,32 @@ supply_templates = Table(
                     name="ck_supply_templates_color"),
 )
 
+printer_info = Table(
+    "printer_info", metadata,
+    Column("customer_id", Integer,
+           ForeignKey("customers.id", ondelete="CASCADE"), nullable=False),
+    Column("printer_id", Text, nullable=False),
+    # Per-device overrides — non-empty wins over the value from Printix BI.
+    # Empty means "use whatever BI says".
+    Column("location_override", Text, nullable=False, server_default=""),
+    Column("serial_override",   Text, nullable=False, server_default=""),
+    Column("asset_tag",         Text, nullable=False, server_default=""),
+    Column("group_name",        Text, nullable=False, server_default=""),
+    Column("contact_email",     Text, nullable=False, server_default=""),
+    Column("purchased_at",      Text, nullable=False, server_default=""),
+    Column("warranty_until",    Text, nullable=False, server_default=""),
+    Column("notes",             Text, nullable=False, server_default=""),
+    Column("updated_at",        Text, nullable=False,
+           server_default=func.current_timestamp()),
+    Column("updated_by_user_id", Integer,
+           ForeignKey("users.id", ondelete="SET NULL")),
+    PrimaryKeyConstraint("customer_id", "printer_id",
+                         name="pk_printer_info"),
+)
+Index("idx_printer_info_group",
+      printer_info.c.customer_id, printer_info.c.group_name)
+
+
 printer_supplies = Table(
     "printer_supplies", metadata,
     Column("customer_id", Integer,

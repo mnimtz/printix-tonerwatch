@@ -76,6 +76,36 @@
     text-decoration: underline; padding: 2px 6px;
   }
   .toner-filters .reset-link:hover { color: var(--tw-primary); }
+  .toner-filters .search {
+    padding: 6px 10px; border-radius: 16px;
+    border: 1px solid var(--tw-gray-300); background: var(--tw-white);
+    font-family: inherit; font-size: 0.85rem; color: var(--tw-primary);
+    min-width: 180px;
+  }
+  .toner-filters .search:focus {
+    outline: none; border-color: var(--tw-accent);
+    box-shadow: 0 0 0 3px rgba(0, 160, 251, 0.15);
+  }
+  .toner-filters .view-toggle {
+    display: inline-flex; border: 1px solid var(--tw-gray-300);
+    border-radius: 16px; overflow: hidden;
+  }
+  .toner-filters .view-toggle a {
+    padding: 5px 12px; font-size: 0.82rem; font-weight: 600;
+    color: var(--tw-muted-blue); background: var(--tw-white);
+    text-decoration: none; border-right: 1px solid var(--tw-gray-300);
+  }
+  .toner-filters .view-toggle a:last-child { border-right: none; }
+  .toner-filters .view-toggle a.active {
+    background: var(--tw-primary); color: var(--tw-white);
+  }
+  .printer-header .group-badge {
+    display: inline-block; margin-top: 4px; margin-left: 6px;
+    padding: 1px 8px; border-radius: 8px;
+    background: #ECFDF5; color: #065F46;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.04em;
+  }
 
   .toner-grid {
     display: grid;
@@ -326,6 +356,7 @@
     {% if customer_choices %}
       <form method="get" action="/toner" class="customer-picker" data-noloader>
         {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
+        {% if filter_group %}<input type="hidden" name="group" value="{{ filter_group }}">{% endif %}
         <label for="customer-select">{{ _('toner.filter.customer_label', lang) }}</label>
         <select id="customer-select" name="customer" onchange="this.form.submit()">
           <option value="">{{ _('toner.filter.all_customers', lang) }}</option>
@@ -337,6 +368,44 @@
         </select>
       </form>
     {% endif %}
+
+    {% if group_choices %}
+      <form method="get" action="/toner" class="customer-picker" data-noloader
+            style="margin-left: 0;">
+        {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
+        {% if filter_customer %}<input type="hidden" name="customer" value="{{ filter_customer }}">{% endif %}
+        <label for="group-select">{{ _('toner.filter.group_label', lang) }}</label>
+        <select id="group-select" name="group" onchange="this.form.submit()">
+          <option value="">{{ _('toner.filter.all_groups', lang) }}</option>
+          {% for g in group_choices %}
+            <option value="{{ g }}" {% if filter_group == g %}selected{% endif %}>{{ g }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+
+    <!-- Search box (client-submitted) -->
+    <form method="get" action="/toner" class="customer-picker" data-noloader
+          style="margin-left: 0;">
+      {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
+      {% if filter_customer %}<input type="hidden" name="customer" value="{{ filter_customer }}">{% endif %}
+      {% if filter_group %}<input type="hidden" name="group" value="{{ filter_group }}">{% endif %}
+      <input type="search" name="q" class="search"
+             placeholder="{{ _('toner.filter.search_placeholder', lang) }}"
+             value="{{ filter_search or '' }}">
+    </form>
+
+    <!-- View toggle: grid ↔ list -->
+    <div class="view-toggle" data-noloader>
+      <a href="?view=grid{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
+         class="{{ 'active' if view_mode == 'grid' else '' }}" data-noloader>
+        ▦ {{ _('toner.view.grid', lang) }}
+      </a>
+      <a href="?view=list{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
+         class="{{ 'active' if view_mode == 'list' else '' }}" data-noloader>
+        ☰ {{ _('toner.view.list', lang) }}
+      </a>
+    </div>
   </div>
 {% endif %}
 
@@ -367,12 +436,25 @@
                 {{ p.customer_name }}
               </a>
             {% endif %}
+            {% if p.group_name %}
+              <a href="/toner?group={{ p.group_name|urlencode }}"
+                 class="group-badge" style="text-decoration: none;">
+                🏷 {{ p.group_name }}
+              </a>
+            {% endif %}
           </div>
-          <a href="/toner/{{ p.customer_id }}/{{ p.id }}/supply"
-             class="supply-edit"
-             title="{{ _('supplies.link.edit', lang) }}">
-            📦 {{ _('supplies.link.edit', lang) }}
-          </a>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <a href="/toner/{{ p.customer_id }}/{{ p.id }}/supply"
+               class="supply-edit"
+               title="{{ _('supplies.link.edit', lang) }}">
+              📦 {{ _('supplies.link.edit', lang) }}
+            </a>
+            <a href="/toner/{{ p.customer_id }}/{{ p.id }}/info"
+               class="supply-edit"
+               title="{{ _('printer_info.link.edit', lang) }}">
+              ✎ {{ _('printer_info.link.edit', lang) }}
+            </a>
+          </div>
         </div>
 
         <div class="toner-bars">
