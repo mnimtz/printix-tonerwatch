@@ -77,6 +77,11 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'WEBSITES_PORT', value: '8080' }
         { name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE', value: 'false' }
         { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://ghcr.io' }
+        // Enables the /api/registry/webhook endpoint so GHCR can trigger
+        // an auto-pull + restart on every new image push. Without a
+        // webhook registered on the GHCR side this is a no-op, but it
+        // makes the App Service ready for one without a redeploy.
+        { name: 'DOCKER_ENABLE_CI', value: 'true' }
         { name: 'WEB_HOST', value: '0.0.0.0' }
         { name: 'WEB_PORT', value: '8080' }
         { name: 'DB_PATH', value: '/data/tonerwatch.sqlite' }
