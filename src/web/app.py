@@ -20,9 +20,9 @@ from urllib.parse import quote as _urlquote
 
 from .. import auth, db, toner_alerts
 from . import (access_routes, auth_routes, backup_routes, customer_routes,
-               dashboard_routes, i18n, order_routes, printer_info_routes,
-               saved_view_routes, settings_routes, supply_routes,
-               toner_routes, user_routes)
+               dashboard_routes, graph_routes, i18n, order_routes,
+               printer_info_routes, saved_view_routes, settings_routes,
+               supply_routes, toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -167,6 +167,7 @@ def create_app() -> FastAPI:
     app.include_router(printer_info_routes.router)  # v0.9: per-printer metadata overrides
     app.include_router(backup_routes.router)      # v0.10: backup download + Azure Blob upload
     app.include_router(saved_view_routes.router)  # v0.11: saved filter presets on /toner
+    app.include_router(graph_routes.router)       # v0.14: Copilot Connector admin
 
     # ── Alert runner (P3) ─────────────────────────────────────────────
     # Env-driven cadence: 0 disables the scheduler entirely (useful for

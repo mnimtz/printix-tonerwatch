@@ -28,6 +28,7 @@ from sqlalchemy import func, insert, select, update
 
 from . import backup as _backup
 from . import bi_client, db, mail_client, orders, supply_library
+from . import graph_connector as _graph
 
 
 logger = logging.getLogger(__name__)
@@ -519,6 +520,20 @@ def start_runner(interval_minutes: int = 15) -> None:
                       + _dt.timedelta(minutes=5),
     )
 
+    # v0.14: M365 Copilot Connector sync. Same debounce pattern as
+    # backup upload — the job checks the persisted interval + last
+    # sync timestamp before actually pushing to Graph.
+    _scheduler.add_job(
+        _tick_graph_sync,
+        trigger=IntervalTrigger(hours=1),
+        id="graph_sync",
+        name="M365 Copilot Connector sync",
+        max_instances=1,
+        coalesce=True,
+        next_run_time=_dt.datetime.now(_dt.timezone.utc)
+                      + _dt.timedelta(minutes=10),
+    )
+
     _scheduler.start()
     logger.info("toner_alerts: scheduler started, alerts every %d min, "
                 "cache refresh every %d min",
@@ -539,6 +554,32 @@ def _tick_all_customers() -> None:
         except Exception as e:  # noqa: BLE001 — runner mustn't die
             logger.exception("evaluate_and_notify crashed for customer %s: %s",
                              c.get("id"), str(e)[:200])
+
+
+def _tick_graph_sync() -> None:
+    """Push all printers to M365 Copilot Connector, if enabled."""
+    try:
+        cfg = _graph.load_config()
+    except Exception:
+        return
+    if not cfg.get("enabled") or not cfg.get("client_secret"):
+        return
+    interval = max(1, int(cfg.get("interval_hours") or 24))
+    last = (cfg.get("last_sync_at") or "").split(" UTC")[0]
+    if last:
+        try:
+            last_dt = _dt.datetime.strptime(last, "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=_dt.timezone.utc)
+            if (_dt.datetime.now(_dt.timezone.utc) - last_dt).total_seconds() < interval * 3600 - 60:
+                return
+        except ValueError:
+            pass
+    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    pushed, err = _graph.sync_all_printers(public_base_url=public_base)
+    if err:
+        logger.info("scheduled graph sync: pushed %d, errors: %s", pushed, err)
+    else:
+        logger.info("scheduled graph sync: pushed %d items OK", pushed)
 
 
 def _tick_backup_upload() -> None:

@@ -141,6 +141,103 @@
     </p>
   </div>
 
+  <!-- v0.14: M365 Copilot Connector -->
+  <div class="card" id="graph">
+    <h3>{{ _('settings.graph.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.graph.intro', lang) }}
+    </p>
+    <p style="color: var(--tw-muted-blue); font-size: 0.82rem;
+              margin-top: var(--sp-2); padding: var(--sp-3);
+              background: var(--tw-gray-100); border-radius: var(--r);">
+      <strong>{{ _('settings.graph.requires', lang) }}:</strong>
+      {{ _('settings.graph.requires_hint', lang) }}
+    </p>
+    <form method="post" action="/settings/graph" style="margin-top: var(--sp-3);">
+      <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="graph_enabled" name="enabled"
+               {% if graph.enabled %}checked{% endif %}>
+        <label for="graph_enabled" style="margin: 0;">
+          {{ _('settings.graph.enable', lang) }}
+        </label>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="graph_tenant">{{ _('settings.entra.tenant', lang) }}</label>
+          <input type="text" id="graph_tenant" name="tenant_id"
+                 value="{{ graph.tenant_id or '' }}"
+                 placeholder="12345678-abcd-ef01-2345-abcdef012345">
+        </div>
+        <div class="form-group">
+          <label for="graph_client">{{ _('settings.entra.client_id', lang) }}</label>
+          <input type="text" id="graph_client" name="client_id"
+                 value="{{ graph.client_id or '' }}"
+                 placeholder="12345678-abcd-ef01-2345-abcdef012345">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="graph_secret">{{ _('settings.entra.client_secret', lang) }}</label>
+        <input type="password" id="graph_secret" name="client_secret"
+               placeholder="{% if graph.client_secret_present %}{{ _('settings.entra.secret_kept', lang) }}{% else %}Client secret VALUE from Azure App Registration{% endif %}">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 100px; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="graph_conn_id">{{ _('settings.graph.connection_id', lang) }}</label>
+          <input type="text" id="graph_conn_id" name="connection_id"
+                 value="{{ graph.connection_id or 'tonerwatch-printers' }}">
+        </div>
+        <div class="form-group">
+          <label for="graph_conn_name">{{ _('settings.graph.connection_name', lang) }}</label>
+          <input type="text" id="graph_conn_name" name="connection_name"
+                 value="{{ graph.connection_name or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="graph_interval">{{ _('settings.graph.interval', lang) }}</label>
+          <input type="number" id="graph_interval" name="interval_hours"
+                 min="1" max="720" value="{{ graph.interval_hours or 24 }}">
+        </div>
+      </div>
+      <div style="display: flex; gap: var(--sp-2); margin-top: var(--sp-3);">
+        <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+        <button type="submit" formaction="/settings/graph/sync_now"
+                formnovalidate class="btn btn-secondary">
+          ☁ {{ _('settings.graph.sync_now', lang) }}
+        </button>
+      </div>
+      {% if graph.last_sync_at %}
+      <div style="margin-top: var(--sp-3); padding: var(--sp-3);
+                  background: var(--tw-gray-100); border-radius: var(--r);
+                  font-size: 0.83rem;">
+        <div style="color: var(--tw-muted-blue); font-size: 0.72rem;
+                    letter-spacing: 0.08em; text-transform: uppercase;">
+          {{ _('settings.graph.last_sync', lang) }}
+        </div>
+        <div style="margin-top: 4px;">
+          <span style="font-family: var(--font-mono);">{{ graph.last_sync_at }}</span>
+          {% if graph.last_sync_count %}
+            — {{ graph.last_sync_count }} {{ _('settings.graph.items', lang) }}
+          {% endif %}
+          {% if graph.last_sync_error %}
+            <div style="color: var(--status-critical); margin-top: 4px;">
+              ✗ {{ graph.last_sync_error }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </form>
+    {% if info == 'graph_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        {{ _('settings.graph.saved', lang) }}
+      </div>
+    {% elif info and info.startswith('graph_sync_ok_') %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        ✓ {{ _('settings.graph.sync_ok', lang) }} —
+        <strong>{{ info[len('graph_sync_ok_'):] }}</strong> {{ _('settings.graph.items', lang) }}
+      </div>
+    {% endif %}
+  </div>
+
   <!-- v0.13: LLM provider (AI features) -->
   <div class="card" id="llm">
     <h3>{{ _('settings.llm.section', lang) }}</h3>

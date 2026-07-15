@@ -9,8 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import (auth, backup, bi_client, db, entra_sso, llm_client,
-                 mail_client, toner_alerts)
+from .. import (auth, backup, bi_client, db, entra_sso, graph_connector,
+                 llm_client, mail_client, toner_alerts)
 from ..db import customers as customers_tbl
 
 
@@ -35,6 +35,7 @@ async def settings_page(request: Request):
             "backup": backup.load_config(),
             "entra":  entra_sso.load_config(),
             "llm":    llm_client.load_config(),
+            "graph":  graph_connector.load_config(),
             "info":   request.query_params.get("info", ""),
             "error":  request.query_params.get("error", ""),
         },
