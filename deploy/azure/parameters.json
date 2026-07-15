@@ -4,7 +4,7 @@
   "parameters": {
     "appName":        { "value": "my-toner-radar" },
     "sku":            { "value": "B1" },
-    "containerImage": { "value": "ghcr.io/mnimtz/tonerwatch:latest" },
+    "containerImage": { "value": "ghcr.io/mnimtz/printix-tonerwatch:latest" },
     "tz":             { "value": "Europe/Berlin" },
     "defaultLang":    { "value": "en" }
   }
