@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# TonerWatch — container entrypoint
+# Printix TonerWatch — container entrypoint
 # ============================================================================
 # On first start:
 #   - generate the Fernet key used to encrypt per-customer BI-DB credentials
@@ -17,7 +17,7 @@ log_error() { printf '[%s] [ERROR] %s\n'  "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*
 
 APP_VERSION="$(cat /app/VERSION 2>/dev/null || echo '0.0.0')"
 export APP_VERSION
-log_info "Starting TonerWatch v${APP_VERSION}"
+log_info "Starting Printix TonerWatch v${APP_VERSION}"
 
 if [ ! -w /data ]; then
     log_error "/data is not writable — mount a persistent volume (chown 1000:1000)."

@@ -1,5 +1,5 @@
 // ============================================================================
-// TonerWatch — Azure App Service deployment (Bicep)
+// Printix TonerWatch — Azure App Service deployment (Bicep)
 // ============================================================================
 // Provisions:
 //   * Storage account + Azure Files share mounted at /data on the container
@@ -23,7 +23,7 @@ param location string = resourceGroup().location
 param sku string = 'B1'
 
 @description('Container image to pull from the registry.')
-param containerImage string = 'ghcr.io/mnimtz/tonerwatch:latest'
+param containerImage string = 'ghcr.io/mnimtz/printix-tonerwatch:latest'
 
 @description('IANA timezone for the runtime — controls quiet-hours calculations.')
 param tz string = 'Europe/Berlin'

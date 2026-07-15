@@ -1,16 +1,27 @@
 # Changelog
 
-All notable changes to TonerWatch are documented here.
+All notable changes to Printix TonerWatch are documented here.
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## [Unreleased]
 
 ### Changed
-- **Rebranded from "Printix Toner Radar" to "TonerWatch — Print Supply
-  Intelligence".** Repo renamed on GitHub (redirect from the old URL is
+- **Product name settled on "Printix TonerWatch — Print Supply
+  Intelligence"** (short logo mark stays "TonerWatch"). Repo renamed on
+  GitHub: `mnimtz/tonerwatch` → `mnimtz/printix-tonerwatch` (redirect
+  from old URL in place). Container image now published to
+  `ghcr.io/mnimtz/printix-tonerwatch`.
+- Docker runtime stage no longer references the non-existent
+  Debian-bookworm package `libfreetds-dev` — replaced with `libsybdb5`
+  (actual FreeTDS runtime shared library used by pymssql). Also drops
+  the redundant `libodbc1` (pulled in transitively by `unixodbc`).
+  This fixes the CI build that broke immediately after v0.1.0 was
+  tagged.
+- **Earlier this session**: rebranded from "Printix Toner Radar" to
+  "TonerWatch — Print Supply Intelligence". Repo renamed on GitHub (redirect from the old URL is
   in place). Container image now published to
-  `ghcr.io/mnimtz/tonerwatch`. Default SQLite database file is now
+  `ghcr.io/mnimtz/printix-tonerwatch`. Default SQLite database file is now
   `/data/tonerwatch.sqlite` (previously `/data/toner_radar.sqlite`) —
   operators upgrading from v0.1.0 must rename the file inside their
   `/data` volume before the container next starts.

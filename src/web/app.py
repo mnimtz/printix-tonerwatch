@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     db.init_schema()
 
     app = FastAPI(
-        title="TonerWatch",
+        title="Printix TonerWatch",
         docs_url=None,        # No public API docs surface — internal tool.
         redoc_url=None,
         openapi_url=None,
@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
         return i18n.t(key, lang or i18n.DEFAULT_LANG)
 
     templates.env.globals["_"] = _t
-    templates.env.globals["APP_NAME"] = "TonerWatch"
+    templates.env.globals["APP_NAME"] = "Printix TonerWatch"
     templates.env.globals["LANG_LABELS"] = i18n.LANG_LABELS
     templates.env.globals["SUPPORTED_LANGS"] = i18n.SUPPORTED_LANGS
 

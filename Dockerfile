@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ============================================================================
-# TonerWatch — multi-tenant toner monitoring for MSP partners
+# Printix TonerWatch — multi-tenant toner monitoring for MSP partners
 # ============================================================================
 # Multi-stage build:
 #   1. builder  — compile Python wheels (pyodbc, pymssql need dev headers)
@@ -43,9 +43,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         unixodbc \
-        libodbc1 \
+        libsybdb5 \
         freetds-bin \
-        libfreetds-dev \
         tini \
         ca-certificates \
         curl \

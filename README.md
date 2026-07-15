@@ -1,13 +1,13 @@
-# TonerWatch
+# Printix TonerWatch
 
 **Multi-tenant toner monitoring, alerting and ordering for Managed Service Providers**
 built on top of the Tungsten Printix BI database.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmnimtz%2Ftonerwatch%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
-[![Container image](https://ghcr-badge.egpl.dev/mnimtz/tonerwatch/latest_tag?trim=major&label=ghcr.io)](https://github.com/mnimtz/tonerwatch/pkgs/container/tonerwatch)
+[![Container image](https://ghcr-badge.egpl.dev/mnimtz/printix-tonerwatch/latest_tag?trim=major&label=ghcr.io)](https://github.com/mnimtz/printix-tonerwatch/pkgs/container/tonerwatch)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-TonerWatch lets one MSP technician oversee toner status across
+Printix TonerWatch lets one MSP technician oversee toner status across
 dozens of Printix customer tenants from a single console — with per-customer
 thresholds, supply catalog entries per printer model, and end-to-end order
 tracking that closes the loop between "low toner detected" and "cartridge
@@ -66,7 +66,7 @@ See [`deploy/azure/README.md`](deploy/azure/README.md) for parameter details.
 docker run -d --name toner-radar \
   -p 8080:8080 \
   -v tonerwatch-data:/data \
-  ghcr.io/mnimtz/tonerwatch:latest
+  ghcr.io/mnimtz/printix-tonerwatch:latest
 ```
 
 Open <http://localhost:8080>, complete the first-run setup wizard, and add
@@ -123,7 +123,7 @@ request lifecycle and deployment topology.
 
 Apache License 2.0 — see [`LICENSE`](LICENSE).
 
-TonerWatch is an independent tool for the Tungsten Printix
+Printix TonerWatch is an independent tool for the Tungsten Printix
 ecosystem and is not an official product of Tungsten Automation
 Corporation. Tungsten Automation®, Tungsten Printix™ and the Tungsten
 Automation logo are trademarks of Tungsten Automation Corporation.

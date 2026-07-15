@@ -1,6 +1,6 @@
 # Architecture
 
-TonerWatch is a single-process, single-binary web application
+Printix TonerWatch is a single-process, single-binary web application
 that manages many Printix customers from one runtime. This document
 describes the data model, request lifecycle and deployment topology.
 
@@ -30,7 +30,7 @@ describes the data model, request lifecycle and deployment topology.
                                                     │ (pymssql / pyodbc)
     ┌────────────┐    HTTPS    ┌────────────────────┴────────────┐
     │ MSP tech   ├─────────────▶  Azure App Service (Linux)      │
-    │ (browser)  │             │  ─ TonerWatch          │
+    │ (browser)  │             │  ─ Printix TonerWatch  │
     └────────────┘             │    (FastAPI + uvicorn)          │
                                │  ─ APScheduler (alert runner)   │
                                └─────────────────┬───────────────┘
