@@ -140,5 +140,128 @@
       <code>ALERT_INTERVAL_MINUTES</code>
     </p>
   </div>
+
+  <!-- v0.10: backup -->
+  <div class="card" id="backup">
+    <h3>{{ _('settings.backup.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.backup.intro', lang) }}
+    </p>
+
+    <!-- One-shot download -->
+    <div style="display: flex; align-items: center; gap: var(--sp-3);
+                margin-top: var(--sp-4); flex-wrap: wrap;
+                padding: var(--sp-3); background: var(--tw-gray-100);
+                border-radius: var(--r);">
+      <div style="flex: 1; min-width: 220px;">
+        <div style="font-weight: 700; color: var(--tw-primary);">
+          {{ _('settings.backup.download.title', lang) }}
+        </div>
+        <div style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                    margin-top: 2px;">
+          {{ _('settings.backup.download.intro', lang) }}
+        </div>
+      </div>
+      <form method="get" action="/settings/backup/download" style="margin: 0;
+            display: flex; align-items: center; gap: var(--sp-3);"
+            data-noloader>
+        <label style="font-size: 0.82rem; color: var(--tw-primary);
+                      display: flex; align-items: center; gap: 4px;">
+          <input type="checkbox" name="include_fernet" value="on" checked>
+          {{ _('settings.backup.include_fernet', lang) }}
+        </label>
+        <button type="submit" class="btn"
+                style="padding: 8px 16px; font-size: 0.9rem;">
+          ⬇ {{ _('settings.backup.download_button', lang) }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Azure Blob config -->
+    <form method="post" action="/settings/backup" style="margin-top: var(--sp-5);">
+      <h4 style="margin-bottom: var(--sp-3);">
+        {{ _('settings.backup.azure.title', lang) }}
+      </h4>
+      <p style="color: var(--tw-muted-blue); font-size: 0.85rem;
+                margin-bottom: var(--sp-3);">
+        {{ _('settings.backup.azure.intro', lang) }}
+      </p>
+      <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="azure_enabled" name="azure_enabled"
+               {% if backup.azure_enabled %}checked{% endif %}>
+        <label for="azure_enabled" style="margin: 0;">
+          {{ _('settings.backup.azure.enable', lang) }}
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="azure_conn_str">{{ _('settings.backup.azure.conn_str', lang) }}</label>
+        <input type="password" id="azure_conn_str" name="azure_conn_str"
+               placeholder="{% if backup.azure_conn_str_present %}{{ _('settings.backup.azure.conn_str_kept', lang) }}{% else %}DefaultEndpointsProtocol=https;AccountName=…{% endif %}">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('settings.backup.azure.conn_str_hint', lang) }}
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="azure_container">{{ _('settings.backup.azure.container', lang) }}</label>
+          <input type="text" id="azure_container" name="azure_container"
+                 value="{{ backup.azure_container or 'tonerwatch-backups' }}">
+        </div>
+        <div class="form-group">
+          <label for="azure_interval_hours">{{ _('settings.backup.azure.interval', lang) }}</label>
+          <input type="number" id="azure_interval_hours" name="azure_interval_hours"
+                 min="1" max="720" value="{{ backup.azure_interval_hours or 24 }}">
+        </div>
+      </div>
+      <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="azure_include_fernet" name="azure_include_fernet"
+               {% if backup.azure_include_fernet %}checked{% endif %}>
+        <label for="azure_include_fernet" style="margin: 0;">
+          {{ _('settings.backup.azure.include_fernet', lang) }}
+        </label>
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--sp-3);
+                  margin-top: var(--sp-3); flex-wrap: wrap;">
+        <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+        <button type="submit" formaction="/settings/backup/upload_now"
+                formnovalidate class="btn btn-secondary">
+          ☁ {{ _('settings.backup.azure.upload_now', lang) }}
+        </button>
+      </div>
+
+      {% if backup.last_upload_at %}
+      <div style="margin-top: var(--sp-4); padding: var(--sp-3);
+                  background: var(--tw-gray-100); border-radius: var(--r);
+                  font-size: 0.83rem;">
+        <div style="color: var(--tw-muted-blue); font-size: 0.72rem;
+                    letter-spacing: 0.08em; text-transform: uppercase;">
+          {{ _('settings.backup.last_upload', lang) }}
+        </div>
+        <div style="margin-top: 4px;">
+          <span style="font-family: var(--font-mono);">{{ backup.last_upload_at }}</span>
+          {% if backup.last_upload_blob %}
+            → <code>{{ backup.last_upload_blob }}</code>
+          {% endif %}
+          {% if backup.last_upload_error %}
+            <span style="color: var(--status-critical); margin-left: 8px;">
+              ✗ {{ backup.last_upload_error }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </form>
+
+    {% if info == 'backup_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-4);">
+        {{ _('settings.backup.saved', lang) }}
+      </div>
+    {% elif info and info.startswith('backup_uploaded_') %}
+      <div class="alert alert-info" style="margin-top: var(--sp-4);">
+        {{ _('settings.backup.uploaded', lang) }} —
+        <code>{{ info[len('backup_uploaded_'):] }}</code>
+      </div>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

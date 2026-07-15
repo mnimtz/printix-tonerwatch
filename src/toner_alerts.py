@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, insert, select, update
 
+from . import backup as _backup
 from . import bi_client, db, mail_client, orders, supply_library
 
 
@@ -503,6 +504,21 @@ def start_runner(interval_minutes: int = 15) -> None:
                           + _dt.timedelta(seconds=15),
         )
 
+    # v0.10: Azure Blob backup job. Reads the persisted config on
+    # every tick so a settings save takes effect on the next fire
+    # without needing a restart. The job itself decides whether to
+    # actually run (config.enabled + valid connection string).
+    _scheduler.add_job(
+        _tick_backup_upload,
+        trigger=IntervalTrigger(hours=1),
+        id="backup_upload",
+        name="Backup — Azure Blob upload",
+        max_instances=1,
+        coalesce=True,
+        next_run_time=_dt.datetime.now(_dt.timezone.utc)
+                      + _dt.timedelta(minutes=5),
+    )
+
     _scheduler.start()
     logger.info("toner_alerts: scheduler started, alerts every %d min, "
                 "cache refresh every %d min",
@@ -523,6 +539,35 @@ def _tick_all_customers() -> None:
         except Exception as e:  # noqa: BLE001 — runner mustn't die
             logger.exception("evaluate_and_notify crashed for customer %s: %s",
                              c.get("id"), str(e)[:200])
+
+
+def _tick_backup_upload() -> None:
+    """Fire the Azure Blob upload if the operator's schedule is due.
+    Idle by default. Enabled + interval_hours are configured via
+    /settings → Backup section."""
+    try:
+        cfg = _backup.load_config()
+    except Exception:
+        return
+    if not cfg.get("azure_enabled") or not cfg.get("azure_conn_str"):
+        return
+    # Debounce: don't run if the last upload was less than
+    # `azure_interval_hours` ago.
+    interval = max(1, int(cfg.get("azure_interval_hours") or 24))
+    last = (cfg.get("last_upload_at") or "").split(" UTC")[0]
+    if last:
+        try:
+            last_dt = _dt.datetime.strptime(last, "%Y-%m-%d %H:%M:%S").replace(
+                tzinfo=_dt.timezone.utc)
+            if (_dt.datetime.now(_dt.timezone.utc) - last_dt).total_seconds() < interval * 3600 - 60:
+                return
+        except ValueError:
+            pass
+    ok, msg = _backup.run_scheduled_upload()
+    if ok:
+        logger.info("scheduled backup upload OK: %s", msg)
+    else:
+        logger.info("scheduled backup upload skipped/failed: %s", msg)
 
 
 def _tick_cache_refresh() -> None:

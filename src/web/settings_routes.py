@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import auth, bi_client, db, mail_client, toner_alerts
+from .. import auth, backup, bi_client, db, mail_client, toner_alerts
 from ..db import customers as customers_tbl
 
 
@@ -30,9 +30,10 @@ async def settings_page(request: Request):
             "request": request,
             "lang": request.state.lang,
             "user": user,
-            "mail":  mail_client.load_config(),
-            "info":  request.query_params.get("info", ""),
-            "error": request.query_params.get("error", ""),
+            "mail":   mail_client.load_config(),
+            "backup": backup.load_config(),
+            "info":   request.query_params.get("info", ""),
+            "error":  request.query_params.get("error", ""),
         },
     )
 

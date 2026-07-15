@@ -32,3 +32,9 @@ openpyxl>=3.1.0
 
 # Email — Resend HTTP API (preferred) + stdlib smtplib (fallback)
 # Both use stdlib / httpx already listed above; no extra dep required.
+
+# v0.10: Azure Blob Storage for scheduled backup uploads (optional
+# feature — the import happens lazily inside `src/backup.py` so an
+# operator who doesn't configure Blob upload never pays the size
+# penalty at import time).
+azure-storage-blob>=12.19.0
