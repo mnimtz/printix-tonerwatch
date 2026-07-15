@@ -363,8 +363,14 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
                 reading = cur.fetchone()
             except Exception:
                 reading = None
+            pid_str = str(pid)
             rows.append({
-                "printer_id":    str(pid),
+                # v0.14.1: "id" is a first-class alias for "printer_id".
+                # Consumers in toner_routes / printer_info / graph_connector
+                # / templates read one or the other — keeping both means we
+                # never fall off the KeyError cliff again.
+                "id":            pid_str,
+                "printer_id":    pid_str,
                 "printer_name":  p.get("printer_name") or "",
                 "location":      p.get("location") or "",
                 "model":         p.get("model") or "",
