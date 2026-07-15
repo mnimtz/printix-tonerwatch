@@ -12,32 +12,25 @@
     overflow: hidden;
   }
   .auth-header {
-    background: var(--blue-domain);
-    color: var(--tw-white);
+    background: var(--tw-white);
     padding: var(--sp-8) var(--sp-6) var(--sp-6);
-    position: relative;
-    overflow: hidden;
-  }
-  .auth-header::after {
-    content: ''; position: absolute;
-    top: 0; right: -30px; bottom: 0; width: 140px;
-    background: var(--pillar-gradient); opacity: 0.85;
-    clip-path: polygon(30% 0, 100% 0, 70% 100%, 0 100%);
+    text-align: center;
+    /* Thin Print & Workplace pillar-gradient stripe at the top —
+       brand-book-compliant signature accent that stays inside the
+       card and doesn't overlap the logo or title. */
+    border-top: 4px solid transparent;
+    border-image: var(--pillar-gradient-h) 1;
   }
   .auth-header .brand-logo {
     display: block;
-    width: 100%; max-width: 320px;
+    width: 100%; max-width: 300px;
     height: auto;
-    margin: 0 auto var(--sp-3);
-    padding: var(--sp-4);
-    background: rgba(255,255,255,.94);
-    border-radius: var(--r);
-    position: relative; z-index: 2;
+    margin: 0 auto var(--sp-4);
   }
   .auth-header h1 {
-    color: var(--tw-white); font-size: 1.5rem;
-    margin-top: var(--sp-5); font-weight: 700;
-    position: relative; z-index: 2;
+    color: var(--tw-primary);
+    font-size: 1.4rem; font-weight: 700;
+    margin: 0;
   }
   .auth-body { padding: var(--sp-8) var(--sp-6); }
   .auth-body .btn { width: 100%; justify-content: center; }
