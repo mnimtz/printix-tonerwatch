@@ -77,6 +77,61 @@
     font-size: 0.78rem; color: var(--tw-muted-blue);
     text-decoration: underline; padding: 2px 6px;
   }
+  /* Saved-view chip bar — same styling as in grid.html */
+  .saved-views {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--sp-2); margin-bottom: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    background: linear-gradient(90deg, rgba(0, 235, 134, 0.06), rgba(0, 160, 251, 0.06));
+    border: 1px solid rgba(0, 40, 84, 0.1);
+    border-radius: var(--r);
+  }
+  .saved-views .sv-label {
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tw-muted-blue); font-weight: 700;
+  }
+  .saved-views .sv-chips {
+    display: inline-flex; flex-wrap: wrap; gap: 4px;
+  }
+  .saved-views .sv-chip {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 3px 6px 3px 10px; border-radius: 14px;
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    font-size: 0.82rem;
+  }
+  .saved-views .sv-chip a {
+    color: var(--tw-primary); text-decoration: none; font-weight: 600;
+  }
+  .saved-views .sv-chip.active {
+    background: var(--tw-primary); border-color: var(--tw-primary);
+  }
+  .saved-views .sv-chip.active a { color: var(--tw-white); }
+  .saved-views .sv-chip.shared {
+    background: rgba(0, 160, 251, 0.08);
+    border-color: rgba(0, 160, 251, 0.3);
+  }
+  .saved-views .sv-del {
+    background: none; border: none; padding: 0 4px; margin-left: 4px;
+    color: var(--tw-muted-blue); cursor: pointer; font-size: 0.9rem;
+    line-height: 1; opacity: 0.6;
+  }
+  .saved-views .sv-del:hover { color: var(--status-critical); opacity: 1; }
+  .saved-views .sv-save {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: auto;
+  }
+  .saved-views .sv-name {
+    padding: 4px 8px; border-radius: 4px;
+    border: 1px solid var(--tw-gray-300); font-size: 0.82rem;
+    min-width: 140px;
+  }
+  .saved-views .sv-shared {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 0.78rem; color: var(--tw-muted-blue);
+  }
+  .saved-views .sv-save-btn {
+    padding: 4px 12px; font-size: 0.82rem;
+  }
 
   .list-wrap {
     background: var(--tw-white); border: 1px solid var(--tw-gray-300);
@@ -220,6 +275,9 @@
     {% endif %}
   </div>
 {% endfor %}
+
+{# Saved-view chip bar (v0.11) #}
+{% include 'toner/_saved_views.html' %}
 
 <!-- Filter bar (same shape as grid.html) -->
 {% if counts.total or customer_choices %}

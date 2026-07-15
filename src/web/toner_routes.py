@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from .. import auth, bi_client, db, printer_info, supply_library
+from .. import auth, bi_client, db, printer_info, saved_views, supply_library
 from ..db import customers as customers_tbl, customer_access
 from ..web import printer_icons
 
@@ -213,6 +213,22 @@ async def toner_grid(request: Request):
         "unknown":  sum(1 for r in rows if r["worst_severity"] == "UNKNOWN"),
     }
 
+    # v0.11: saved views the user can pick from (own + shared)
+    views = saved_views.list_visible(user["id"], "toner")
+    # Match a view when the current filter state is identical to a
+    # saved one so we can highlight the active chip.
+    current_filters = {
+        "customer": filter_customer, "severity": filter_severity,
+        "group":    filter_group,    "q":        filter_search,
+        "view":     view_mode,
+    }
+    current_filters_norm = {k: v for k, v in current_filters.items() if v}
+    active_view_id = None
+    for v in views:
+        if v.get("filters") == current_filters_norm:
+            active_view_id = v["id"]
+            break
+
     templates = request.app.state.templates
     template_name = "toner/list.html" if view_mode == "list" else "toner/grid.html"
     return templates.TemplateResponse(
@@ -231,6 +247,10 @@ async def toner_grid(request: Request):
             "filter_group":    filter_group,
             "filter_search":   filter_search,
             "view_mode":       view_mode,
+            "saved_views":     views,
+            "active_view_id":  active_view_id,
+            "view_saved_flag": q.get("view_saved") == "1",
+            "view_deleted_flag": q.get("view_deleted") == "1",
         },
     )
 

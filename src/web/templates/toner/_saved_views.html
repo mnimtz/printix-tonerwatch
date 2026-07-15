@@ -1,0 +1,62 @@
+{# Saved-view chip bar — rendered above the filter bar on both
+   toner/grid.html and toner/list.html. Consumes:
+     - saved_views:      list of view dicts (may be empty)
+     - active_view_id:   id of the currently-active view (or None)
+     - filter_customer / filter_severity / filter_group / filter_search / view_mode
+     - view_saved_flag / view_deleted_flag: transient info banners
+#}
+{% if saved_views is defined and (saved_views or filter_customer or filter_severity or filter_group or filter_search) %}
+  <div class="saved-views">
+    {% if saved_views %}
+      <span class="sv-label">★ {{ _('toner.views.label', lang) }}</span>
+      <div class="sv-chips">
+        {% for v in saved_views %}
+          <span class="sv-chip {{ 'active' if v.id == active_view_id else '' }} {{ 'shared' if not v.is_own else '' }}">
+            <a href="/toner/views/{{ v.id }}/apply" data-noloader
+               title="{% if v.is_own %}{{ _('toner.views.own', lang) }}{% else %}{{ _('toner.views.shared', lang) }}{% endif %}">
+              {% if not v.is_own %}⇢{% endif %} {{ v.name }}
+            </a>
+            {% if v.is_own %}
+              <form method="post" action="/toner/views/{{ v.id }}/delete"
+                    onsubmit="return confirm('{{ _('toner.views.confirm_delete', lang) }}')"
+                    data-noloader style="display: inline; margin: 0;">
+                <button type="submit" class="sv-del"
+                        title="{{ _('common.delete', lang) }}">✕</button>
+              </form>
+            {% endif %}
+          </span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {# "Save current filter as view" — only when a filter is active AND
+       the current state doesn't match an existing view. #}
+    {% if (filter_customer or filter_severity or filter_group or filter_search) and not active_view_id %}
+      <form method="post" action="/toner/views" class="sv-save" data-noloader>
+        <input type="hidden" name="customer" value="{{ filter_customer or '' }}">
+        <input type="hidden" name="severity" value="{{ filter_severity or '' }}">
+        <input type="hidden" name="group"    value="{{ filter_group or '' }}">
+        <input type="hidden" name="q"        value="{{ filter_search or '' }}">
+        <input type="hidden" name="view"     value="{{ view_mode or '' }}">
+        <input type="text" name="name" required maxlength="60"
+               class="sv-name"
+               placeholder="{{ _('toner.views.name_placeholder', lang) }}">
+        {% if user.role == 'admin' %}
+          <label class="sv-shared">
+            <input type="checkbox" name="is_shared" value="1">
+            {{ _('toner.views.share', lang) }}
+          </label>
+        {% endif %}
+        <button type="submit" class="btn btn-primary sv-save-btn">
+          ★ {{ _('toner.views.save', lang) }}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if view_saved_flag %}
+    <div class="alert alert-info">{{ _('toner.views.saved', lang) }}</div>
+  {% elif view_deleted_flag %}
+    <div class="alert alert-info">{{ _('toner.views.deleted', lang) }}</div>
+  {% endif %}
+{% endif %}
