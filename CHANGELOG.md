@@ -7,6 +7,22 @@ and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 ## [Unreleased]
 
 ### Added
+- **P1 — Customer management + M:N user↔customer access**. New
+  `/customers` menu (list, create, edit, detail, deactivate) with
+  Fernet-encrypted BI-database password and an inline
+  "Test connection" button that actually opens a MSSQL socket to the
+  supplied credentials before saving. New `/users` menu (admin only)
+  for MSP technicians and administrators, and a dedicated
+  `/users/{id}/access` matrix that governs which customers each
+  technician can see. Route-level `require_admin` and
+  `require_customer_access` guards enforce the model at the HTTP
+  layer, and every state change (`customer.created`,
+  `customer.updated`, `customer.deactivated`, `user.created`,
+  `user.updated`, `user.access_updated`) is captured in the audit log
+  with the acting user id and a JSON payload.
+- 88 new i18n keys × 5 languages for the P1 UI (customer, user,
+  access namespaces). The boot-time translation gate confirms every
+  key is present in every language.
 - **SQLAlchemy Core + Alembic** — the whole database layer is now
   dialect-neutral. `DATABASE_URL` picks the backend at startup:
   `sqlite:///data/tonerwatch.sqlite` (default) or

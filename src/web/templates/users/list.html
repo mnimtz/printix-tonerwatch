@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ _('user.list_title', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('nav.users', lang) }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between;
+            gap: var(--sp-4); margin-bottom: var(--sp-6);">
+  <div>
+    <h1>{{ _('user.list_title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+      {{ _('user.list_intro', lang) }}
+    </p>
+  </div>
+  <a href="/users/new" class="btn">+ {{ _('user.new_button', lang) }}</a>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead style="background: var(--tw-gray-200); color: var(--tw-primary);
+                  font-weight: 700; font-size: 0.82rem;
+                  letter-spacing: 0.06em; text-transform: uppercase;">
+      <tr>
+        <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+          {{ _('user.table.email', lang) }}
+        </th>
+        <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+          {{ _('user.table.name', lang) }}
+        </th>
+        <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
+                   width: 130px;">
+          {{ _('user.table.role', lang) }}
+        </th>
+        <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
+                   width: 130px;">
+          {{ _('user.table.status', lang) }}
+        </th>
+        <th style="text-align: right; padding: var(--sp-3) var(--sp-4);
+                   width: 220px;">
+          {{ _('user.table.actions', lang) }}
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for u in users %}
+      <tr style="border-top: 1px solid var(--tw-gray-300);">
+        <td style="padding: var(--sp-3) var(--sp-4); font-family: var(--font-mono);
+                   font-size: 0.9rem;">
+          {{ u.email }}
+        </td>
+        <td style="padding: var(--sp-3) var(--sp-4);">
+          {{ u.name or '—' }}
+        </td>
+        <td style="padding: var(--sp-3) var(--sp-4);">
+          {% if u.role == 'admin' %}
+            <span style="padding: 3px 10px; border-radius: 12px;
+                         background: var(--tw-primary); color: white;
+                         font-size: 0.78rem; font-weight: 700;">
+              {{ _('user.role.admin', lang) }}
+            </span>
+          {% else %}
+            <span style="padding: 3px 10px; border-radius: 12px;
+                         background: var(--tw-gray-200); color: var(--tw-primary);
+                         font-size: 0.78rem; font-weight: 700;">
+              {{ _('user.role.technician', lang) }}
+            </span>
+          {% endif %}
+        </td>
+        <td style="padding: var(--sp-3) var(--sp-4);">
+          {% if u.active %}
+            <span style="color: var(--status-ok); font-weight: 700;
+                         font-size: 0.85rem;">● {{ _('customer.status.active', lang) }}</span>
+          {% else %}
+            <span style="color: var(--tw-muted-blue); font-weight: 700;
+                         font-size: 0.85rem;">○ {{ _('customer.status.inactive', lang) }}</span>
+          {% endif %}
+        </td>
+        <td style="padding: var(--sp-3) var(--sp-4); text-align: right;">
+          <a href="/users/{{ u.id }}/access" class="btn btn-secondary"
+             style="padding: 6px 12px; font-size: 0.82rem;">
+            🔑 {{ _('user.actions.access', lang) }}
+          </a>
+          <a href="/users/{{ u.id }}/edit" class="btn btn-secondary"
+             style="padding: 6px 12px; font-size: 0.82rem;">
+            {{ _('user.actions.edit', lang) }}
+          </a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

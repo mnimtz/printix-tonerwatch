@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} · {{ _('nav.customers', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/customers" style="color: inherit;">{{ _('nav.customers', lang) }}</a> ›
+  {{ customer.name }}
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between;
+            gap: var(--sp-4); margin-bottom: var(--sp-6);">
+  <div>
+    <h1>{{ customer.name }}</h1>
+    {% if customer.tenant_url %}
+      <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);
+                font-family: var(--font-mono);">
+        <a href="{{ customer.tenant_url }}" target="_blank" rel="noopener">
+          {{ customer.tenant_url }} ↗
+        </a>
+      </p>
+    {% endif %}
+  </div>
+  {% if user.role == 'admin' %}
+    <a href="/customers/{{ customer.id }}/edit" class="btn btn-secondary">
+      ✎ {{ _('common.edit', lang) }}
+    </a>
+  {% endif %}
+</div>
+
+{% if not customer.active %}
+  <div class="alert alert-error" style="margin-bottom: var(--sp-6);">
+    {{ _('customer.detail.inactive_note', lang) }}
+  </div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5);">
+  <div class="card">
+    <h3 style="margin-bottom: var(--sp-4);">
+      {{ _('customer.section.bi', lang) }}
+    </h3>
+    <dl style="display: grid; grid-template-columns: 130px 1fr;
+               gap: var(--sp-2) var(--sp-4); margin: 0; font-size: 0.92rem;">
+      <dt style="color: var(--tw-muted-blue);">Server</dt>
+      <dd style="font-family: var(--font-mono);">
+        {{ customer.sql_server or '—' }}
+      </dd>
+      <dt style="color: var(--tw-muted-blue);">Database</dt>
+      <dd style="font-family: var(--font-mono);">
+        {{ customer.sql_database or '—' }}
+      </dd>
+      <dt style="color: var(--tw-muted-blue);">Username</dt>
+      <dd style="font-family: var(--font-mono);">
+        {{ customer.sql_username or '—' }}
+      </dd>
+      <dt style="color: var(--tw-muted-blue);">Password</dt>
+      <dd>
+        {% if customer.sql_password_present %}
+          <span style="color: var(--status-ok);">••••••••</span>
+        {% else %}
+          <span style="color: var(--tw-muted-blue);">
+            {{ _('customer.detail.no_password', lang) }}
+          </span>
+        {% endif %}
+      </dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom: var(--sp-4);">
+      {{ _('customer.section.alerts', lang) }}
+    </h3>
+    <dl style="display: grid; grid-template-columns: 130px 1fr;
+               gap: var(--sp-2) var(--sp-4); margin: 0; font-size: 0.92rem;">
+      <dt style="color: var(--tw-muted-blue);">Recipients</dt>
+      <dd>{{ customer.alert_recipients_csv or '—' }}</dd>
+      <dt style="color: var(--tw-muted-blue);">Min level</dt>
+      <dd><strong>{{ customer.alert_min_level }}</strong></dd>
+      <dt style="color: var(--tw-muted-blue);">Warn / Critical</dt>
+      <dd>{{ customer.warn_pct }}% / {{ customer.critical_pct }}%</dd>
+      <dt style="color: var(--tw-muted-blue);">Timezone</dt>
+      <dd>{{ customer.timezone }}</dd>
+      {% if customer.quiet_hours_start and customer.quiet_hours_end %}
+        <dt style="color: var(--tw-muted-blue);">Quiet hours</dt>
+        <dd>{{ customer.quiet_hours_start }} – {{ customer.quiet_hours_end }}</dd>
+      {% endif %}
+      <dt style="color: var(--tw-muted-blue);">Digest</dt>
+      <dd>{{ (_('common.yes', lang) if customer.digest_mode else _('common.no', lang)) }}</dd>
+      <dt style="color: var(--tw-muted-blue);">Auto-order</dt>
+      <dd>{{ customer.auto_order_mode }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="card" style="margin-top: var(--sp-5);">
+  <h3 style="margin-bottom: var(--sp-4);">
+    {{ _('customer.detail.section.access', lang) }}
+    <span style="font-weight: 400; color: var(--tw-muted-blue);
+                 font-size: 0.9rem;">
+      ({{ access|length }})
+    </span>
+  </h3>
+  {% if access %}
+    <ul style="list-style: none; padding: 0; margin: 0;">
+      {% for a in access %}
+        <li style="padding: var(--sp-2) 0; display: flex; align-items: center;
+                   gap: var(--sp-3); border-bottom: 1px solid var(--tw-gray-200);">
+          <span style="display: inline-flex; width: 28px; height: 28px;
+                       border-radius: 50%; background: var(--tw-faint-blue);
+                       color: var(--tw-primary); align-items: center;
+                       justify-content: center; font-weight: 700;
+                       font-size: 0.75rem;">
+            {{ (a.name or a.email)[0]|upper }}
+          </span>
+          <strong>{{ a.name or a.email }}</strong>
+          <span style="color: var(--tw-muted-blue); font-size: 0.85rem;">
+            {{ a.role }} · {{ a.access_level }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p style="color: var(--tw-muted-blue);">
+      {% if user.role == 'admin' %}
+        {{ _('customer.detail.no_access_admin_hint', lang) }}
+      {% else %}
+        {{ _('customer.detail.no_access', lang) }}
+      {% endif %}
+    </p>
+  {% endif %}
+</div>
+
+{% if recent_events %}
+  <div class="card" style="margin-top: var(--sp-5);">
+    <h3 style="margin-bottom: var(--sp-4);">
+      {{ _('customer.detail.section.recent_events', lang) }}
+    </h3>
+    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
+      {% for e in recent_events %}
+        <li style="padding: var(--sp-2) 0;
+                   border-bottom: 1px solid var(--tw-gray-200);
+                   display: flex; justify-content: space-between; gap: var(--sp-4);">
+          <span>
+            <code style="background: var(--tw-gray-200); padding: 2px 6px;
+                         border-radius: 4px; font-size: 0.82em;">
+              {{ e.action }}
+            </code>
+          </span>
+          <time style="color: var(--tw-muted-blue); white-space: nowrap;
+                       font-family: var(--font-mono); font-size: 0.82rem;">
+            {{ e.created_at }}
+          </time>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% endblock %}

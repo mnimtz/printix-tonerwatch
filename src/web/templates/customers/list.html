@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ _('customer.list_title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('nav.customers', lang) }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between;
+            gap: var(--sp-4); margin-bottom: var(--sp-6);">
+  <div>
+    <h1>{{ _('customer.list_title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+      {{ _('customer.list_intro', lang) }}
+    </p>
+  </div>
+  {% if user.role == 'admin' %}
+    <a href="/customers/new" class="btn">
+      + {{ _('customer.new_button', lang) }}
+    </a>
+  {% endif %}
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+  {% if customers %}
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead style="background: var(--tw-gray-200); color: var(--tw-primary);
+                    font-weight: 700; font-size: 0.82rem;
+                    letter-spacing: 0.06em; text-transform: uppercase;">
+        <tr>
+          <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+            {{ _('customer.table.name', lang) }}
+          </th>
+          <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+            {{ _('customer.table.tenant_url', lang) }}
+          </th>
+          <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
+                     width: 140px;">
+            {{ _('customer.table.status', lang) }}
+          </th>
+          <th style="width: 160px; text-align: right;
+                     padding: var(--sp-3) var(--sp-4);">
+            {{ _('customer.table.actions', lang) }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in customers %}
+        <tr style="border-top: 1px solid var(--tw-gray-300);">
+          <td style="padding: var(--sp-3) var(--sp-4); font-weight: 500;">
+            <a href="/customers/{{ c.id }}"
+               style="color: var(--tw-primary); font-weight: 700;">
+              {{ c.name }}
+            </a>
+            {% if c.notes %}
+              <div style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                          margin-top: 2px;">
+                {{ c.notes[:80] }}{% if c.notes|length > 80 %}…{% endif %}
+              </div>
+            {% endif %}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4);
+                     font-family: var(--font-mono); font-size: 0.82rem;
+                     color: var(--tw-muted-blue);">
+            {{ c.tenant_url or '—' }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4);">
+            {% if c.active %}
+              <span style="display: inline-flex; align-items: center; gap: 6px;
+                           padding: 3px 10px; border-radius: 12px;
+                           background: #ECFDF5; color: #065F46;
+                           font-size: 0.78rem; font-weight: 700;">
+                ● {{ _('customer.status.active', lang) }}
+              </span>
+            {% else %}
+              <span style="display: inline-flex; align-items: center; gap: 6px;
+                           padding: 3px 10px; border-radius: 12px;
+                           background: var(--tw-gray-200); color: var(--tw-muted-blue);
+                           font-size: 0.78rem; font-weight: 700;">
+                ○ {{ _('customer.status.inactive', lang) }}
+              </span>
+            {% endif %}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); text-align: right;">
+            <a href="/customers/{{ c.id }}" class="btn btn-secondary"
+               style="padding: 6px 12px; font-size: 0.82rem;">
+              {{ _('customer.actions.view', lang) }}
+            </a>
+            {% if user.role == 'admin' %}
+              <a href="/customers/{{ c.id }}/edit" class="btn btn-secondary"
+                 style="padding: 6px 12px; font-size: 0.82rem;">
+                {{ _('customer.actions.edit', lang) }}
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div style="padding: var(--sp-12) var(--sp-6); text-align: center;
+                color: var(--tw-muted-blue);">
+      <p style="font-size: 1.05rem;">{{ _('customer.no_customers', lang) }}</p>
+      {% if user.role == 'admin' %}
+        <a href="/customers/new" class="btn" style="margin-top: var(--sp-5);">
+          + {{ _('customer.new_button', lang) }}
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

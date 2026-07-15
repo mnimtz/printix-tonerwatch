@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ _('access.title', lang) }} · {{ target.name or target.email }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/users" style="color: inherit;">{{ _('nav.users', lang) }}</a> ›
+  {{ target.name or target.email }} ›
+  {{ _('access.title', lang) }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 820px;">
+  <h1>
+    {{ _('access.title', lang) }}
+  </h1>
+  <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);
+            margin-bottom: var(--sp-6);">
+    {{ _('access.intro', lang) }}
+    <strong>{{ target.name or target.email }}</strong>
+    {% if target.role == 'admin' %}
+      — <span style="color: var(--status-warn); font-weight: 700;">
+        {{ _('access.admin_note', lang) }}
+      </span>
+    {% endif %}
+  </p>
+
+  <form method="post" action="/users/{{ target.id }}/access">
+    {% if all_customers %}
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead style="background: var(--tw-gray-200); color: var(--tw-primary);
+                        font-weight: 700; font-size: 0.82rem;
+                        letter-spacing: 0.06em; text-transform: uppercase;">
+            <tr>
+              <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
+                         width: 60px;"></th>
+              <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+                {{ _('customer.table.name', lang) }}
+              </th>
+              <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
+                         width: 180px;">
+                {{ _('access.column.level', lang) }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for c in all_customers %}
+            <tr style="border-top: 1px solid var(--tw-gray-300);">
+              <td style="padding: var(--sp-3) var(--sp-4); text-align: center;">
+                <input type="checkbox"
+                       id="chk_{{ c.id }}"
+                       {% if c.id in granted %}checked{% endif %}
+                       onchange="document.getElementById('lvl_{{ c.id }}').disabled = !this.checked;">
+              </td>
+              <td style="padding: var(--sp-3) var(--sp-4);">
+                <label for="chk_{{ c.id }}"
+                       style="font-weight: 500; cursor: pointer;">
+                  {{ c.name }}
+                </label>
+                {% if c.tenant_url %}
+                  <div style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                              margin-top: 2px; font-family: var(--font-mono);">
+                    {{ c.tenant_url }}
+                  </div>
+                {% endif %}
+              </td>
+              <td style="padding: var(--sp-3) var(--sp-4);">
+                <select id="lvl_{{ c.id }}" name="access:{{ c.id }}"
+                        {% if c.id not in granted %}disabled{% endif %}
+                        style="padding: 6px 10px; font-size: 0.9rem;">
+                  <option value="read"
+                    {% if granted.get(c.id) == 'read'  %}selected{% endif %}>
+                    {{ _('access.level.read', lang) }}
+                  </option>
+                  <option value="admin"
+                    {% if granted.get(c.id) == 'admin' %}selected{% endif %}>
+                    {{ _('access.level.admin', lang) }}
+                  </option>
+                </select>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);
+                               color: var(--tw-muted-blue);">
+        <p>{{ _('access.no_customers', lang) }}</p>
+        <a href="/customers/new" class="btn" style="margin-top: var(--sp-5);">
+          + {{ _('customer.new_button', lang) }}
+        </a>
+      </div>
+    {% endif %}
+
+    {% if all_customers %}
+      <div class="form-actions">
+        <button type="submit" class="btn">
+          {{ _('common.save', lang) }}
+        </button>
+        <a href="/users" class="btn btn-secondary">
+          {{ _('common.cancel', lang) }}
+        </a>
+      </div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

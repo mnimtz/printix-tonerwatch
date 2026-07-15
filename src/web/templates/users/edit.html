@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ (_('user.new_title', lang) if is_new else _('user.edit_title', lang)) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/users" style="color: inherit;">{{ _('nav.users', lang) }}</a> ›
+  {{ (_('user.new_title', lang) if is_new else (form.name or form.email)) }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 640px;">
+  <h1>
+    {% if is_new %}{{ _('user.new_title', lang) }}
+    {% else %}{{ form.name or form.email }}{% endif %}
+  </h1>
+
+  {% if error %}
+    <div class="alert alert-error" style="margin-top: var(--sp-4);">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <div class="card" style="margin-top: var(--sp-5);">
+    <form method="post"
+          action="{% if is_new %}/users/new{% else %}/users/{{ form.id }}/edit{% endif %}"
+          autocomplete="off">
+      <div class="form-group">
+        <label for="email">{{ _('user.field.email', lang) }} *</label>
+        <input id="email" name="email" type="email" required
+               value="{{ form.email or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="name">{{ _('user.field.name', lang) }}</label>
+        <input id="name" name="name" type="text" value="{{ form.name or '' }}">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr;
+                  gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="role">{{ _('user.field.role', lang) }}</label>
+          <select id="role" name="role">
+            <option value="technician" {% if form.role == 'technician' %}selected{% endif %}>
+              {{ _('user.role.technician', lang) }}
+            </option>
+            <option value="admin" {% if form.role == 'admin' %}selected{% endif %}>
+              {{ _('user.role.admin', lang) }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="lang">{{ _('user.field.lang', lang) }}</label>
+          <select id="lang" name="lang">
+            {% for code in SUPPORTED_LANGS %}
+              <option value="{{ code }}"
+                {% if form.lang == code %}selected{% endif %}>
+                {{ LANG_LABELS[code] }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {% if is_new %}
+        <div class="form-group">
+          <label for="password">{{ _('user.field.password', lang) }} *</label>
+          <input id="password" name="password" type="text" required minlength="12"
+                 value="{{ form.generated_password }}"
+                 style="font-family: var(--font-mono);">
+          <p style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                    margin-top: var(--sp-2);">
+            {{ _('user.generated_password_hint', lang) }}
+          </p>
+        </div>
+      {% else %}
+        <div class="form-group">
+          <label for="new_password">{{ _('user.field.new_password', lang) }}</label>
+          <input id="new_password" name="new_password" type="password" minlength="12"
+                 autocomplete="new-password">
+          <p style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                    margin-top: var(--sp-2);">
+            {{ _('user.field.new_password_hint', lang) }}
+          </p>
+        </div>
+      {% endif %}
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label style="display: flex; align-items: center; gap: 8px;
+                      cursor: pointer;">
+          <input type="checkbox" name="active" value="1"
+                 {% if form.active %}checked{% endif %}>
+          {{ _('user.field.active', lang) }}
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn">
+          {{ _('common.save', lang) }}
+        </button>
+        <a href="/users" class="btn btn-secondary">
+          {{ _('common.cancel', lang) }}
+        </a>
+        {% if not is_new %}
+          <a href="/users/{{ form.id }}/access" class="btn btn-secondary"
+             style="margin-left: auto;">
+            🔑 {{ _('user.actions.access', lang) }}
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

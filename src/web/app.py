@@ -18,7 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .. import auth, db
-from . import auth_routes, i18n
+from . import access_routes, auth_routes, customer_routes, i18n, user_routes
 from .lang import LanguageMiddleware
 
 
@@ -122,6 +122,9 @@ def create_app() -> FastAPI:
 
     # Routers.
     app.include_router(auth_routes.router)
+    app.include_router(customer_routes.router)
+    app.include_router(user_routes.router)
+    app.include_router(access_routes.router)
 
     # Root → dashboard when logged in, otherwise setup/login.
     @app.get("/", include_in_schema=False)

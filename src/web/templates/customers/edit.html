@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}{{ (_('customer.new_title', lang) if is_new else _('customer.edit_title', lang)) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/customers" style="color: inherit;">{{ _('nav.customers', lang) }}</a> ›
+  {{ (_('customer.new_title', lang) if is_new else form.name) }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 820px;">
+  <h1>
+    {% if is_new %}{{ _('customer.new_title', lang) }}
+    {% else %}{{ form.name }}{% endif %}
+  </h1>
+
+  {% if error %}
+    <div class="alert alert-error" style="margin-top: var(--sp-4);">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="post"
+        action="{% if is_new %}/customers/new{% else %}/customers/{{ form.id }}/edit{% endif %}"
+        id="customer-form" autocomplete="off">
+
+    <!-- Basic info -->
+    <div class="card">
+      <h3 style="margin-bottom: var(--sp-4);">
+        {{ _('customer.section.basic', lang) }}
+      </h3>
+      <div class="form-group">
+        <label for="name">{{ _('customer.field.name', lang) }} *</label>
+        <input id="name" name="name" type="text" required
+               value="{{ form.name or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="tenant_url">{{ _('customer.field.tenant_url', lang) }}</label>
+        <input id="tenant_url" name="tenant_url" type="url"
+               placeholder="https://acme.printix.net"
+               value="{{ form.tenant_url or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="notes">{{ _('customer.field.notes', lang) }}</label>
+        <textarea id="notes" name="notes" rows="2">{{ form.notes or '' }}</textarea>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label style="display: flex; align-items: center; gap: 8px;
+                      cursor: pointer;">
+          <input type="checkbox" name="active" value="1"
+                 {% if form.active %}checked{% endif %}>
+          {{ _('customer.field.active', lang) }}
+        </label>
+      </div>
+    </div>
+
+    <!-- BI database -->
+    <div class="card">
+      <h3 style="margin-bottom: var(--sp-4);">
+        {{ _('customer.section.bi', lang) }}
+      </h3>
+      <div class="form-row" style="display: grid;
+           grid-template-columns: 2fr 1fr; gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="sql_server">{{ _('customer.field.sql_server', lang) }}</label>
+          <input id="sql_server" name="sql_server" type="text"
+                 placeholder="acme.database.windows.net"
+                 value="{{ form.sql_server or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="sql_database">{{ _('customer.field.sql_database', lang) }}</label>
+          <input id="sql_database" name="sql_database" type="text"
+                 value="{{ form.sql_database or '' }}">
+        </div>
+      </div>
+      <div class="form-row" style="display: grid;
+           grid-template-columns: 1fr 1fr; gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="sql_username">{{ _('customer.field.sql_username', lang) }}</label>
+          <input id="sql_username" name="sql_username" type="text"
+                 autocomplete="username"
+                 value="{{ form.sql_username or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="sql_password">{{ _('customer.field.sql_password', lang) }}</label>
+          <input id="sql_password" name="sql_password" type="password"
+                 autocomplete="new-password"
+                 placeholder="{{ _('customer.field.sql_password_placeholder', lang) if form.sql_password_present else '' }}">
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--sp-4);
+                  margin-top: var(--sp-3);">
+        <button type="button" id="btn-test-conn" class="btn btn-secondary"
+                style="padding: 8px 14px; font-size: 0.9rem;">
+          🔌 {{ _('customer.test_connection', lang) }}
+        </button>
+        <div id="test-conn-result"
+             style="font-size: 0.9rem; color: var(--tw-muted-blue);"></div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="card">
+      <h3 style="margin-bottom: var(--sp-4);">
+        {{ _('customer.section.alerts', lang) }}
+      </h3>
+      <div class="form-group">
+        <label for="alert_recipients_csv">
+          {{ _('customer.field.alert_recipients_csv', lang) }}
+        </label>
+        <input id="alert_recipients_csv" name="alert_recipients_csv" type="text"
+               placeholder="ops@acme.example, admin@acme.example"
+               value="{{ form.alert_recipients_csv or '' }}">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr;
+                  gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="alert_min_level">
+            {{ _('customer.field.alert_min_level', lang) }}
+          </label>
+          <select id="alert_min_level" name="alert_min_level">
+            <option value="INFO"     {% if form.alert_min_level == 'INFO' %}selected{% endif %}>INFO</option>
+            <option value="WARN"     {% if form.alert_min_level == 'WARN' %}selected{% endif %}>WARN</option>
+            <option value="CRITICAL" {% if form.alert_min_level == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="warn_pct">{{ _('customer.field.warn_pct', lang) }} (%)</label>
+          <input id="warn_pct" name="warn_pct" type="number" min="1" max="99"
+                 value="{{ form.warn_pct }}">
+        </div>
+        <div class="form-group">
+          <label for="critical_pct">{{ _('customer.field.critical_pct', lang) }} (%)</label>
+          <input id="critical_pct" name="critical_pct" type="number" min="0" max="98"
+                 value="{{ form.critical_pct }}">
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr;
+                  gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="timezone">{{ _('customer.field.timezone', lang) }}</label>
+          <input id="timezone" name="timezone" type="text"
+                 value="{{ form.timezone or 'Europe/Berlin' }}">
+        </div>
+        <div class="form-group">
+          <label for="quiet_hours_start">
+            {{ _('customer.field.quiet_hours_start', lang) }}
+          </label>
+          <input id="quiet_hours_start" name="quiet_hours_start" type="time"
+                 value="{{ form.quiet_hours_start or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="quiet_hours_end">
+            {{ _('customer.field.quiet_hours_end', lang) }}
+          </label>
+          <input id="quiet_hours_end" name="quiet_hours_end" type="time"
+                 value="{{ form.quiet_hours_end or '' }}">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label style="display: flex; align-items: center; gap: 8px;
+                      cursor: pointer;">
+          <input type="checkbox" name="digest_mode" value="1"
+                 {% if form.digest_mode %}checked{% endif %}>
+          {{ _('customer.field.digest_mode', lang) }}
+        </label>
+      </div>
+    </div>
+
+    <!-- Orders -->
+    <div class="card">
+      <h3 style="margin-bottom: var(--sp-4);">
+        {{ _('customer.section.orders', lang) }}
+      </h3>
+      <div class="form-group">
+        <label for="order_recipients_csv">
+          {{ _('customer.field.order_recipients_csv', lang) }}
+        </label>
+        <input id="order_recipients_csv" name="order_recipients_csv" type="text"
+               placeholder="orders@acme.example"
+               value="{{ form.order_recipients_csv or '' }}">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="auto_order_mode">
+          {{ _('customer.field.auto_order_mode', lang) }}
+        </label>
+        <select id="auto_order_mode" name="auto_order_mode">
+          <option value="off"   {% if form.auto_order_mode == 'off'   %}selected{% endif %}>
+            {{ _('customer.auto_order.off',   lang) }}
+          </option>
+          <option value="draft" {% if form.auto_order_mode == 'draft' %}selected{% endif %}>
+            {{ _('customer.auto_order.draft', lang) }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn">
+        {{ _('common.save', lang) }}
+      </button>
+      <a href="{% if is_new %}/customers{% else %}/customers/{{ form.id }}{% endif %}"
+         class="btn btn-secondary">
+        {{ _('common.cancel', lang) }}
+      </a>
+    </div>
+  </form>
+
+  {% if not is_new %}
+  <!-- Danger zone -->
+  <div class="card" style="margin-top: var(--sp-8);
+                           border-color: #FCA5A5;">
+    <h3 style="margin-bottom: var(--sp-3); color: var(--status-critical);">
+      {{ _('customer.section.danger', lang) }}
+    </h3>
+    <p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-4);
+              font-size: 0.9rem;">
+      {{ _('customer.deactivate_intro', lang) }}
+    </p>
+    <form method="post" action="/customers/{{ form.id }}/delete"
+          onsubmit="return confirm('{{ _('customer.deactivate_confirm', lang) }}');">
+      <button type="submit" class="btn btn-danger">
+        {{ _('customer.deactivate', lang) }}
+      </button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.getElementById('btn-test-conn').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-test-conn');
+  const out = document.getElementById('test-conn-result');
+  const form = document.getElementById('customer-form');
+  btn.disabled = true;
+  out.innerHTML = '{{ _('customer.test_connection.checking', lang) }}';
+  out.style.color = 'var(--tw-muted-blue)';
+
+  const fd = new FormData(form);
+  {% if not is_new %}fd.append('customer_id', '{{ form.id }}');{% endif %}
+  try {
+    const r = await fetch('/customers/test-connection', {method: 'POST', body: fd});
+    const j = await r.json();
+    if (j.ok) {
+      out.innerHTML = '✅ {{ _('customer.test_connection.ok', lang) }}' +
+                      (j.server_version ? ' — <code>' + j.server_version + '</code>' : '');
+      out.style.color = 'var(--status-ok)';
+    } else {
+      out.innerHTML = '❌ ' + j.message;
+      out.style.color = 'var(--status-critical)';
+    }
+  } catch (e) {
+    out.innerHTML = '❌ ' + e.message;
+    out.style.color = 'var(--status-critical)';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+{% endblock %}
