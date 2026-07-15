@@ -21,7 +21,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from .. import auth, bi_client, db, supply_library
+from fastapi.responses import JSONResponse
+
+from .. import auth, bi_client, db, llm_client, supply_library
 from ..db import customers as customers_tbl
 
 
@@ -139,6 +141,90 @@ async def supplies_delete(tpl_id: int, request: Request):
     db.audit(admin["id"], "supply.template_deleted",
              target_type="supply_template", target_id=str(tpl_id))
     return RedirectResponse("/supplies?info=template_deleted", status_code=303)
+
+
+@router.post("/supplies/ai/suggest", include_in_schema=False)
+async def supplies_ai_suggest(request: Request):
+    """Ask the configured LLM for a SKU + description + yield given
+    a printer model + colour. Returns a small JSON object the edit
+    form JS pre-fills the empty fields with.
+
+    Never overwrites values the operator has already typed — that's
+    a client-side decision (JS only fills empty inputs).
+    """
+    auth.require_admin(request)
+    if not llm_client.is_configured():
+        return JSONResponse(
+            {"ok": False, "error": "llm_not_configured"}, status_code=400)
+
+    form = await request.form()
+    model = (form.get("printer_model") or "").strip()
+    color = (form.get("color") or "K").strip().upper()
+    if not model:
+        return JSONResponse(
+            {"ok": False, "error": "printer_model_required"}, status_code=400)
+    if color not in ("K", "C", "M", "Y", "OTHER"):
+        color = "K"
+
+    color_word = {"K": "black", "C": "cyan", "M": "magenta",
+                  "Y": "yellow", "OTHER": "other"}[color]
+
+    system = (
+        "You are a printer-supply lookup assistant. Given a printer "
+        "model and a toner colour, return the OEM cartridge SKU and "
+        "a one-line description. Never invent numbers you're unsure "
+        "about — if you don't know a value, return null. "
+        "Reply with ONE JSON object only, no prose, no code fences: "
+        "{\"sku\": \"…\", \"description\": \"…\", "
+        "\"manufacturer\": \"…\", \"yield_pages\": 12345}"
+    )
+    user = (f"Printer model: {model}\n"
+            f"Toner slot colour: {color_word}\n"
+            "Return the OEM cartridge (not a compatible / generic).")
+
+    try:
+        resp = llm_client.chat(system, user)
+    except llm_client.LLMError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e)[:200]}, status_code=500)
+
+    # Best-effort parse. Some models still wrap JSON in markdown even
+    # when told not to — strip code fences before json.loads().
+    raw = resp.text.strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].lstrip("\n")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Return the raw text so the operator can see what the LLM said
+        return JSONResponse(
+            {"ok": False, "error": "llm_response_not_json", "raw": raw[:400]},
+            status_code=500)
+
+    return JSONResponse({
+        "ok": True,
+        "provider": resp.provider,
+        "model": resp.model,
+        "sku":          _clean(data.get("sku")),
+        "description":  _clean(data.get("description")),
+        "manufacturer": _clean(data.get("manufacturer")),
+        "yield_pages":  _as_int(data.get("yield_pages")),
+    })
+
+
+def _clean(v):
+    if v is None:
+        return ""
+    return str(v).strip()
+
+
+def _as_int(v):
+    try:
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 @router.post("/supplies/seed", include_in_schema=False)

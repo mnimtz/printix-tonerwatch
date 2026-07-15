@@ -141,6 +141,82 @@
     </p>
   </div>
 
+  <!-- v0.13: LLM provider (AI features) -->
+  <div class="card" id="llm">
+    <h3>{{ _('settings.llm.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.llm.intro', lang) }}
+    </p>
+    <form method="post" action="/settings/llm" style="margin-top: var(--sp-3);">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="llm_provider">{{ _('settings.llm.provider', lang) }}</label>
+          <select id="llm_provider" name="provider">
+            <option value="disabled"     {% if llm.provider == 'disabled' %}selected{% endif %}>{{ _('settings.llm.provider.disabled', lang) }}</option>
+            <option value="openai"       {% if llm.provider == 'openai' %}selected{% endif %}>OpenAI</option>
+            <option value="azure_openai" {% if llm.provider == 'azure_openai' %}selected{% endif %}>Azure OpenAI</option>
+            <option value="gemini"       {% if llm.provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
+            <option value="anthropic"    {% if llm.provider == 'anthropic' %}selected{% endif %}>Anthropic Claude</option>
+            <option value="ollama"       {% if llm.provider == 'ollama' %}selected{% endif %}>Ollama (self-hosted)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="llm_model">{{ _('settings.llm.model', lang) }}</label>
+          <input type="text" id="llm_model" name="model"
+                 value="{{ llm.model or '' }}"
+                 placeholder="gpt-4o-mini / gemini-1.5-flash / …">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="llm_key">{{ _('settings.llm.api_key', lang) }}</label>
+        <input type="password" id="llm_key" name="api_key"
+               placeholder="{% if llm.api_key_present %}{{ _('settings.llm.key_kept', lang) }}{% else %}{{ _('settings.llm.key_hint', lang) }}{% endif %}">
+      </div>
+      <div class="form-group">
+        <label for="llm_endpoint">{{ _('settings.llm.endpoint', lang) }}</label>
+        <input type="url" id="llm_endpoint" name="endpoint"
+               value="{{ llm.endpoint or '' }}"
+               placeholder="{{ _('settings.llm.endpoint_placeholder', lang) }}">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('settings.llm.endpoint_hint', lang) }}
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="llm_api_version">{{ _('settings.llm.azure_api_version', lang) }}</label>
+          <input type="text" id="llm_api_version" name="azure_api_version"
+                 value="{{ llm.azure_api_version or '2024-06-01' }}">
+        </div>
+        <div class="form-group">
+          <label for="llm_temp">{{ _('settings.llm.temperature', lang) }}</label>
+          <input type="number" step="0.1" min="0" max="2"
+                 id="llm_temp" name="temperature" value="{{ llm.temperature or 0.2 }}">
+        </div>
+        <div class="form-group">
+          <label for="llm_max">{{ _('settings.llm.max_tokens', lang) }}</label>
+          <input type="number" min="16" max="16384"
+                 id="llm_max" name="max_tokens" value="{{ llm.max_tokens or 512 }}">
+        </div>
+      </div>
+      <div style="display: flex; gap: var(--sp-2); margin-top: var(--sp-3);">
+        <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+        <button type="submit" formaction="/settings/llm/test"
+                formnovalidate class="btn btn-secondary">
+          🤖 {{ _('settings.llm.test', lang) }}
+        </button>
+      </div>
+    </form>
+    {% if info == 'llm_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        {{ _('settings.llm.saved', lang) }}
+      </div>
+    {% elif info and info.startswith('llm_test_ok_') %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        ✓ {{ _('settings.llm.test_ok', lang) }} — <code>{{ info[len('llm_test_ok_'):] }}</code>
+      </div>
+    {% endif %}
+  </div>
+
   <!-- v0.12: Entra ID SSO -->
   <div class="card" id="entra">
     <h3>{{ _('settings.entra.section', lang) }}</h3>

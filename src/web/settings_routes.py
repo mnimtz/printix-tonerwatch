@@ -9,7 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import auth, backup, bi_client, db, entra_sso, mail_client, toner_alerts
+from .. import (auth, backup, bi_client, db, entra_sso, llm_client,
+                 mail_client, toner_alerts)
 from ..db import customers as customers_tbl
 
 
@@ -33,6 +34,7 @@ async def settings_page(request: Request):
             "mail":   mail_client.load_config(),
             "backup": backup.load_config(),
             "entra":  entra_sso.load_config(),
+            "llm":    llm_client.load_config(),
             "info":   request.query_params.get("info", ""),
             "error":  request.query_params.get("error", ""),
         },
@@ -87,6 +89,42 @@ async def settings_entra_save(request: Request):
              meta_json=json.dumps({"enabled": cfg["enabled"],
                                     "tenant_id": cfg["tenant_id"]}))
     return RedirectResponse("/settings?info=entra_saved#entra", status_code=303)
+
+
+@router.post("/settings/llm", include_in_schema=False)
+async def settings_llm_save(request: Request):
+    admin = auth.require_admin(request)
+    form = await request.form()
+    cfg = {
+        "provider":          form.get("provider") or "disabled",
+        "model":             form.get("model") or "",
+        "api_key":           form.get("api_key") or "",
+        "endpoint":          form.get("endpoint") or "",
+        "azure_api_version": form.get("azure_api_version") or "2024-06-01",
+        "temperature":       form.get("temperature") or 0.2,
+        "max_tokens":        form.get("max_tokens") or 512,
+    }
+    llm_client.save_config(cfg)
+    db.audit(admin["id"], "settings.llm_updated",
+             target_type="settings", target_id="llm",
+             meta_json=json.dumps({"provider": cfg["provider"],
+                                    "model": cfg["model"]}))
+    return RedirectResponse("/settings?info=llm_saved#llm", status_code=303)
+
+
+@router.post("/settings/llm/test", include_in_schema=False)
+async def settings_llm_test(request: Request):
+    auth.require_admin(request)
+    try:
+        r = llm_client.chat(
+            "You are a laconic assistant. Reply with exactly one word.",
+            "Say 'hello'.")
+    except llm_client.LLMError as e:
+        return RedirectResponse(
+            f"/settings?error=llm_test_{str(e)[:120].replace('&','')}#llm",
+            status_code=303)
+    return RedirectResponse(
+        f"/settings?info=llm_test_ok_{r.provider}#llm", status_code=303)
 
 
 @router.post("/settings/mail/test", include_in_schema=False)
