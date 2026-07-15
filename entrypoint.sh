@@ -27,7 +27,11 @@ fi
 if [ ! -f /data/fernet.key ]; then
     log_info "First start — generating Fernet key for encrypted credential storage."
     python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" > /data/fernet.key
-    chmod 600 /data/fernet.key
+    # chmod on Azure Files SMB shares is a no-op that returns EPERM
+    # under some mount configurations. `|| true` prevents `set -e`
+    # from killing the container on Azure App Service where the
+    # mount is already restricted to the app tenant anyway.
+    chmod 600 /data/fernet.key 2>/dev/null || true
 fi
 export FERNET_KEY
 FERNET_KEY="$(cat /data/fernet.key)"
