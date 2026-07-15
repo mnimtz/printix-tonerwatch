@@ -192,9 +192,12 @@ async def toner_grid(request: Request):
             return filter_search in hay
         filtered = [r for r in filtered if _matches(r)]
 
-    # Distinct customer list for the dropdown
+    # Distinct customer list for the dropdown. Populate from EVERY
+    # customer the operator can see — not just the ones that
+    # returned rows — so the filter is still discoverable when a
+    # tenant has no BI creds yet or the BI DB is asleep.
     customer_choices = sorted(
-        {(r["customer_id"], r["customer_name"]) for r in rows},
+        {(c["id"], c["name"]) for c in _visible_customers(user)},
         key=lambda t: t[1].lower(),
     )
     # Distinct group list for the group filter (over the whole,

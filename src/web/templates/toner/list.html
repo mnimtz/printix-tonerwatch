@@ -304,7 +304,9 @@
         {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
         {% if filter_group %}<input type="hidden" name="group" value="{{ filter_group }}">{% endif %}
         <label for="customer-select">{{ _('toner.filter.customer_label', lang) }}</label>
-        <select id="customer-select" name="customer" onchange="this.form.submit()">
+        <select id="customer-select" name="customer" onchange="this.form.submit()"
+                data-searchable
+                data-search-placeholder="{{ _('toner.filter.customer_search_placeholder', lang) }}">
           <option value="">{{ _('toner.filter.all_customers', lang) }}</option>
           {% for cid, cname in customer_choices %}
             <option value="{{ cid }}" {% if filter_customer == cid|string %}selected{% endif %}>{{ cname }}</option>
@@ -319,7 +321,9 @@
         {% if filter_severity %}<input type="hidden" name="severity" value="{{ filter_severity }}">{% endif %}
         {% if filter_customer %}<input type="hidden" name="customer" value="{{ filter_customer }}">{% endif %}
         <label for="group-select">{{ _('toner.filter.group_label', lang) }}</label>
-        <select id="group-select" name="group" onchange="this.form.submit()">
+        <select id="group-select" name="group" onchange="this.form.submit()"
+                data-searchable
+                data-search-placeholder="{{ _('toner.filter.group_search_placeholder', lang) }}">
           <option value="">{{ _('toner.filter.all_groups', lang) }}</option>
           {% for g in group_choices %}
             <option value="{{ g }}" {% if filter_group == g %}selected{% endif %}>{{ g }}</option>

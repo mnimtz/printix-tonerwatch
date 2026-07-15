@@ -707,5 +707,10 @@
      Opt-out per element with data-noloader; force splash with
      data-matrix-splash (used by the login/setup forms below). #}
   {% include "_matrix_loader.html" %}
+
+  {# Searchable-select (v0.14.2). Any <select data-searchable> in the
+     page gets a filter combobox on top; native <select> stays as
+     no-JS fallback. Include after matrix-loader so DOM is ready. #}
+  {% include "_searchable_select.html" %}
 </body>
 </html>
