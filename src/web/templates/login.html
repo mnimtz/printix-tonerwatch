@@ -68,6 +68,9 @@
       <div class="alert alert-info">{{ info }}</div>
     {% endif %}
     <form method="post" action="/login" autocomplete="on">
+      {% if form and form.next %}
+        <input type="hidden" name="next" value="{{ form.next }}">
+      {% endif %}
       <div class="form-group">
         <label for="email">{{ _('auth.email', lang) }}</label>
         <input id="email" name="email" type="email" required

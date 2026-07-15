@@ -1,23 +1,22 @@
 {% extends "base.html" %}
 {% block title %}{{ _(title_key, lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _(title_key, lang) }}{% endblock %}
 {% block content %}
 <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);
                         max-width: 640px; margin: var(--sp-8) auto;">
   <div style="display: inline-block; padding: 6px 14px;
-              background: var(--pillar-gradient);
+              background: var(--pillar-gradient-h);
               color: var(--tw-white); font-weight: 700;
               border-radius: var(--r-sm);
               font-size: 0.75rem; letter-spacing: 0.14em;
               text-transform: uppercase;">
-    Coming in {{ phase }}
+    {{ _('coming_soon.badge', lang) }} {{ phase }}
   </div>
   <h1 style="margin: var(--sp-5) 0 var(--sp-3);">
     {{ _(title_key, lang) }}
   </h1>
   <p style="color: var(--tw-muted-blue); font-size: 1rem;">
-    This feature is being built as part of the {{ phase }} phase of the MVP.
-    The rest of the console is fully functional — carry on with what's already
-    available in the top navigation.
+    {{ _('coming_soon.intro', lang).replace('{phase}', phase) }}
   </p>
 </div>
 {% endblock %}

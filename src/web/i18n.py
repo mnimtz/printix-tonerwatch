@@ -171,6 +171,9 @@ _EN: dict[str, str] = {
     "access.level.read":              "Read",
     "access.level.admin":             "Admin",
     "access.column.level":            "Level",
+    # -- Coming-soon stubs (P1c) ------------------------------------------
+    "coming_soon.badge":              "Coming in",
+    "coming_soon.intro":              "This feature is being built as part of the {phase} phase of the MVP. The rest of the console is fully functional — carry on with what is already available in the sidebar.",
 }
 
 _FR: dict[str, str] = {
@@ -307,6 +310,9 @@ _FR: dict[str, str] = {
     "access.level.read":              "Lecture",
     "access.level.admin":             "Administrateur",
     "access.column.level":            "Niveau",
+    # -- Placeholders (P1c) ----------------------------------------------
+    "coming_soon.badge":              "Bientôt en",
+    "coming_soon.intro":              "Cette fonctionnalité est en cours de développement dans le cadre de la phase {phase} du MVP. Le reste de la console est pleinement opérationnel — continuez avec ce qui est déjà disponible dans la barre latérale.",
 }
 
 _IT: dict[str, str] = {
@@ -443,6 +449,9 @@ _IT: dict[str, str] = {
     "access.level.read":              "Lettura",
     "access.level.admin":             "Amministratore",
     "access.column.level":            "Livello",
+    # -- Placeholder (P1c) -----------------------------------------------
+    "coming_soon.badge":              "In arrivo con",
+    "coming_soon.intro":              "Questa funzionalità è in fase di sviluppo come parte della fase {phase} dell\'MVP. Il resto della console è pienamente funzionante — continua con ciò che è già disponibile nella barra laterale.",
 }
 
 _DE: dict[str, str] = {
@@ -579,6 +588,9 @@ _DE: dict[str, str] = {
     "access.level.read":              "Lesen",
     "access.level.admin":             "Administrator",
     "access.column.level":            "Ebene",
+    # -- Coming-soon-Stubs (P1c) -----------------------------------------
+    "coming_soon.badge":              "Kommt in",
+    "coming_soon.intro":              "Diese Funktion wird als Teil der {phase}-Phase des MVP gebaut. Der Rest der Konsole ist voll funktionsfähig — arbeite mit dem weiter, was in der Sidebar bereits verfügbar ist.",
 }
 
 _ES: dict[str, str] = {
@@ -715,6 +727,9 @@ _ES: dict[str, str] = {
     "access.level.read":              "Lectura",
     "access.level.admin":             "Administrador",
     "access.column.level":            "Nivel",
+    # -- Marcadores (P1c) ------------------------------------------------
+    "coming_soon.badge":              "Disponible en",
+    "coming_soon.intro":              "Esta función se está desarrollando como parte de la fase {phase} del MVP. El resto de la consola está totalmente operativo — continúa con lo que ya está disponible en la barra lateral.",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {

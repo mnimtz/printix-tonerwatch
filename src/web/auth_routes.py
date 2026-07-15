@@ -154,24 +154,34 @@ async def setup_submit(request: Request,
 # --------------------------------------------------------------------------
 
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
-async def login_form(request: Request):
+async def login_form(request: Request, next: str = "/dashboard"):
     templates = request.app.state.templates
     if db.user_count() == 0:
         return RedirectResponse("/setup", status_code=303)
     return templates.TemplateResponse(
         "login.html",
         {"request": request, "lang": request.state.lang,
-         "error": None, "info": None, "form": {"email": ""}},
+         "error": None, "info": None,
+         "form": {"email": "", "next": _safe_next(next)}},
     )
+
+
+def _safe_next(value: str | None) -> str:
+    """Only allow same-origin relative paths — no `//evil.com` open-redirect."""
+    if not value or not value.startswith("/") or value.startswith("//"):
+        return "/dashboard"
+    return value
 
 
 @router.post("/login", response_class=HTMLResponse, include_in_schema=False)
 async def login_submit(request: Request,
                        email: str = Form(""),
-                       password: str = Form("")):
+                       password: str = Form(""),
+                       next: str = Form("")):
     templates = request.app.state.templates
     lang = request.state.lang
     email = email.strip().lower()
+    next_path = _safe_next(next or request.query_params.get("next", ""))
 
     user = db.find_user_by_email(email) if email else None
     if user is None or not user["active"] or \
@@ -182,7 +192,7 @@ async def login_submit(request: Request,
             {"request": request, "lang": lang,
              "error": i18n.t("auth.invalid_credentials", lang),
              "info": None,
-             "form": {"email": email}},
+             "form": {"email": email, "next": next_path}},
             status_code=401,
         )
 
@@ -193,7 +203,7 @@ async def login_submit(request: Request,
     db.touch_last_login(user["id"])
     db.audit(user["id"], "user.login",
              target_type="user", target_id=str(user["id"]))
-    return RedirectResponse("/dashboard", status_code=303)
+    return RedirectResponse(next_path, status_code=303)
 
 
 @router.post("/logout", include_in_schema=False)

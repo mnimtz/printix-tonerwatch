@@ -10,12 +10,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from urllib.parse import quote as _urlquote
 
 from .. import auth, db
 from . import access_routes, auth_routes, customer_routes, i18n, user_routes
@@ -135,25 +136,88 @@ def create_app() -> FastAPI:
             return RedirectResponse("/login", status_code=303)
         return RedirectResponse("/dashboard", status_code=303)
 
-    # Placeholder — real dashboard lands in P2. Keeps the root redirect
-    # from breaking during the P0/P1 preview.
-    @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
-    async def dashboard_stub(request: Request):
-        user = auth.require_user(request)
-        return templates.TemplateResponse(
-            "coming_soon.html",
-            {
-                "request": request,
-                "lang": request.state.lang,
-                "user": dict(user),
-                "phase": "P2",
-                "title_key": "nav.dashboard",
-            },
-        )
+    # Coming-soon stubs — one route per sidebar entry that hasn't
+    # landed yet. Keeps the nav from producing dead JSON-404s while
+    # phases roll out incrementally. Each stub declares which phase
+    # the real implementation lives in.
+    _STUBS = (
+        ("/dashboard",  "nav.dashboard",   "P2"),
+        ("/toner",      "nav.toner",       "P2"),
+        ("/orders",     "nav.orders",      "P4b"),
+        ("/settings",   "nav.settings",    "P3"),
+    )
+    for _path, _title_key, _phase in _STUBS:
+        def _make_stub(path, title_key, phase):
+            @app.get(path, response_class=HTMLResponse, include_in_schema=False,
+                     name=f"stub_{path.strip('/')}")
+            async def _stub(request: Request):
+                user = auth.require_user(request)
+                # Admin-only sections
+                if path == "/settings":
+                    auth.require_admin(request)
+                return templates.TemplateResponse(
+                    "coming_soon.html",
+                    {
+                        "request": request,
+                        "lang": request.state.lang,
+                        "user": dict(user),
+                        "phase": phase,
+                        "title_key": title_key,
+                    },
+                )
+            return _stub
+        _make_stub(_path, _title_key, _phase)
 
     # Health check for Azure App Service liveness probes.
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
         return JSONResponse({"status": "ok"})
+
+    # ── HTML-aware exception handlers ────────────────────────────────
+    # Default FastAPI returns raw JSON for HTTPException, which is
+    # jarring in a browser context. Rewrite 401/403/404 to the right
+    # user-facing surface when the client wants HTML.
+    def _accepts_html(request: Request) -> bool:
+        accept = request.headers.get("accept", "")
+        return "text/html" in accept or "*/*" in accept and "application/json" not in accept
+
+    @app.exception_handler(HTTPException)
+    async def _http_exc(request: Request, exc: HTTPException):
+        if not _accepts_html(request):
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
+                                headers=getattr(exc, "headers", None))
+
+        lang = getattr(request.state, "lang", i18n.DEFAULT_LANG)
+        user = auth.current_user(request)
+
+        if exc.status_code == 401:
+            # Not authenticated → send them to /login and come back here
+            next_path = request.url.path
+            if request.url.query:
+                next_path += "?" + request.url.query
+            return RedirectResponse(
+                f"/login?next={_urlquote(next_path, safe='/?&=')}",
+                status_code=303,
+            )
+        if exc.status_code in (403, 404):
+            tmpl = "error_403.html" if exc.status_code == 403 else "error_404.html"
+            return templates.TemplateResponse(
+                tmpl,
+                {
+                    "request": request, "lang": lang,
+                    "user": dict(user) if user else None,
+                    "detail": exc.detail,
+                },
+                status_code=exc.status_code,
+            )
+        # Everything else: JSON, same as before
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+    @app.exception_handler(404)
+    async def _not_found(request: Request, exc: HTTPException):
+        # Starlette raises a bare Not Found for unmatched routes — route
+        # it through the same HTML-vs-JSON logic.
+        return await _http_exc(request, HTTPException(status_code=404,
+                                                     detail="not_found"))
 
     return app

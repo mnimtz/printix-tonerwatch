@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}404 · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}404{% endblock %}
+{% block content %}
+<div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);
+                        max-width: 560px; margin: var(--sp-8) auto;">
+  <div style="font-size: 3rem; font-weight: 900; color: var(--tw-primary);
+              letter-spacing: -0.03em; margin-bottom: var(--sp-3);">
+    404
+  </div>
+  <h2 style="margin-bottom: var(--sp-3);">
+    {{ _('common.not_found', lang) }}
+  </h2>
+  <p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-6);">
+    <code style="font-family: var(--font-mono); font-size: 0.9em;">
+      {{ request.url.path }}
+    </code>
+  </p>
+  <a href="/dashboard" class="btn">
+    {{ _('common.back', lang) }} → {{ _('nav.dashboard', lang) }}
+  </a>
+</div>
+{% endblock %}
