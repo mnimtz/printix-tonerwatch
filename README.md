@@ -3,7 +3,7 @@
 **Multi-tenant toner monitoring, alerting and ordering for Managed Service Providers**
 built on top of the Tungsten Printix BI database.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmnimtz%2Ftonerwatch%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmnimtz%2Fprintix-tonerwatch%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
 [![Container image](https://ghcr-badge.egpl.dev/mnimtz/printix-tonerwatch/latest_tag?trim=major&label=ghcr.io)](https://github.com/mnimtz/printix-tonerwatch/pkgs/container/tonerwatch)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
