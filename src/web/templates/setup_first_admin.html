@@ -1,0 +1,57 @@
+{% extends "login.html" %}
+{% block title %}{{ _('setup.title', lang) }}{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <div class="auth-header">
+    <div class="wordmark">
+      Printix
+      <span class="product">Toner Radar</span>
+    </div>
+    <h1>{{ _('setup.title', lang) }}</h1>
+  </div>
+  <div class="auth-body">
+    <p style="color: var(--tw-text); margin-bottom: var(--sp-6);">
+      {{ _('setup.intro', lang) }}
+    </p>
+    {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/setup" autocomplete="off">
+      <div class="form-group">
+        <label for="name">{{ _('setup.name', lang) }}</label>
+        <input id="name" name="name" type="text" required
+               value="{{ form.name if form else '' }}">
+      </div>
+      <div class="form-group">
+        <label for="email">{{ _('setup.email', lang) }}</label>
+        <input id="email" name="email" type="email" required
+               autocomplete="username"
+               value="{{ form.email if form else '' }}">
+      </div>
+      <div class="form-group">
+        <label for="password">{{ _('setup.password', lang) }}</label>
+        <input id="password" name="password" type="password" required
+               minlength="12" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="password_confirm">{{ _('setup.password_confirm', lang) }}</label>
+        <input id="password_confirm" name="password_confirm" type="password"
+               required minlength="12" autocomplete="new-password">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn">
+          {{ _('setup.create_button', lang) }}
+        </button>
+      </div>
+    </form>
+    <div class="auth-lang">
+      {% for code in SUPPORTED_LANGS %}
+        <a href="/language?lang={{ code }}&next=/setup"
+           class="{{ 'current' if code == lang else '' }}">
+          {{ LANG_LABELS[code] }}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

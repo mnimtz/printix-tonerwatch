@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+.env.local
+*.egg
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data / secrets (never commit)
+/data/
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-journal
+fernet.key
+*.pem
+*.key
+
+# IDE / OS
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Node (in case tooling is added later)
+node_modules/

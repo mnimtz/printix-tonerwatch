@@ -1,0 +1,20 @@
+services:
+  toner-radar:
+    build: .
+    image: ghcr.io/mnimtz/printix-toner-radar:local
+    container_name: toner-radar
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - toner-radar-data:/data
+    environment:
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: 8080
+      DB_PATH: /data/toner_radar.sqlite
+      # SESSION_SECRET is derived from FERNET_KEY on first start when unset.
+      # Set explicitly if you want a stable value independent of the DB key.
+      # SESSION_SECRET: "change-me"
+
+volumes:
+  toner-radar-data:

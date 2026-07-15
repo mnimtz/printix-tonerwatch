@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName":        { "value": "my-toner-radar" },
+    "sku":            { "value": "B1" },
+    "containerImage": { "value": "ghcr.io/mnimtz/printix-toner-radar:latest" },
+    "tz":             { "value": "Europe/Berlin" },
+    "defaultLang":    { "value": "en" }
+  }
+}

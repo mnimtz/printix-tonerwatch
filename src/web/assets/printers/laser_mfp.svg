@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"
+     stroke="#231F20" stroke-width="2.2" stroke-linecap="round"
+     stroke-linejoin="round" role="img" aria-label="Laser multi-function printer">
+  <title>Laser multi-function printer</title>
+  <!-- Document feeder on top -->
+  <path d="M14 8 h36 v6 h-36 z"/>
+  <path d="M20 11 h24" stroke="#00A0FB"/>
+  <!-- Scanner glass -->
+  <rect x="10" y="14" width="44" height="10" rx="1"/>
+  <line x1="14" y1="19" x2="50" y2="19" stroke="#00A0FB"/>
+  <!-- Printer body -->
+  <rect x="10" y="26" width="44" height="18" rx="2"/>
+  <!-- Control panel -->
+  <rect x="34" y="30" width="16" height="6" rx="1" stroke="#00A0FB"/>
+  <!-- Output slot -->
+  <line x1="14" y1="40" x2="30" y2="40"/>
+  <!-- Paper drawer at bottom -->
+  <path d="M12 46 h40 v8 h-40 z"/>
+  <line x1="18" y1="50" x2="46" y2="50" stroke="#00A0FB"/>
+  <!-- Two feet -->
+  <line x1="18" y1="54" x2="18" y2="58"/>
+  <line x1="46" y1="54" x2="46" y2="58"/>
+</svg>

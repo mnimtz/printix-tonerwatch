@@ -1,0 +1,28 @@
+# Web framework
+fastapi>=0.111.0,<0.116.0
+starlette>=0.40.0,<1.0.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+jinja2>=3.1.0
+itsdangerous>=2.1.0
+
+# Security & crypto
+cryptography>=42.0.0
+bcrypt>=4.1.0
+
+# HTTP client (Wikidata enrichment, future integrations)
+httpx>=0.25.0
+
+# Printix BI database — Azure SQL Server
+pyodbc>=5.1.0
+pymssql>=2.3.0
+
+# Scheduling — alert runner cron loop
+APScheduler>=3.10.0
+python-dateutil>=2.9.0
+
+# CSV / spreadsheet — supply-library bulk import + reports
+openpyxl>=3.1.0
+
+# Email — Resend HTTP API (preferred) + stdlib smtplib (fallback)
+# Both use stdlib / httpx already listed above; no extra dep required.

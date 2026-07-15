@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"
+     stroke="#231F20" stroke-width="2.2" stroke-linecap="round"
+     stroke-linejoin="round" role="img" aria-label="Inkjet single-function printer">
+  <title>Inkjet single-function printer</title>
+  <!-- Rear paper feed -->
+  <path d="M14 10 h36 v4 h-36 z"/>
+  <path d="M18 14 v-6 M32 14 v-6 M46 14 v-6" stroke="#00A0FB"/>
+  <!-- Compact body -->
+  <rect x="8" y="16" width="48" height="20" rx="4"/>
+  <!-- Print head bar (indicative of inkjet) -->
+  <rect x="20" y="22" width="24" height="3" rx="1" fill="#00A0FB" stroke="none"/>
+  <!-- Ink cartridge dots -->
+  <circle cx="24" cy="28" r="1.5" fill="#00A0FB" stroke="none"/>
+  <circle cx="29" cy="28" r="1.5" fill="#231F20" stroke="none"/>
+  <circle cx="34" cy="28" r="1.5" fill="#D030E8" stroke="none"/>
+  <circle cx="39" cy="28" r="1.5" fill="#FFC600" stroke="none"/>
+  <!-- Output tray -->
+  <path d="M12 36 h40 l-2 8 h-36 z"/>
+  <line x1="20" y1="42" x2="44" y2="42" stroke="#00A0FB"/>
+</svg>

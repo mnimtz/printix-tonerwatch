@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"
+     stroke="#231F20" stroke-width="2.2" stroke-linecap="round"
+     stroke-linejoin="round" role="img" aria-label="Large-format printer">
+  <title>Large-format printer</title>
+  <!-- Wide upper roller -->
+  <rect x="4" y="14" width="56" height="6" rx="2"/>
+  <line x1="9"  y1="17" x2="55" y2="17" stroke="#00A0FB"/>
+  <!-- Wide sheet emerging from roller -->
+  <path d="M12 20 h40 v10 h-40 z"/>
+  <path d="M16 24 h32 M16 27 h20" stroke="#00A0FB"/>
+  <!-- Main body -->
+  <rect x="4" y="30" width="56" height="12" rx="2"/>
+  <!-- Display -->
+  <rect x="42" y="34" width="12" height="4" rx="1" stroke="#00A0FB"/>
+  <!-- Stand legs -->
+  <line x1="10" y1="42" x2="10" y2="58"/>
+  <line x1="54" y1="42" x2="54" y2="58"/>
+  <line x1="6"  y1="58" x2="58" y2="58"/>
+  <!-- Roll paper indicator -->
+  <circle cx="10" cy="50" r="4" stroke="#00A0FB"/>
+  <circle cx="54" cy="50" r="4" stroke="#00A0FB"/>
+</svg>

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Printix Toner Radar — multi-tenant toner monitoring for MSP partners. Provisions a Linux App Service Web App running the container from GHCR, plus an Azure Files share mounted at /data for the SQLite database and Fernet encryption key."
+  },
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": { "description": "Unique app name. Reachable at https://<appName>.azurewebsites.net" }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": { "description": "Azure region — defaults to the resource group location." }
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "B1",
+      "allowedValues": [ "F1", "B1", "B2", "B3", "S1", "P1V3" ],
+      "metadata": { "description": "App Service Plan SKU. B1 recommended (~10 EUR/month, always-on). F1 is free with limits (1 GB RAM, sleeps when idle)." }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/mnimtz/printix-toner-radar:latest",
+      "metadata": { "description": "Container image to pull. Use a versioned tag (e.g. ghcr.io/mnimtz/printix-toner-radar:0.1.0) for reproducible deployments." }
+    },
+    "tz": {
+      "type": "string",
+      "defaultValue": "Europe/Berlin",
+      "metadata": { "description": "IANA timezone for the runtime — controls quiet-hours calculations." }
+    },
+    "defaultLang": {
+      "type": "string",
+      "defaultValue": "en",
+      "allowedValues": [ "en", "fr", "it", "de", "es" ],
+      "metadata": { "description": "Fallback UI language when the browser preference cannot be resolved. Users can switch languages at any time from the UI." }
+    }
+  },
+  "variables": {
+    "planName": "[concat(parameters('appName'), '-plan')]",
+    "storageAccountName": "[concat('tonrad', uniqueString(resourceGroup().id))]",
+    "fileShareName": "toner-radar-data"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": { "name": "Standard_LRS" },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+      "apiVersion": "2023-05-01",
+      "name": "[concat(variables('storageAccountName'), '/default/', variables('fileShareName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+      ],
+      "properties": { "shareQuota": 5 }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[variables('planName')]",
+      "location": "[parameters('location')]",
+      "sku": { "name": "[parameters('sku')]" },
+      "kind": "linux",
+      "properties": { "reserved": true }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('appName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux,container",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices/shares', variables('storageAccountName'), 'default', variables('fileShareName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('containerImage'))]",
+          "alwaysOn": "[if(equals(parameters('sku'), 'F1'), false(), true())]",
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "appSettings": [
+            { "name": "WEBSITES_PORT", "value": "8080" },
+            { "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false" },
+            { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "https://ghcr.io" },
+            { "name": "WEB_HOST", "value": "0.0.0.0" },
+            { "name": "WEB_PORT", "value": "8080" },
+            { "name": "DB_PATH", "value": "/data/toner_radar.sqlite" },
+            { "name": "DEFAULT_LANG", "value": "[parameters('defaultLang')]" },
+            { "name": "TZ", "value": "[parameters('tz')]" }
+          ],
+          "azureStorageAccounts": {
+            "data": {
+              "type": "AzureFiles",
+              "accountName": "[variables('storageAccountName')]",
+              "shareName": "[variables('fileShareName')]",
+              "mountPath": "/data",
+              "accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2023-05-01').keys[0].value]"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "appUrl": {
+      "type": "string",
+      "value": "[concat('https://', parameters('appName'), '.azurewebsites.net')]"
+    },
+    "storageAccount": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    },
+    "nextSteps": {
+      "type": "string",
+      "value": "Open the App URL, complete the first-run setup wizard to create the admin account, then add your first Printix customer under /customers."
+    }
+  }
+}

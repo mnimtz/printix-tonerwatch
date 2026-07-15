@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"
+     stroke="#231F20" stroke-width="2.2" stroke-linecap="round"
+     stroke-linejoin="round" role="img" aria-label="Inkjet multi-function printer">
+  <title>Inkjet multi-function printer</title>
+  <!-- Scanner lid -->
+  <path d="M10 8 h44 v3 h-44 z"/>
+  <!-- Scanner glass panel -->
+  <rect x="8" y="11" width="48" height="10" rx="2"/>
+  <line x1="12" y1="16" x2="52" y2="16" stroke="#00A0FB"/>
+  <!-- Printer body -->
+  <rect x="8" y="21" width="48" height="18" rx="3"/>
+  <!-- Touch display -->
+  <rect x="34" y="25" width="16" height="7" rx="1" stroke="#00A0FB"/>
+  <!-- Ink cartridge indicators — CMYK -->
+  <circle cx="16" cy="28" r="1.7" fill="#00A0FB" stroke="none"/>
+  <circle cx="21" cy="28" r="1.7" fill="#D030E8" stroke="none"/>
+  <circle cx="26" cy="28" r="1.7" fill="#FFC600" stroke="none"/>
+  <circle cx="31" cy="28" r="1.7" fill="#231F20" stroke="none"/>
+  <!-- Output tray -->
+  <path d="M12 39 h40 v6 h-40 z"/>
+  <line x1="18" y1="42" x2="46" y2="42" stroke="#00A0FB"/>
+  <!-- Paper tray at bottom -->
+  <path d="M10 47 h44 v8 h-44 z"/>
+</svg>
