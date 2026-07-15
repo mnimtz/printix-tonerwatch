@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -10,6 +13,47 @@ from . import i18n
 
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Very small in-memory login throttle
+# ---------------------------------------------------------------------------
+# Not a replacement for a real rate limiter — that comes with fastapi-limiter
+# or a reverse-proxy WAF — but this fold-in stops the trivial brute-force
+# case (one attacker hammering /login) without any external dependency.
+#
+# Bookkeeping is per (client ip, email) tuple so a single bad email can't
+# lock out an entire tenant, and per-IP + per-email combined so many
+# users behind a shared NAT don't lock each other out either.
+_LOGIN_FAILS: dict[tuple[str, str], list[float]] = {}
+_LOGIN_WINDOW_SECONDS = 60 * 5   # rolling 5 min window
+_LOGIN_MAX_ATTEMPTS = 8          # after N fails in the window → back-off
+_LOGIN_BACKOFF_BASE = 0.5        # seconds; multiplied by (fails - MAX)
+
+
+def _login_client_key(request: Request, email: str) -> tuple[str, str]:
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host
+                                                if request.client else "-")
+    return (ip, email.lower())
+
+
+async def _throttle_login_failure(request: Request, email: str) -> None:
+    key = _login_client_key(request, email)
+    now = time.time()
+    hits = [t for t in _LOGIN_FAILS.get(key, []) if now - t < _LOGIN_WINDOW_SECONDS]
+    hits.append(now)
+    _LOGIN_FAILS[key] = hits
+    if len(hits) > _LOGIN_MAX_ATTEMPTS:
+        # Exponential back-off up to a hard cap so the request doesn't
+        # tie up a worker for too long even under attack.
+        delay = min(_LOGIN_BACKOFF_BASE * (2 ** (len(hits) - _LOGIN_MAX_ATTEMPTS)),
+                    30.0)
+        await asyncio.sleep(delay)
+
+
+def _reset_login_throttle(request: Request, email: str) -> None:
+    _LOGIN_FAILS.pop(_login_client_key(request, email), None)
 
 
 # --------------------------------------------------------------------------
@@ -128,6 +172,7 @@ async def login_submit(request: Request,
     user = db.find_user_by_email(email) if email else None
     if user is None or not user["active"] or \
             not auth.verify_password(password, user["password_hash"]):
+        await _throttle_login_failure(request, email)
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "lang": lang,
@@ -137,6 +182,7 @@ async def login_submit(request: Request,
             status_code=401,
         )
 
+    _reset_login_throttle(request, email)
     request.session["user_id"] = user["id"]
     if user["lang"] in i18n.SUPPORTED_LANGS:
         request.session["lang"] = user["lang"]

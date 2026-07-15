@@ -64,4 +64,10 @@ VOLUME ["/data"]
 
 EXPOSE 8080
 
+# Liveness probe — the /healthz endpoint returns {"status":"ok"} once
+# the FastAPI app is fully initialised (schema migrated, translations
+# checked). Azure App Service uses this to gate traffic during rollouts.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:${WEB_PORT:-8080}/healthz || exit 1
+
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

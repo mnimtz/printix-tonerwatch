@@ -7,17 +7,62 @@ views) plug in cleanly by importing this factory.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .. import auth, db
 from . import auth_routes, i18n
 from .lang import LanguageMiddleware
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    v = os.environ.get(name, "").strip().lower()
+    if not v:
+        return default
+    return v in ("1", "true", "yes", "on")
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Attach a small set of hardening response headers on every request.
+
+    * Content-Security-Policy — allow inline styles + scripts (we ship
+      them inline in base.html for zero-latency rendering), Bunny CDN
+      for the Red Hat Display webfont, self for everything else.
+    * X-Content-Type-Options — stop MIME sniffing.
+    * X-Frame-Options — deny framing (no legitimate embed use case).
+    * Referrer-Policy — send origin only cross-site.
+    * Permissions-Policy — deny sensor / device APIs that we never use.
+    """
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        headers = response.headers
+        headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
+            "font-src 'self' https://fonts.bunny.net data:; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=()",
+        )
+        return response
 
 
 ASSETS_DIR = Path(__file__).parent / "assets"
@@ -40,15 +85,19 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
 
+    # Session cookie is Secure by default. Override with
+    # SESSION_HTTPS_ONLY=false when running behind a plain-HTTP dev
+    # environment (docker compose on localhost, for instance).
     app.add_middleware(
         SessionMiddleware,
         secret_key=auth.session_secret(),
         session_cookie="tonerwatch_session",
         max_age=60 * 60 * 24 * 30,   # 30 days
         same_site="lax",
-        https_only=False,            # Set True in production via reverse proxy.
+        https_only=_env_bool("SESSION_HTTPS_ONLY", True),
     )
     app.add_middleware(LanguageMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Static assets — logo, favicon, printer pictograms.
     app.mount(

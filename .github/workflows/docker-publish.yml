@@ -8,7 +8,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/tonerwatch
+  # Uses the current repository name so a future `gh repo rename` is
+  # self-healing — no workflow edit required to keep the image URL in
+  # sync with the repo URL.
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
