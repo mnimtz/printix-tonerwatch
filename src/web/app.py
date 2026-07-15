@@ -30,6 +30,22 @@ def _env_bool(name: str, default: bool) -> bool:
     return v in ("1", "true", "yes", "on")
 
 
+def _read_version() -> str:
+    """Return the running app version — env var takes precedence (that's
+    what the container entrypoint exports from /app/VERSION), local dev
+    falls back to reading the VERSION file next to the source tree."""
+    env = os.environ.get("APP_VERSION", "").strip()
+    if env:
+        return env
+    for p in (Path(__file__).parent.parent.parent / "VERSION",
+              Path("/app/VERSION")):
+        try:
+            return p.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+    return "dev"
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach a small set of hardening response headers on every request.
 
@@ -116,6 +132,7 @@ def create_app() -> FastAPI:
 
     templates.env.globals["_"] = _t
     templates.env.globals["APP_NAME"] = "Printix TonerWatch"
+    templates.env.globals["APP_VERSION"] = _read_version()
     templates.env.globals["LANG_LABELS"] = i18n.LANG_LABELS
     templates.env.globals["SUPPORTED_LANGS"] = i18n.SUPPORTED_LANGS
 

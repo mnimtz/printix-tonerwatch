@@ -144,11 +144,13 @@
     }
     .sidebar-brand img {
       width: 44px; height: 44px; flex-shrink: 0;
-      /* Faint white halo so the icon reads cleanly against the dark
-         blue-domain gradient of the sidebar */
-      background: rgba(255,255,255,.06);
+      /* Solid white tile so the icon's dark-navy printer body and
+         CMYK toner bars read cleanly against the dark blue-domain
+         sidebar. Faint alpha-white didn't have enough contrast. */
+      background: #ffffff;
       border-radius: 10px;
       padding: 4px;
+      box-shadow: 0 2px 6px rgba(0, 18, 59, .35);
     }
     .sidebar-brand .wordmark {
       display: flex; flex-direction: column;
@@ -233,11 +235,26 @@
 
     /* Sidebar bottom — language + user + sign-out */
     .sidebar-bottom {
-      padding: var(--sp-3) var(--sp-3) var(--sp-5);
+      padding: var(--sp-3) var(--sp-3) var(--sp-4);
       border-top: 1px solid rgba(255, 255, 255, .08);
       display: flex;
       flex-direction: column;
       gap: var(--sp-2);
+    }
+    /* Version stamp — muted mono strip at the very bottom so operators
+       can eyeball which build they're on without cURL. */
+    .sidebar-version {
+      padding: var(--sp-2) var(--sp-4) var(--sp-2);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, .30);
+      letter-spacing: 0.04em;
+      border-top: 1px solid rgba(255, 255, 255, .04);
+    }
+    .sidebar-version strong {
+      color: rgba(255, 255, 255, .55);
+      font-weight: 600;
     }
     .sidebar-lang {
       position: relative;
@@ -625,6 +642,10 @@
               </button>
             </form>
           </div>
+        </div>
+
+        <div class="sidebar-version" aria-label="running version">
+          <strong>v{{ APP_VERSION }}</strong>
         </div>
       </aside>
 
