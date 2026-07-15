@@ -54,6 +54,43 @@ _SCOPES: list[str] = ["User.Read", "offline_access"]
 # empty — Microsoft handles home-tenant discovery on their side.
 _MULTI_TENANT_AUTHORITY = "https://login.microsoftonline.com/common"
 
+# ─── Auto-setup constants (v0.16) ────────────────────────────────
+# Device-code + Graph endpoints for the "one-click Azure App
+# Registration" flow. The admin never touches Azure Portal — they
+# authenticate once at microsoft.com/devicelogin, and TonerWatch
+# creates the App Registration + secret + admin consent on their
+# behalf via Graph API.
+_DEVICE_CODE_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/devicecode"
+_TOKEN_URL       = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+_GRAPH_URL       = "https://graph.microsoft.com/v1.0"
+
+# First-party Microsoft app for Graph CLI — supports device-code
+# flow + dynamic consent for Graph API permissions. Same one the
+# `mgc` CLI and Microsoft.Graph PowerShell SDK use.
+_GRAPH_CLI_CLIENT_ID = "14d82eec-204b-4c2f-b7e8-296a70dab67e"
+
+# Microsoft Graph's own AppId — used to look up its ServicePrincipal
+# when we grant tenant-wide consent for delegated scopes.
+_MSGRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"
+
+# Scopes we need for the device-code login that then performs
+# auto-registration. All Application.ReadWrite.All is enough for
+# create/update apps + secrets. DelegatedPermissionGrant.ReadWrite.All
+# lets us grant tenant-wide consent so end-users skip the consent
+# screen on first sign-in.
+_AUTOSETUP_SCOPES = (
+    "https://graph.microsoft.com/Application.ReadWrite.All "
+    "https://graph.microsoft.com/DelegatedPermissionGrant.ReadWrite.All "
+    "offline_access openid profile"
+)
+
+# Delegated permission IDs on Microsoft Graph.
+# Docs: https://learn.microsoft.com/en-us/graph/permissions-reference
+_GRAPH_SCOPE_OPENID   = "37f7f235-527c-4136-accd-4a02d197296e"
+_GRAPH_SCOPE_PROFILE  = "14dad69e-099b-42c9-810b-d002981feec1"
+_GRAPH_SCOPE_EMAIL    = "64a6cdd6-aab1-4aaf-94b8-3cc8405e90d0"
+_GRAPH_SCOPE_USERREAD = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+
 # Session key for the state token (guards against CSRF on the
 # callback) and the redirect-target after successful login.
 _SESSION_STATE_KEY = "entra_state"
@@ -325,3 +362,266 @@ def resolve_or_create_user(claims: dict[str, Any]) -> dict[str, Any] | None:
             select(db.users).where(db.users.c.id == new_id)
         ).first()
         return db._row_to_dict(row)
+
+
+# ---------------------------------------------------------------------------
+# Auto-setup: device-code login → Graph API creates App Registration
+# ---------------------------------------------------------------------------
+#
+# One-click Azure onboarding. The admin never opens the Azure Portal.
+# They click "Auto-configure", get a short code, sign in once at
+# microsoft.com/devicelogin, and TonerWatch does the rest via
+# Microsoft Graph:
+#
+#   1. Fetch tenant_id via /organization
+#   2. POST /applications — create the App Registration with the
+#      correct redirect URI + single-tenant audience + openid /
+#      profile / email / User.Read scopes
+#   3. POST /applications/{obj_id}/addPassword — mint a fresh client
+#      secret (Microsoft caps at 24 months)
+#   4. Create the ServicePrincipal + oauth2PermissionGrant so end
+#      users never see the consent screen
+#   5. Save all of the above into the entra_sso settings row
+#
+# Required scopes on the admin's device-code login:
+#   * Application.ReadWrite.All            (create app + secret)
+#   * DelegatedPermissionGrant.ReadWrite.All (tenant-wide consent)
+#
+# The admin must have the "Application Administrator" or a higher
+# role in Entra. Regular users can't grant tenant-wide consent.
+
+
+def start_device_code_flow(tenant: str = "common") -> dict[str, Any]:
+    """POST /devicecode. Returns a dict with user_code, verification_uri,
+    device_code, expires_in, interval, plus an ``error`` key when
+    Microsoft rejected the request (tenant blocks device flow,
+    unknown tenant, etc.)."""
+    import httpx as _httpx
+    try:
+        r = _httpx.post(
+            _DEVICE_CODE_URL.format(tenant=tenant),
+            data={"client_id": _GRAPH_CLI_CLIENT_ID,
+                  "scope":     _AUTOSETUP_SCOPES},
+            timeout=15.0)
+    except _httpx.HTTPError as e:
+        return {"error": f"network error: {e}"}
+    if r.status_code != 200:
+        try:
+            payload = r.json()
+            msg = (payload.get("error_description")
+                   or payload.get("error") or f"HTTP {r.status_code}")
+        except Exception:
+            msg = f"HTTP {r.status_code}: {r.text[:200]}"
+        return {"error": msg}
+    d = r.json()
+    return {
+        "device_code":      d.get("device_code", ""),
+        "user_code":        d.get("user_code", ""),
+        "verification_uri": d.get("verification_uri", ""),
+        "expires_in":       int(d.get("expires_in", 900)),
+        "interval":         int(d.get("interval", 5)),
+        "message":          d.get("message", ""),
+    }
+
+
+def poll_device_code_token(device_code: str,
+                            tenant: str = "common") -> dict[str, Any]:
+    """One poll cycle. Returns status ∈ {pending, success, expired, error}."""
+    import httpx as _httpx
+    try:
+        r = _httpx.post(
+            _TOKEN_URL.format(tenant=tenant),
+            data={"client_id":  _GRAPH_CLI_CLIENT_ID,
+                  "device_code": device_code,
+                  "grant_type": "urn:ietf:params:oauth:grant-type:device_code"},
+            timeout=15.0)
+    except _httpx.HTTPError as e:
+        return {"status": "error", "error": str(e)}
+    data = r.json() if r.text else {}
+    if r.status_code == 200:
+        token = data.get("access_token", "")
+        if token:
+            return {"status": "success", "access_token": token}
+        return {"status": "error", "error": "no access_token in response"}
+    err = data.get("error", "")
+    if err in ("authorization_pending", "slow_down"):
+        return {"status": "pending"}
+    if err == "expired_token":
+        return {"status": "expired"}
+    return {"status": "error",
+            "error": data.get("error_description", err or "unknown")}
+
+
+def _graph(access_token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {access_token}",
+            "Content-Type":  "application/json"}
+
+
+def auto_register_app(
+    access_token: str, redirect_uri: str,
+    app_name: str = "Printix TonerWatch",
+) -> dict[str, Any]:
+    """Create App Registration + secret + tenant-wide consent.
+
+    Returns a dict with tenant_id, client_id, client_secret,
+    secret_expires_at, admin_consent status. Raises EntraSSOError
+    on any Graph-side failure worth surfacing to the admin.
+    """
+    import httpx as _httpx
+    h = _graph(access_token)
+
+    # 1. Discover tenant_id
+    tenant_id = ""
+    try:
+        r = _httpx.get(f"{_GRAPH_URL}/organization", headers=h, timeout=10.0)
+        if r.status_code == 200:
+            orgs = r.json().get("value", [])
+            if orgs:
+                tenant_id = orgs[0].get("id", "")
+    except _httpx.HTTPError as e:
+        logger.warning("could not resolve tenant_id: %s", e)
+
+    # 2. Create App Registration.
+    # signInAudience=AzureADMyOrg → single-tenant (safest default).
+    # The four OIDC scopes cover everything the sign-in flow needs.
+    app_body = {
+        "displayName": app_name,
+        "signInAudience": "AzureADMyOrg",
+        "web": {
+            "redirectUris": [redirect_uri],
+            "implicitGrantSettings": {"enableIdTokenIssuance": True},
+        },
+        "requiredResourceAccess": [{
+            "resourceAppId": _MSGRAPH_APP_ID,
+            "resourceAccess": [
+                {"id": _GRAPH_SCOPE_OPENID,   "type": "Scope"},
+                {"id": _GRAPH_SCOPE_PROFILE,  "type": "Scope"},
+                {"id": _GRAPH_SCOPE_EMAIL,    "type": "Scope"},
+                {"id": _GRAPH_SCOPE_USERREAD, "type": "Scope"},
+            ],
+        }],
+    }
+    try:
+        r = _httpx.post(f"{_GRAPH_URL}/applications",
+                        headers=h, json=app_body, timeout=20.0)
+    except _httpx.HTTPError as e:
+        raise EntraSSOError(f"Graph /applications: {e}") from e
+    if r.status_code not in (200, 201):
+        raise EntraSSOError(
+            f"App creation failed: HTTP {r.status_code}: {r.text[:300]}")
+    app = r.json()
+    client_id = app["appId"]
+    obj_id = app["id"]
+
+    # 3. Create client secret.
+    try:
+        r = _httpx.post(
+            f"{_GRAPH_URL}/applications/{obj_id}/addPassword",
+            headers=h,
+            json={"passwordCredential": {
+                "displayName": "TonerWatch auto-generated"}},
+            timeout=15.0)
+    except _httpx.HTTPError as e:
+        raise EntraSSOError(f"Graph addPassword: {e}") from e
+    if r.status_code not in (200, 201):
+        raise EntraSSOError(
+            f"Secret creation failed: HTTP {r.status_code}: {r.text[:200]}")
+    sec = r.json()
+    client_secret = sec.get("secretText", "")
+    secret_expires_at = sec.get("endDateTime", "")
+
+    # 4. Tenant-wide consent → users don't see the consent screen.
+    consent_status = _grant_tenant_consent(h, client_id)
+
+    logger.info(
+        "Entra SSO app auto-registered: %s (client_id=%s, tenant=%s, "
+        "secret_expires=%s, admin_consent=%s)",
+        app_name, client_id, tenant_id, secret_expires_at, consent_status)
+
+    return {
+        "tenant_id":         tenant_id,
+        "client_id":         client_id,
+        "client_secret":     client_secret,
+        "secret_expires_at": secret_expires_at,
+        "object_id":         obj_id,
+        "admin_consent":     consent_status,
+    }
+
+
+def _grant_tenant_consent(headers: dict[str, str], client_id: str,
+                          scopes: str = "openid profile email User.Read") -> str:
+    """Create ServicePrincipal for our new app + oauth2PermissionGrant
+    for the four Graph scopes on behalf of the whole tenant.
+
+    Returns "granted" | "sp_failed" | "no_msgraph_sp" | "grant_failed"
+    | "partial". Never raises — the SSO app is usable without tenant
+    consent (users just click through on first login), so we report
+    the outcome for the UI rather than failing the whole setup.
+    """
+    import httpx as _httpx
+    # 1. Create ServicePrincipal for the new app
+    try:
+        r = _httpx.post(f"{_GRAPH_URL}/servicePrincipals",
+                        headers=headers, json={"appId": client_id},
+                        timeout=15.0)
+    except _httpx.HTTPError:
+        return "sp_failed"
+    if r.status_code not in (200, 201):
+        logger.warning("SP creation failed: %s %s",
+                       r.status_code, r.text[:200])
+        return "sp_failed"
+    our_sp_id = r.json().get("id", "")
+    if not our_sp_id:
+        return "sp_failed"
+
+    # 2. Look up Microsoft Graph's own ServicePrincipal id (target
+    # for the grant — Graph API is a resource that we're granting
+    # scopes ON).
+    try:
+        r = _httpx.get(
+            f"{_GRAPH_URL}/servicePrincipals(appId='{_MSGRAPH_APP_ID}')",
+            headers=headers, timeout=10.0)
+    except _httpx.HTTPError:
+        return "no_msgraph_sp"
+    if r.status_code != 200:
+        return "no_msgraph_sp"
+    msgraph_sp_id = r.json().get("id", "")
+
+    # 3. Create the tenant-wide grant.
+    try:
+        r = _httpx.post(
+            f"{_GRAPH_URL}/oauth2PermissionGrants",
+            headers=headers,
+            json={"clientId":    our_sp_id,
+                  "consentType": "AllPrincipals",
+                  "resourceId":  msgraph_sp_id,
+                  "scope":       scopes},
+            timeout=15.0)
+    except _httpx.HTTPError:
+        return "grant_failed"
+    if r.status_code not in (200, 201):
+        logger.warning("consent grant failed: %s %s",
+                       r.status_code, r.text[:200])
+        return "grant_failed"
+    return "granted"
+
+
+def apply_auto_setup_result(result: dict[str, Any], *,
+                             redirect_uri: str) -> None:
+    """Persist the auto-registration result into the entra_sso settings
+    row so the SSO login flow can use it immediately. Enables SSO by
+    default — the admin just clicked "Auto-configure", they clearly
+    want it on."""
+    save_config({
+        "enabled":       True,
+        "tenant_id":     result.get("tenant_id", ""),
+        "client_id":     result.get("client_id", ""),
+        "client_secret": result.get("client_secret", ""),
+        "redirect_uri":  redirect_uri,
+        # Auto-setup doesn't imply auto-provisioning — the admin has
+        # to explicitly opt in to that (creates local users on first
+        # SSO login, which some tenants deliberately don't want).
+        "allow_auto_provision": False,
+        "auto_provision_domain": "",
+        "default_role":  "technician",
+    })

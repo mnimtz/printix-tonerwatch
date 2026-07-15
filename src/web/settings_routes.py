@@ -71,6 +71,102 @@ async def settings_mail_save(request: Request):
     return RedirectResponse("/settings?info=mail_saved", status_code=303)
 
 
+@router.post("/settings/entra/autosetup/start", include_in_schema=False)
+async def entra_autosetup_start(request: Request):
+    """Kick off the Entra device-code flow. Returns the user_code
+    the admin must type at microsoft.com/devicelogin plus the
+    verification URI. Stashes the device_code + start-time in the
+    session so the poll endpoint can complete the exchange."""
+    admin = auth.require_admin(request)
+    tenant = "common"  # multi-tenant device-code — Microsoft resolves
+    d = entra_sso.start_device_code_flow(tenant=tenant)
+    if "error" in d:
+        return JSONResponse({"ok": False, "error": d["error"]}, status_code=400)
+    # Session-stash for the poll endpoint. Device codes are single-use;
+    # the admin's browser session owns this until they finish or it
+    # expires (15 min default).
+    try:
+        request.session["entra_setup_device_code"] = d["device_code"]
+        request.session["entra_setup_tenant"] = tenant
+    except AssertionError:
+        return JSONResponse({"ok": False, "error": "session unavailable"},
+                            status_code=500)
+    db.audit(admin["id"], "settings.entra_autosetup_started",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({"user_code_len": len(d["user_code"])}))
+    return JSONResponse({
+        "ok": True,
+        "user_code":        d["user_code"],
+        "verification_uri": d["verification_uri"],
+        "expires_in":       d["expires_in"],
+        "interval":         d["interval"],
+    })
+
+
+@router.post("/settings/entra/autosetup/poll", include_in_schema=False)
+async def entra_autosetup_poll(request: Request):
+    """Poll Microsoft's token endpoint once. If the admin has
+    completed device-code auth, exchange the token, auto-register
+    the App Registration + secret + consent, save the config, and
+    return ``{status: "done"}``. Otherwise pending/expired/error."""
+    admin = auth.require_admin(request)
+    try:
+        device_code = request.session.get("entra_setup_device_code", "")
+        tenant = request.session.get("entra_setup_tenant", "common")
+    except AssertionError:
+        device_code = ""
+        tenant = "common"
+    if not device_code:
+        return JSONResponse({"ok": False,
+                              "status": "error",
+                              "error": "no_device_code_in_session"},
+                             status_code=400)
+
+    poll = entra_sso.poll_device_code_token(device_code, tenant=tenant)
+    status = poll.get("status")
+    if status != "success":
+        return JSONResponse({"ok": True, "status": status,
+                              "error": poll.get("error", "")})
+
+    # Success — clear the device_code from the session so a stale
+    # code can't be re-used, then run the auto-registration.
+    try:
+        request.session.pop("entra_setup_device_code", None)
+        request.session.pop("entra_setup_tenant", None)
+    except AssertionError:
+        pass
+
+    access_token = poll["access_token"]
+    redirect_uri = f"{str(request.base_url).rstrip('/')}/auth/entra/callback"
+    try:
+        result = entra_sso.auto_register_app(
+            access_token, redirect_uri=redirect_uri,
+            app_name="Printix TonerWatch")
+    except entra_sso.EntraSSOError as e:
+        db.audit(admin["id"], "settings.entra_autosetup_failed",
+                 target_type="settings", target_id="entra_sso",
+                 meta_json=json.dumps({"error": str(e)[:300]}))
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": str(e)[:400]}, status_code=500)
+
+    entra_sso.apply_auto_setup_result(result, redirect_uri=redirect_uri)
+    db.audit(admin["id"], "settings.entra_autosetup_done",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({
+                 "tenant_id": result["tenant_id"],
+                 "client_id": result["client_id"],
+                 "admin_consent": result["admin_consent"],
+                 "secret_expires_at": result["secret_expires_at"]}))
+    return JSONResponse({
+        "ok": True,
+        "status": "done",
+        "tenant_id": result["tenant_id"],
+        "client_id": result["client_id"],
+        "admin_consent": result["admin_consent"],
+        "secret_expires_at": result["secret_expires_at"],
+    })
+
+
 @router.post("/settings/runner", include_in_schema=False)
 async def settings_runner_save(request: Request):
     admin = auth.require_admin(request)

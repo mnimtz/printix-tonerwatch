@@ -427,6 +427,35 @@
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
       {{ _('settings.entra.intro', lang) }}
     </p>
+
+    {# v0.16: one-click auto-setup. Admin doesn't touch the Azure Portal
+       — TW does the App Registration + Client Secret + tenant-wide
+       consent via Graph API after the admin signs in once with a
+       device code. #}
+    <div id="entra-autosetup"
+         style="margin-top: var(--sp-3); padding: var(--sp-4);
+                background: linear-gradient(90deg, rgba(0,235,134,0.06), rgba(0,160,251,0.06));
+                border: 1px solid rgba(0,40,84,0.15);
+                border-radius: var(--r-lg);">
+      <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <div style="font-weight: 700; color: var(--tw-primary);">
+            ⚡ {{ _('settings.entra.autosetup.title', lang) }}
+          </div>
+          <div style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 3px;">
+            {{ _('settings.entra.autosetup.intro', lang) }}
+          </div>
+        </div>
+        <button type="button" id="btn-entra-autosetup" class="btn btn-primary"
+                data-noloader style="white-space: nowrap;">
+          🚀 {{ _('settings.entra.autosetup.start', lang) }}
+        </button>
+      </div>
+      <div id="entra-autosetup-panel" style="display: none; margin-top: var(--sp-4);">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
     <form method="post" action="/settings/entra" style="margin-top: var(--sp-3);">
       <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
         <input type="checkbox" id="entra_enabled" name="enabled"
@@ -684,6 +713,129 @@
   });
   window.addEventListener('hashchange', pickFromHash);
   pickFromHash();
+})();
+
+// v0.16: Entra auto-setup device-code flow. Start returns a user_code
+// the admin types at microsoft.com/devicelogin, then the front-end
+// polls until Microsoft confirms — the server auto-registers the app,
+// stores credentials, and this JS reloads the page onto a done state.
+(function() {
+  var btn = document.getElementById('btn-entra-autosetup');
+  if (!btn) return;
+  var panel = document.getElementById('entra-autosetup-panel');
+  var pollTimer = null;
+  var pollInterval = 5000;
+
+  function esc(s) {
+    return String(s || '').replace(/[<>&"']/g, function(c) {
+      return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function show(html) {
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+  }
+
+  function stop() {
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  }
+
+  async function poll() {
+    try {
+      var r = await fetch('/settings/entra/autosetup/poll', {
+        method: 'POST', credentials: 'same-origin'});
+      var j = await r.json();
+      if (j.status === 'success' || j.status === 'done') {
+        stop();
+        show(
+          '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
+                'border-radius: var(--r); color: #065F46;">' +
+          '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
+             {{ _('settings.entra.autosetup.done', lang)|tojson }} +
+          '</div>' +
+          '<div style="font-size: 0.85rem; margin-top: 6px;">' +
+             {{ _('settings.entra.autosetup.done_hint', lang)|tojson }} +
+          '</div>' +
+          '<pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
+                'border-radius: 4px; font-size: 0.78rem;">' +
+             'tenant_id: ' + esc(j.tenant_id) + '\n' +
+             'client_id: ' + esc(j.client_id) + '\n' +
+             'admin_consent: ' + esc(j.admin_consent) +
+             (j.secret_expires_at ? '\nsecret_expires_at: ' + esc(j.secret_expires_at) : '') +
+          '</pre>' +
+          '<button type="button" class="btn" data-noloader ' +
+             'onclick="location.reload()">' +
+             {{ _('common.reload', lang)|tojson }} +
+          '</button></div>');
+        return;
+      }
+      if (j.status === 'pending') {
+        pollTimer = setTimeout(poll, pollInterval);
+        return;
+      }
+      if (j.status === 'expired') {
+        stop();
+        show(
+          '<div style="padding: var(--sp-3); background: #FFFBEB; ' +
+                'border-radius: var(--r); color: #92400E;">' +
+          '<strong>' + {{ _('settings.entra.autosetup.expired', lang)|tojson }} + '</strong><br>' +
+             {{ _('settings.entra.autosetup.expired_hint', lang)|tojson }} +
+          '</div>');
+        return;
+      }
+      // status === "error"
+      stop();
+      show(
+        '<div style="padding: var(--sp-3); background: #FEE2E2; ' +
+              'border-radius: var(--r); color: #991B1B;">' +
+        '<strong>✗ ' + {{ _('settings.entra.autosetup.error', lang)|tojson }} + '</strong><br>' +
+        '<span style="font-family: var(--font-mono); font-size: 0.82rem;">' +
+           esc(j.error || 'unknown') + '</span></div>');
+    } catch (e) {
+      stop();
+      show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+    }
+  }
+
+  btn.addEventListener('click', async function() {
+    btn.disabled = true;
+    show('<div style="color: var(--tw-muted-blue);">' +
+         {{ _('settings.entra.autosetup.starting', lang)|tojson }} + '</div>');
+    try {
+      var r = await fetch('/settings/entra/autosetup/start', {
+        method: 'POST', credentials: 'same-origin'});
+      var j = await r.json();
+      if (!j.ok) {
+        show('<div style="color:#991B1B;">✗ ' + esc(j.error || 'error') + '</div>');
+        btn.disabled = false;
+        return;
+      }
+      pollInterval = Math.max(2000, (j.interval || 5) * 1000);
+      show(
+        '<div style="padding: var(--sp-4); background: var(--tw-white); ' +
+              'border: 2px solid var(--tw-accent); border-radius: var(--r-lg); ' +
+              'text-align: center;">' +
+        '<div style="color: var(--tw-muted-blue); font-size: 0.85rem;">' +
+           {{ _('settings.entra.autosetup.instructions', lang)|tojson }} +
+        '</div>' +
+        '<div style="margin-top: 10px; font-family: var(--font-mono); ' +
+              'font-size: 2rem; font-weight: 900; letter-spacing: 0.08em; ' +
+              'color: var(--tw-primary);">' + esc(j.user_code) + '</div>' +
+        '<div style="margin-top: 12px;">' +
+        '<a href="' + esc(j.verification_uri) + '" target="_blank" rel="noopener" ' +
+           'class="btn btn-primary" data-noloader>🔗 ' +
+           {{ _('settings.entra.autosetup.open_ms', lang)|tojson }} + '</a>' +
+        '</div>' +
+        '<div style="margin-top: 10px; color: var(--tw-muted-blue); font-size: 0.78rem;">' +
+           {{ _('settings.entra.autosetup.waiting', lang)|tojson }} +
+        '</div></div>');
+      pollTimer = setTimeout(poll, pollInterval);
+    } catch (e) {
+      show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+      btn.disabled = false;
+    }
+  });
 })();
 </script>
 {% endblock %}
