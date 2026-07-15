@@ -24,16 +24,14 @@
     background: var(--pillar-gradient); opacity: 0.85;
     clip-path: polygon(30% 0, 100% 0, 70% 100%, 0 100%);
   }
-  .auth-header .wordmark {
-    font-weight: 900; letter-spacing: 0.02em;
-    font-size: 1.35rem;
-    position: relative; z-index: 2;
-  }
-  .auth-header .product {
+  .auth-header .brand-logo {
     display: block;
-    font-weight: 500; font-size: 0.75rem;
-    color: var(--tw-light-blue); letter-spacing: 0.16em;
-    margin-top: 4px;
+    width: 100%; max-width: 320px;
+    height: auto;
+    margin: 0 auto var(--sp-3);
+    padding: var(--sp-4);
+    background: rgba(255,255,255,.94);
+    border-radius: var(--r);
     position: relative; z-index: 2;
   }
   .auth-header h1 {
@@ -65,10 +63,8 @@
 {% block content %}
 <div class="auth-shell">
   <div class="auth-header">
-    <div class="wordmark">
-      Printix
-      <span class="product">Toner Radar</span>
-    </div>
+    <img class="brand-logo" src="/assets/product-logo.png"
+         alt="{{ APP_NAME }} — Print Supply Intelligence" width="320">
     <h1>{{ _('auth.sign_in', lang) }}</h1>
   </div>
   <div class="auth-body">

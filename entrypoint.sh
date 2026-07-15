@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# Printix Toner Radar — container entrypoint
+# TonerWatch — container entrypoint
 # ============================================================================
 # On first start:
 #   - generate the Fernet key used to encrypt per-customer BI-DB credentials
@@ -17,7 +17,7 @@ log_error() { printf '[%s] [ERROR] %s\n'  "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*
 
 APP_VERSION="$(cat /app/VERSION 2>/dev/null || echo '0.0.0')"
 export APP_VERSION
-log_info "Starting Printix Toner Radar v${APP_VERSION}"
+log_info "Starting TonerWatch v${APP_VERSION}"
 
 if [ ! -w /data ]; then
     log_error "/data is not writable — mount a persistent volume (chown 1000:1000)."
@@ -34,7 +34,7 @@ FERNET_KEY="$(cat /data/fernet.key)"
 
 export WEB_HOST="${WEB_HOST:-0.0.0.0}"
 export WEB_PORT="${WEB_PORT:-8080}"
-export DB_PATH="${DB_PATH:-/data/toner_radar.sqlite}"
+export DB_PATH="${DB_PATH:-/data/tonerwatch.sqlite}"
 
 log_info "Listening on ${WEB_HOST}:${WEB_PORT}, database ${DB_PATH}"
 

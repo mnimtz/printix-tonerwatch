@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>{% block title %}{{ _('brand.product_name', lang) }}{% endblock %}</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="/assets/product-icon.png">
   <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
   <link href="https://fonts.bunny.net/css?family=red-hat-display:300,400,500,700,900&display=swap"
         rel="stylesheet">
@@ -140,7 +142,14 @@
       color: var(--tw-white); text-decoration: none;
       position: relative;
     }
-    .sidebar-brand img { width: 40px; height: 40px; flex-shrink: 0; }
+    .sidebar-brand img {
+      width: 44px; height: 44px; flex-shrink: 0;
+      /* Faint white halo so the icon reads cleanly against the dark
+         blue-domain gradient of the sidebar */
+      background: rgba(255,255,255,.06);
+      border-radius: 10px;
+      padding: 4px;
+    }
     .sidebar-brand .wordmark {
       display: flex; flex-direction: column;
       line-height: 1.1;
@@ -484,11 +493,11 @@
     {% if user %}
       <aside class="sidebar" id="sidebar">
         <a class="sidebar-brand" href="/dashboard">
-          <img src="/assets/product-mark.svg" alt="{{ APP_NAME }}"
-               width="40" height="40">
+          <img src="/assets/product-icon.png" alt="{{ APP_NAME }}"
+               width="44" height="44">
           <span class="wordmark">
-            <span class="name">Printix</span>
-            <span class="product">Toner Radar</span>
+            <span class="name">TonerWatch</span>
+            <span class="product">Print Supply Intelligence</span>
           </span>
         </a>
 

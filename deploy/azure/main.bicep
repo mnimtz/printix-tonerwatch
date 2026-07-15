@@ -1,5 +1,5 @@
 // ============================================================================
-// Printix Toner Radar — Azure App Service deployment (Bicep)
+// TonerWatch — Azure App Service deployment (Bicep)
 // ============================================================================
 // Provisions:
 //   * Storage account + Azure Files share mounted at /data on the container
@@ -23,7 +23,7 @@ param location string = resourceGroup().location
 param sku string = 'B1'
 
 @description('Container image to pull from the registry.')
-param containerImage string = 'ghcr.io/mnimtz/printix-toner-radar:latest'
+param containerImage string = 'ghcr.io/mnimtz/tonerwatch:latest'
 
 @description('IANA timezone for the runtime — controls quiet-hours calculations.')
 param tz string = 'Europe/Berlin'
@@ -34,7 +34,7 @@ param defaultLang string = 'en'
 
 var planName     = '${appName}-plan'
 var storageName  = 'tonrad${uniqueString(resourceGroup().id)}'
-var fileShareName = 'toner-radar-data'
+var fileShareName = 'tonerwatch-data'
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
@@ -79,7 +79,7 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://ghcr.io' }
         { name: 'WEB_HOST', value: '0.0.0.0' }
         { name: 'WEB_PORT', value: '8080' }
-        { name: 'DB_PATH', value: '/data/toner_radar.sqlite' }
+        { name: 'DB_PATH', value: '/data/tonerwatch.sqlite' }
         { name: 'DEFAULT_LANG', value: defaultLang }
         { name: 'TZ', value: tz }
       ]

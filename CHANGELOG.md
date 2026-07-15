@@ -1,10 +1,28 @@
 # Changelog
 
-All notable changes to Printix Toner Radar are documented here.
+All notable changes to TonerWatch are documented here.
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 and the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## [Unreleased]
+
+### Changed
+- **Rebranded from "Printix Toner Radar" to "TonerWatch — Print Supply
+  Intelligence".** Repo renamed on GitHub (redirect from the old URL is
+  in place). Container image now published to
+  `ghcr.io/mnimtz/tonerwatch`. Default SQLite database file is now
+  `/data/tonerwatch.sqlite` (previously `/data/toner_radar.sqlite`) —
+  operators upgrading from v0.1.0 must rename the file inside their
+  `/data` volume before the container next starts.
+- Login and first-run setup screens now use the full product logo
+  (icon + wordmark + "Print Supply Intelligence" tagline) instead of
+  the icon-plus-CSS-wordmark combination.
+- Sidebar wordmark reads "TonerWatch / Print Supply Intelligence".
+
+### Added
+- Product icon and full logo shipped as PNG assets under
+  `src/web/assets/` (256×256 icon with transparent background,
+  800×400 logo, 32×32 favicon).
 
 ## [0.1.0] — 2026-07-15
 

@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     db.init_schema()
 
     app = FastAPI(
-        title="Printix Toner Radar",
+        title="TonerWatch",
         docs_url=None,        # No public API docs surface — internal tool.
         redoc_url=None,
         openapi_url=None,
@@ -43,7 +43,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         SessionMiddleware,
         secret_key=auth.session_secret(),
-        session_cookie="toner_radar_session",
+        session_cookie="tonerwatch_session",
         max_age=60 * 60 * 24 * 30,   # 30 days
         same_site="lax",
         https_only=False,            # Set True in production via reverse proxy.
@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
         return i18n.t(key, lang or i18n.DEFAULT_LANG)
 
     templates.env.globals["_"] = _t
-    templates.env.globals["APP_NAME"] = "Printix Toner Radar"
+    templates.env.globals["APP_NAME"] = "TonerWatch"
     templates.env.globals["LANG_LABELS"] = i18n.LANG_LABELS
     templates.env.globals["SUPPORTED_LANGS"] = i18n.SUPPORTED_LANGS
 

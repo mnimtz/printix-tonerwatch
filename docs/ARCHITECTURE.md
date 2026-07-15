@@ -1,6 +1,6 @@
 # Architecture
 
-Printix Toner Radar is a single-process, single-binary web application
+TonerWatch is a single-process, single-binary web application
 that manages many Printix customers from one runtime. This document
 describes the data model, request lifecycle and deployment topology.
 
@@ -30,14 +30,14 @@ describes the data model, request lifecycle and deployment topology.
                                                     │ (pymssql / pyodbc)
     ┌────────────┐    HTTPS    ┌────────────────────┴────────────┐
     │ MSP tech   ├─────────────▶  Azure App Service (Linux)      │
-    │ (browser)  │             │  ─ Printix Toner Radar          │
+    │ (browser)  │             │  ─ TonerWatch          │
     └────────────┘             │    (FastAPI + uvicorn)          │
                                │  ─ APScheduler (alert runner)   │
                                └─────────────────┬───────────────┘
                                                  │
                               ┌──────────────────┴─────────────────┐
                               │ Azure File share mounted at /data  │
-                              │   ├── toner_radar.sqlite           │
+                              │   ├── tonerwatch.sqlite           │
                               │   └── fernet.key                   │
                               └────────────────────────────────────┘
                                                  │

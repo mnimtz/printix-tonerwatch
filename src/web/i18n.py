@@ -33,7 +33,7 @@ LANG_LABELS: Mapping[str, str] = {
 
 _EN: dict[str, str] = {
     # Brand / product
-    "brand.product_name":  "Printix Toner Radar",
+    "brand.product_name":  "TonerWatch",
     "brand.tagline":       "Multi-tenant toner monitoring for MSPs",
     "brand.by_line":       "for the Tungsten Printix ecosystem",
     # Navigation
@@ -53,9 +53,9 @@ _EN: dict[str, str] = {
     "auth.sign_in_button":          "Sign in",
     "auth.invalid_credentials":     "Invalid email or password.",
     "auth.session_expired":         "Your session has expired — please sign in again.",
-    "auth.forgot_password_hint":    "Passwords are managed by your Toner Radar administrator.",
+    "auth.forgot_password_hint":    "Passwords are managed by your TonerWatch administrator.",
     # First-run setup
-    "setup.title":                  "Welcome to Printix Toner Radar",
+    "setup.title":                  "Welcome to TonerWatch",
     "setup.intro":                  "Let's create the first administrator account. This account will have full access and can create additional users afterwards.",
     "setup.name":                   "Full name",
     "setup.email":                  "Email address",
@@ -64,7 +64,7 @@ _EN: dict[str, str] = {
     "setup.create_button":          "Create administrator",
     "setup.password_mismatch":      "The two passwords do not match.",
     "setup.password_too_short":     "Password must be at least 12 characters.",
-    "setup.already_configured":     "This Toner Radar instance is already configured. Please sign in.",
+    "setup.already_configured":     "This TonerWatch instance is already configured. Please sign in.",
     # Common actions & status
     "common.save":                  "Save",
     "common.cancel":                "Cancel",
@@ -78,12 +78,12 @@ _EN: dict[str, str] = {
     "common.access_denied":         "You don't have permission to access this page.",
     "common.not_found":             "The page you are looking for was not found.",
     # Footer
-    "footer.copyright":             "© 2026 Printix Toner Radar — released under the Apache License 2.0",
+    "footer.copyright":             "© 2026 TonerWatch — released under the Apache License 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ and the Tungsten Automation logo are trademarks of Tungsten Automation Corporation.",
 }
 
 _FR: dict[str, str] = {
-    "brand.product_name":  "Printix Toner Radar",
+    "brand.product_name":  "TonerWatch",
     "brand.tagline":       "Supervision multi-clients des toners pour MSP",
     "brand.by_line":       "pour l'écosystème Tungsten Printix",
     "nav.dashboard":       "Tableau de bord",
@@ -101,8 +101,8 @@ _FR: dict[str, str] = {
     "auth.sign_in_button":          "Se connecter",
     "auth.invalid_credentials":     "E-mail ou mot de passe incorrect.",
     "auth.session_expired":         "Votre session a expiré — veuillez vous reconnecter.",
-    "auth.forgot_password_hint":    "Les mots de passe sont gérés par votre administrateur Toner Radar.",
-    "setup.title":                  "Bienvenue dans Printix Toner Radar",
+    "auth.forgot_password_hint":    "Les mots de passe sont gérés par votre administrateur TonerWatch.",
+    "setup.title":                  "Bienvenue dans TonerWatch",
     "setup.intro":                  "Créons le premier compte administrateur. Ce compte disposera d'un accès complet et pourra créer d'autres utilisateurs par la suite.",
     "setup.name":                   "Nom complet",
     "setup.email":                  "Adresse e-mail",
@@ -111,7 +111,7 @@ _FR: dict[str, str] = {
     "setup.create_button":          "Créer l'administrateur",
     "setup.password_mismatch":      "Les deux mots de passe ne correspondent pas.",
     "setup.password_too_short":     "Le mot de passe doit contenir au moins 12 caractères.",
-    "setup.already_configured":     "Cette instance Toner Radar est déjà configurée. Veuillez vous connecter.",
+    "setup.already_configured":     "Cette instance TonerWatch est déjà configurée. Veuillez vous connecter.",
     "common.save":                  "Enregistrer",
     "common.cancel":                "Annuler",
     "common.delete":                "Supprimer",
@@ -123,12 +123,12 @@ _FR: dict[str, str] = {
     "common.error":                 "Une erreur est survenue. Veuillez réessayer.",
     "common.access_denied":         "Vous n'êtes pas autorisé à accéder à cette page.",
     "common.not_found":             "La page recherchée est introuvable.",
-    "footer.copyright":             "© 2026 Printix Toner Radar — publié sous licence Apache 2.0",
+    "footer.copyright":             "© 2026 TonerWatch — publié sous licence Apache 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ et le logo Tungsten Automation sont des marques déposées de Tungsten Automation Corporation.",
 }
 
 _IT: dict[str, str] = {
-    "brand.product_name":  "Printix Toner Radar",
+    "brand.product_name":  "TonerWatch",
     "brand.tagline":       "Monitoraggio toner multi-cliente per MSP",
     "brand.by_line":       "per l'ecosistema Tungsten Printix",
     "nav.dashboard":       "Dashboard",
@@ -147,7 +147,7 @@ _IT: dict[str, str] = {
     "auth.invalid_credentials":     "E-mail o password non valide.",
     "auth.session_expired":         "La sessione è scaduta — accedi di nuovo.",
     "auth.forgot_password_hint":    "Le password sono gestite dall'amministratore di Toner Radar.",
-    "setup.title":                  "Benvenuto in Printix Toner Radar",
+    "setup.title":                  "Benvenuto in TonerWatch",
     "setup.intro":                  "Creiamo il primo account amministratore. Questo account avrà accesso completo e potrà creare altri utenti in seguito.",
     "setup.name":                   "Nome completo",
     "setup.email":                  "Indirizzo e-mail",
@@ -156,7 +156,7 @@ _IT: dict[str, str] = {
     "setup.create_button":          "Crea amministratore",
     "setup.password_mismatch":      "Le due password non coincidono.",
     "setup.password_too_short":     "La password deve contenere almeno 12 caratteri.",
-    "setup.already_configured":     "Questa istanza di Toner Radar è già configurata. Accedi.",
+    "setup.already_configured":     "Questa istanza di TonerWatch è già configurata. Accedi.",
     "common.save":                  "Salva",
     "common.cancel":                "Annulla",
     "common.delete":                "Elimina",
@@ -168,12 +168,12 @@ _IT: dict[str, str] = {
     "common.error":                 "Si è verificato un errore. Riprova.",
     "common.access_denied":         "Non hai i permessi per accedere a questa pagina.",
     "common.not_found":             "La pagina richiesta non è stata trovata.",
-    "footer.copyright":             "© 2026 Printix Toner Radar — rilasciato sotto Apache License 2.0",
+    "footer.copyright":             "© 2026 TonerWatch — rilasciato sotto Apache License 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ e il logo Tungsten Automation sono marchi di Tungsten Automation Corporation.",
 }
 
 _DE: dict[str, str] = {
-    "brand.product_name":  "Printix Toner Radar",
+    "brand.product_name":  "TonerWatch",
     "brand.tagline":       "Mandantenübergreifende Tonerüberwachung für MSPs",
     "brand.by_line":       "für das Tungsten-Printix-Ökosystem",
     "nav.dashboard":       "Übersicht",
@@ -192,7 +192,7 @@ _DE: dict[str, str] = {
     "auth.invalid_credentials":     "E-Mail oder Passwort ist ungültig.",
     "auth.session_expired":         "Ihre Sitzung ist abgelaufen — bitte erneut anmelden.",
     "auth.forgot_password_hint":    "Passwörter werden von Ihrer Toner-Radar-Administration verwaltet.",
-    "setup.title":                  "Willkommen bei Printix Toner Radar",
+    "setup.title":                  "Willkommen bei TonerWatch",
     "setup.intro":                  "Legen wir das erste Administratorkonto an. Dieses Konto hat vollen Zugriff und kann anschließend weitere Benutzer anlegen.",
     "setup.name":                   "Vollständiger Name",
     "setup.email":                  "E-Mail-Adresse",
@@ -213,12 +213,12 @@ _DE: dict[str, str] = {
     "common.error":                 "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
     "common.access_denied":         "Sie haben keine Berechtigung für diese Seite.",
     "common.not_found":             "Die gesuchte Seite wurde nicht gefunden.",
-    "footer.copyright":             "© 2026 Printix Toner Radar — veröffentlicht unter der Apache-Lizenz 2.0",
+    "footer.copyright":             "© 2026 TonerWatch — veröffentlicht unter der Apache-Lizenz 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ und das Tungsten-Automation-Logo sind Marken der Tungsten Automation Corporation.",
 }
 
 _ES: dict[str, str] = {
-    "brand.product_name":  "Printix Toner Radar",
+    "brand.product_name":  "TonerWatch",
     "brand.tagline":       "Supervisión multi-cliente de tóner para MSP",
     "brand.by_line":       "para el ecosistema Tungsten Printix",
     "nav.dashboard":       "Panel",
@@ -236,8 +236,8 @@ _ES: dict[str, str] = {
     "auth.sign_in_button":          "Iniciar sesión",
     "auth.invalid_credentials":     "Correo o contraseña no válidos.",
     "auth.session_expired":         "Tu sesión ha expirado — inicia sesión de nuevo.",
-    "auth.forgot_password_hint":    "Las contraseñas las gestiona tu administrador de Toner Radar.",
-    "setup.title":                  "Te damos la bienvenida a Printix Toner Radar",
+    "auth.forgot_password_hint":    "Las contraseñas las gestiona tu administrador de TonerWatch.",
+    "setup.title":                  "Te damos la bienvenida a TonerWatch",
     "setup.intro":                  "Vamos a crear la primera cuenta de administrador. Esta cuenta tendrá acceso completo y podrá crear más usuarios después.",
     "setup.name":                   "Nombre completo",
     "setup.email":                  "Correo electrónico",
@@ -246,7 +246,7 @@ _ES: dict[str, str] = {
     "setup.create_button":          "Crear administrador",
     "setup.password_mismatch":      "Las dos contraseñas no coinciden.",
     "setup.password_too_short":     "La contraseña debe tener al menos 12 caracteres.",
-    "setup.already_configured":     "Esta instancia de Toner Radar ya está configurada. Inicia sesión.",
+    "setup.already_configured":     "Esta instancia de TonerWatch ya está configurada. Inicia sesión.",
     "common.save":                  "Guardar",
     "common.cancel":                "Cancelar",
     "common.delete":                "Eliminar",
@@ -258,7 +258,7 @@ _ES: dict[str, str] = {
     "common.error":                 "Algo ha ido mal. Vuelve a intentarlo.",
     "common.access_denied":         "No tienes permiso para acceder a esta página.",
     "common.not_found":             "No se ha encontrado la página que buscas.",
-    "footer.copyright":             "© 2026 Printix Toner Radar — publicado bajo la licencia Apache 2.0",
+    "footer.copyright":             "© 2026 TonerWatch — publicado bajo la licencia Apache 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ y el logotipo de Tungsten Automation son marcas comerciales de Tungsten Automation Corporation.",
 }
 

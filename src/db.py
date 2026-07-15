@@ -32,7 +32,7 @@ _INITIALISED = False
 
 
 def db_path() -> str:
-    return os.environ.get("DB_PATH", "/data/toner_radar.sqlite")
+    return os.environ.get("DB_PATH", "/data/tonerwatch.sqlite")
 
 
 def _connect(path: str) -> sqlite3.Connection:

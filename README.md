@@ -1,13 +1,13 @@
-# Printix Toner Radar
+# TonerWatch
 
 **Multi-tenant toner monitoring, alerting and ordering for Managed Service Providers**
 built on top of the Tungsten Printix BI database.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmnimtz%2Fprintix-toner-radar%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
-[![Container image](https://ghcr-badge.egpl.dev/mnimtz/printix-toner-radar/latest_tag?trim=major&label=ghcr.io)](https://github.com/mnimtz/printix-toner-radar/pkgs/container/printix-toner-radar)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmnimtz%2Ftonerwatch%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
+[![Container image](https://ghcr-badge.egpl.dev/mnimtz/tonerwatch/latest_tag?trim=major&label=ghcr.io)](https://github.com/mnimtz/tonerwatch/pkgs/container/tonerwatch)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Printix Toner Radar lets one MSP technician oversee toner status across
+TonerWatch lets one MSP technician oversee toner status across
 dozens of Printix customer tenants from a single console — with per-customer
 thresholds, supply catalog entries per printer model, and end-to-end order
 tracking that closes the loop between "low toner detected" and "cartridge
@@ -65,8 +65,8 @@ See [`deploy/azure/README.md`](deploy/azure/README.md) for parameter details.
 ```bash
 docker run -d --name toner-radar \
   -p 8080:8080 \
-  -v toner-radar-data:/data \
-  ghcr.io/mnimtz/printix-toner-radar:latest
+  -v tonerwatch-data:/data \
+  ghcr.io/mnimtz/tonerwatch:latest
 ```
 
 Open <http://localhost:8080>, complete the first-run setup wizard, and add
@@ -85,7 +85,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 mkdir -p ./data
-export DB_PATH=./data/toner_radar.sqlite
+export DB_PATH=./data/tonerwatch.sqlite
 export FERNET_KEY="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 
 uvicorn src.server:app --reload --port 8080
@@ -99,7 +99,7 @@ All configuration is via environment variables — no configuration files.
 |---|---|---|
 | `WEB_HOST` | `0.0.0.0` | Bind address |
 | `WEB_PORT` | `8080` | Bind port |
-| `DB_PATH` | `/data/toner_radar.sqlite` | SQLite database path |
+| `DB_PATH` | `/data/tonerwatch.sqlite` | SQLite database path |
 | `FERNET_KEY` | auto-generated on first start | Encryption key for BI credentials |
 | `SESSION_SECRET` | derived from `FERNET_KEY` | Signing key for session cookies |
 | `DEFAULT_LANG` | `en` | Fallback UI language when browser preference cannot be resolved to a supported one |
@@ -123,7 +123,7 @@ request lifecycle and deployment topology.
 
 Apache License 2.0 — see [`LICENSE`](LICENSE).
 
-Printix Toner Radar is an independent tool for the Tungsten Printix
+TonerWatch is an independent tool for the Tungsten Printix
 ecosystem and is not an official product of Tungsten Automation
 Corporation. Tungsten Automation®, Tungsten Printix™ and the Tungsten
 Automation logo are trademarks of Tungsten Automation Corporation.

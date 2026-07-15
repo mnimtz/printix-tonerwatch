@@ -2,7 +2,7 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "description": "Printix Toner Radar — multi-tenant toner monitoring for MSP partners. Provisions a Linux App Service Web App running the container from GHCR, plus an Azure Files share mounted at /data for the SQLite database and Fernet encryption key."
+    "description": "TonerWatch — multi-tenant toner monitoring for MSP partners. Provisions a Linux App Service Web App running the container from GHCR, plus an Azure Files share mounted at /data for the SQLite database and Fernet encryption key."
   },
   "parameters": {
     "appName": {
@@ -22,8 +22,8 @@
     },
     "containerImage": {
       "type": "string",
-      "defaultValue": "ghcr.io/mnimtz/printix-toner-radar:latest",
-      "metadata": { "description": "Container image to pull. Use a versioned tag (e.g. ghcr.io/mnimtz/printix-toner-radar:0.1.0) for reproducible deployments." }
+      "defaultValue": "ghcr.io/mnimtz/tonerwatch:latest",
+      "metadata": { "description": "Container image to pull. Use a versioned tag (e.g. ghcr.io/mnimtz/tonerwatch:0.1.0) for reproducible deployments." }
     },
     "tz": {
       "type": "string",
@@ -39,8 +39,8 @@
   },
   "variables": {
     "planName": "[concat(parameters('appName'), '-plan')]",
-    "storageAccountName": "[concat('tonrad', uniqueString(resourceGroup().id))]",
-    "fileShareName": "toner-radar-data"
+    "storageAccountName": "[concat('tnrwtch', uniqueString(resourceGroup().id))]",
+    "fileShareName": "tonerwatch-data"
   },
   "resources": [
     {
@@ -97,7 +97,7 @@
             { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "https://ghcr.io" },
             { "name": "WEB_HOST", "value": "0.0.0.0" },
             { "name": "WEB_PORT", "value": "8080" },
-            { "name": "DB_PATH", "value": "/data/toner_radar.sqlite" },
+            { "name": "DB_PATH", "value": "/data/tonerwatch.sqlite" },
             { "name": "DEFAULT_LANG", "value": "[parameters('defaultLang')]" },
             { "name": "TZ", "value": "[parameters('tz')]" }
           ],

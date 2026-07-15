@@ -16,7 +16,7 @@ Click the **Deploy to Azure** button in the root
 | `appName` | Globally-unique DNS label (letters, digits and hyphens) | *required* |
 | `location` | Azure region | Resource group's region |
 | `sku` | App Service Plan SKU | `B1` |
-| `containerImage` | Container image to pull | `ghcr.io/mnimtz/printix-toner-radar:latest` |
+| `containerImage` | Container image to pull | `ghcr.io/mnimtz/tonerwatch:latest` |
 | `tz` | IANA timezone | `Europe/Berlin` |
 | `defaultLang` | Fallback UI language (EFIGS) | `en` |
 
@@ -25,7 +25,7 @@ The template creates:
 - an **App Service Plan** (Linux, SKU per parameter)
 - a **Web App** running the container from GitHub Container Registry
 - a **Storage Account** with an **Azure Files** share mounted at `/data`
-  on the container — the share holds `toner_radar.sqlite` (the SQLite
+  on the container — the share holds `tonerwatch.sqlite` (the SQLite
   database) and `fernet.key` (the encryption key for BI-DB credentials)
 
 Deployment takes about five minutes. Once it finishes, open the app URL
@@ -84,7 +84,7 @@ Everything the tool needs lives in the mounted Azure Files share.
 Snapshot the storage account or copy the share content on a schedule
 that matches your recovery objective. **Losing the Fernet key means
 losing the ability to decrypt customer BI credentials** — always back
-up `fernet.key` alongside `toner_radar.sqlite`.
+up `fernet.key` alongside `tonerwatch.sqlite`.
 
 ## Updating
 
@@ -106,7 +106,7 @@ the `containerImage` app setting to a previous version tag and restart:
 
 ```bash
 az webapp config container set -g my-radar-rg -n my-toner-radar \
-  --docker-custom-image-name ghcr.io/mnimtz/printix-toner-radar:0.1.0
+  --docker-custom-image-name ghcr.io/mnimtz/tonerwatch:0.1.0
 az webapp restart -g my-radar-rg -n my-toner-radar
 ```
 

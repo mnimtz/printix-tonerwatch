@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ============================================================================
-# Printix Toner Radar — multi-tenant toner monitoring for MSP partners
+# TonerWatch — multi-tenant toner monitoring for MSP partners
 # ============================================================================
 # Multi-stage build:
 #   1. builder  — compile Python wheels (pyodbc, pymssql need dev headers)
