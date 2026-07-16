@@ -33,6 +33,8 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from typing import Iterable
 
+import httpx
+
 from . import crypto, db
 
 
@@ -95,6 +97,11 @@ def load_config() -> dict:
         "smtp_username":  raw.get("smtp_username", ""),
         "smtp_password":  raw.get("smtp_password", ""),
         "smtp_starttls":  bool(raw.get("smtp_starttls", True)),
+        # v0.22.0 — Graph provider: reuse Entra SSO's tenant / client_id /
+        # client_secret via entra_sso.load_config(); mailbox_upn is which
+        # mailbox to send AS (any user in the tenant that the app has
+        # Mail.Send.Shared or Mail.Send application permission on).
+        "graph_mailbox_upn": raw.get("graph_mailbox_upn", ""),
         # Marker so the settings page knows secrets ARE stored without
         # exposing them in the form value
         "resend_api_key_present": bool(raw.get("resend_api_key")),
@@ -113,6 +120,7 @@ def save_config(cfg: dict) -> None:
         "smtp_port":      _safe_int(cfg.get("smtp_port"), 587, 1, 65535),
         "smtp_username":  (cfg.get("smtp_username") or "").strip(),
         "smtp_starttls":  bool(cfg.get("smtp_starttls", True)),
+        "graph_mailbox_upn": (cfg.get("graph_mailbox_upn") or "").strip().lower(),
     }
     # Only re-encrypt when a fresh secret was submitted; empty means
     # "keep the currently stored one" (fetch and re-encrypt).
@@ -168,6 +176,8 @@ def send(recipients: Iterable[str], subject: str,
         return _send_resend(recipients, subject, html_body, text_body, cfg)
     if provider == "smtp":
         return _send_smtp(recipients, subject, html_body, text_body, cfg)
+    if provider == "graph":
+        return _send_graph(recipients, subject, html_body, text_body, cfg)
     raise MailSendError(f"unknown provider: {provider}")
 
 
@@ -248,3 +258,129 @@ def _send_smtp(recipients: list[str], subject: str,
         raise MailSendError(f"SMTP error: {e}") from e
     except OSError as e:
         raise MailSendError(f"network error: {e}") from e
+
+
+# ---------------------------------------------------------------------------
+# Microsoft Graph — v0.22.0
+# ---------------------------------------------------------------------------
+
+def _send_graph(recipients: list[str], subject: str,
+                html_body: str, text_body: str,
+                cfg: dict) -> str:
+    """Send via Microsoft Graph /users/{upn}/sendMail using an
+    application-permission access token minted from the Entra SSO
+    client_id + client_secret. Reuses the existing Entra registration
+    — no separate app needed — as long as the admin adds ``Mail.Send``
+    (application) permission + admin consent.
+
+    Uses ``graph_mailbox_upn`` from the mail config as the sender
+    mailbox; recipients from the caller. Silent no-op recipient
+    normalisation (trim, drop empties)."""
+    from . import entra_sso as _sso
+    entra = _sso.load_config()
+    tenant_id     = (entra.get("tenant_id") or "").strip()
+    client_id     = (entra.get("client_id") or "").strip()
+    client_secret = (entra.get("client_secret") or "").strip()
+    mailbox_upn   = (cfg.get("graph_mailbox_upn") or cfg.get("from_email") or "").strip()
+    if not (tenant_id and client_id and client_secret):
+        raise MailSendError(
+            "Graph mail requires Entra SSO to be configured "
+            "(tenant_id, client_id, client_secret).")
+    if not mailbox_upn:
+        raise MailSendError("Graph mail requires a sender mailbox UPN "
+                             "(set 'graph_mailbox_upn' or from_email).")
+    to_recipients = [{"emailAddress": {"address": r.strip()}}
+                      for r in recipients if r and r.strip()]
+    if not to_recipients:
+        raise MailSendError("no recipients")
+
+    # 1. Client-credentials access token
+    try:
+        r = httpx.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+            data={
+                "client_id":     client_id,
+                "client_secret": client_secret,
+                "scope":         "https://graph.microsoft.com/.default",
+                "grant_type":    "client_credentials",
+            }, timeout=15.0)
+    except httpx.HTTPError as e:
+        raise MailSendError(f"Graph token endpoint: {e}") from e
+    if r.status_code >= 400:
+        raise MailSendError(
+            f"Graph token HTTP {r.status_code}: {r.text[:200]}")
+    token = r.json().get("access_token", "")
+    if not token:
+        raise MailSendError("Graph token response had no access_token")
+
+    # 2. sendMail as the configured mailbox. Content-type=HTML always;
+    # Graph handles the multipart wrapping.
+    body = {
+        "message": {
+            "subject": subject,
+            "body": {"contentType": "HTML", "content": html_body},
+            "toRecipients": to_recipients,
+            "from": {"emailAddress": {
+                "address": cfg.get("from_email") or mailbox_upn,
+                "name":    cfg.get("from_name") or "Printix TonerWatch"}},
+        },
+        "saveToSentItems": True,
+    }
+    from urllib.parse import quote as _q
+    url = f"https://graph.microsoft.com/v1.0/users/{_q(mailbox_upn)}/sendMail"
+    try:
+        r = httpx.post(url, json=body,
+                        headers={"Authorization": f"Bearer {token}",
+                                 "Content-Type":  "application/json"},
+                        timeout=20.0)
+    except httpx.HTTPError as e:
+        raise MailSendError(f"Graph sendMail: {e}") from e
+    if r.status_code not in (200, 202):
+        raise MailSendError(
+            f"Graph sendMail HTTP {r.status_code}: {r.text[:300]}")
+    logger.info("mail: graph OK to %d recipient(s) via %s",
+                 len(to_recipients), mailbox_upn)
+    # sendMail returns 202 Accepted with no body / no message-id.
+    return f"graph:{mailbox_upn}"
+
+
+def list_graph_mailboxes(cfg: dict | None = None) -> list[dict]:
+    """v0.22.0 — list Users the Entra app registration can see. Used
+    by the Settings UI to populate the sender-mailbox dropdown so the
+    admin picks from a real list instead of typing a UPN by hand.
+
+    Requires ``User.Read.All`` (application) permission on the Entra
+    app; if it's not granted, returns an empty list rather than
+    surfacing the raw Graph error."""
+    from . import entra_sso as _sso
+    entra = _sso.load_config()
+    tenant_id     = (entra.get("tenant_id") or "").strip()
+    client_id     = (entra.get("client_id") or "").strip()
+    client_secret = (entra.get("client_secret") or "").strip()
+    if not (tenant_id and client_id and client_secret):
+        return []
+    try:
+        r = httpx.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+            data={"client_id": client_id, "client_secret": client_secret,
+                  "scope": "https://graph.microsoft.com/.default",
+                  "grant_type": "client_credentials"}, timeout=15.0)
+        if r.status_code >= 400:
+            return []
+        token = r.json().get("access_token", "")
+        if not token:
+            return []
+        r = httpx.get(
+            "https://graph.microsoft.com/v1.0/users"
+            "?$select=id,displayName,userPrincipalName,mail"
+            "&$top=999",
+            headers={"Authorization": f"Bearer {token}"}, timeout=20.0)
+        if r.status_code >= 400:
+            return []
+        data = r.json().get("value", [])
+        return [{"upn": (u.get("userPrincipalName") or "").lower(),
+                  "display_name": u.get("displayName") or "",
+                  "mail": u.get("mail") or ""}
+                for u in data if u.get("userPrincipalName")]
+    except httpx.HTTPError:
+        return []

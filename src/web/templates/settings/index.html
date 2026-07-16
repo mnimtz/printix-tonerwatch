@@ -83,7 +83,8 @@
         <label for="provider">{{ _('settings.mail.provider', lang) }}</label>
         <select id="provider" name="provider"
                 onchange="document.getElementById('resend-block').style.display = this.value === 'resend' ? '' : 'none';
-                          document.getElementById('smtp-block').style.display = this.value === 'smtp' ? '' : 'none';">
+                          document.getElementById('smtp-block').style.display = this.value === 'smtp' ? '' : 'none';
+                          document.getElementById('graph-block').style.display = this.value === 'graph' ? '' : 'none';">
           <option value="disabled" {% if mail.provider == 'disabled' %}selected{% endif %}>
             {{ _('settings.mail.provider.disabled', lang) }}
           </option>
@@ -92,6 +93,9 @@
           </option>
           <option value="smtp"    {% if mail.provider == 'smtp' %}selected{% endif %}>
             SMTP
+          </option>
+          <option value="graph"   {% if mail.provider == 'graph' %}selected{% endif %}>
+            Microsoft Graph (Entra ID)
           </option>
         </select>
       </div>
@@ -164,6 +168,74 @@
           </label>
         </div>
       </div>
+
+      <!-- Graph section (v0.22.0) -->
+      <div id="graph-block"
+           style="display: {{ '' if mail.provider == 'graph' else 'none' }};
+                  padding: var(--sp-4); background: var(--tw-gray-100);
+                  border-radius: var(--r-sm); margin-bottom: var(--sp-4);">
+        <div class="form-group" style="margin-bottom: var(--sp-3);">
+          <label for="graph_mailbox_upn">{{ _('settings.mail.graph_mailbox_upn', lang) }}</label>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input id="graph_mailbox_upn" name="graph_mailbox_upn" type="email"
+                   placeholder="toner@msp.example"
+                   value="{{ mail.graph_mailbox_upn }}"
+                   list="graph-mailboxes" style="flex: 1;">
+            <datalist id="graph-mailboxes"></datalist>
+            <button type="button" id="btn-graph-list-mailboxes"
+                    class="btn btn-secondary" data-noloader
+                    style="white-space: nowrap; padding: 6px 12px;">
+              ↻ {{ _('settings.mail.graph_mailbox.list', lang) }}
+            </button>
+          </div>
+          <div id="graph-mailbox-status" style="font-size: 0.78rem;
+               color: var(--tw-muted-blue); margin-top: 4px;">
+            {{ _('settings.mail.graph_mailbox.hint', lang) }}
+          </div>
+        </div>
+      </div>
+
+      <script>
+      // v0.22.0 — populate the Graph mailbox datalist from a live
+      // Graph query when the admin clicks "↻ list". Reuses the Entra
+      // SSO client_id/secret; needs User.Read.All application grant.
+      (function () {
+        var btn = document.getElementById('btn-graph-list-mailboxes');
+        if (!btn) return;
+        var dl = document.getElementById('graph-mailboxes');
+        var status = document.getElementById('graph-mailbox-status');
+        btn.addEventListener('click', async function () {
+          btn.disabled = true;
+          status.textContent = {{ _('settings.mail.graph_mailbox.loading', lang)|tojson }};
+          status.style.color = 'var(--tw-muted-blue)';
+          try {
+            var r = await fetch('/settings/mail/graph/mailboxes',
+              {credentials: 'same-origin'});
+            var j = await r.json();
+            if (!j.ok || !j.mailboxes || j.mailboxes.length === 0) {
+              status.textContent = {{ _('settings.mail.graph_mailbox.none', lang)|tojson }};
+              status.style.color = 'var(--status-critical)';
+              return;
+            }
+            dl.innerHTML = '';
+            j.mailboxes.forEach(function (m) {
+              var opt = document.createElement('option');
+              opt.value = m.upn;
+              opt.label = m.display_name + ' <' + m.upn + '>';
+              dl.appendChild(opt);
+            });
+            status.textContent = '✓ ' + j.count + ' '
+              + {{ _('settings.mail.graph_mailbox.count', lang)|tojson }};
+            status.style.color = 'var(--status-ok)';
+          } catch (e) {
+            status.textContent = '✗ ' + (e.message || e);
+            status.style.color = 'var(--status-critical)';
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      })();
+      </script>
 
       <div class="form-actions">
         <button type="submit" class="btn">{{ _('common.save', lang) }}</button>

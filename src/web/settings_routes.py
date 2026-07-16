@@ -43,13 +43,28 @@ async def settings_page(request: Request):
     )
 
 
+@router.get("/settings/mail/graph/mailboxes", include_in_schema=False)
+async def settings_mail_graph_mailboxes(request: Request):
+    """v0.22.0 — populate the sender-mailbox dropdown for the Graph
+    mail provider from the Entra app registration's User.Read.All
+    permission. Returns [] silently if Graph is unreachable, permission
+    is missing, or Entra isn't configured — the UI falls back to a
+    free-text UPN input in that case."""
+    auth.require_admin(request)
+    cfg = mail_client.load_config()
+    mailboxes = mail_client.list_graph_mailboxes(cfg)
+    return JSONResponse({"ok": True,
+                          "count": len(mailboxes),
+                          "mailboxes": mailboxes[:500]})
+
+
 @router.post("/settings/mail", include_in_schema=False)
 async def settings_mail_save(request: Request):
     admin = auth.require_admin(request)
     form = await request.form()
 
     provider = (form.get("provider") or "disabled").strip().lower()
-    if provider not in ("disabled", "resend", "smtp"):
+    if provider not in ("disabled", "resend", "smtp", "graph"):
         provider = "disabled"
 
     cfg: dict[str, Any] = {
@@ -62,6 +77,7 @@ async def settings_mail_save(request: Request):
         "smtp_username":  (form.get("smtp_username") or "").strip(),
         "smtp_password":  form.get("smtp_password") or "",
         "smtp_starttls":  bool(form.get("smtp_starttls")),
+        "graph_mailbox_upn": (form.get("graph_mailbox_upn") or "").strip().lower(),
     }
     mail_client.save_config(cfg)
     db.audit(admin["id"], "settings.mail_updated",
