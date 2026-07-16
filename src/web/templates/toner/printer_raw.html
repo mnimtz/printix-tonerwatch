@@ -46,6 +46,44 @@
   {% endif %}
 </form>
 
+{% if bulk_json %}
+  <section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
+    <h2 style="margin: 0 0 var(--sp-3);">
+      📋 Top 10 Drucker · {{ bulk_row_count }} Zeilen ·
+      {{ bulk_cols|length }} Spalten
+    </h2>
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-2);">
+      Kopier den JSON-Block hier drunter und schick ihn in den Chat —
+      dann sehen wir welches Feld den Anywhere-Marker trägt.
+    </p>
+    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
+      <button type="button" id="btn-copy-json" class="btn btn-secondary"
+              data-noloader style="padding: 6px 12px;">
+        📋 In Zwischenablage kopieren
+      </button>
+      <span id="copy-status" style="font-size: 0.82rem;
+            color: var(--tw-muted-blue);"></span>
+    </div>
+    <textarea id="bulk-json" readonly
+              style="width: 100%; height: 380px; padding: 10px;
+                     font-family: var(--font-mono); font-size: 0.78rem;
+                     border: 1px solid var(--tw-gray-300);
+                     border-radius: 6px; background: var(--tw-gray-100);
+                     white-space: pre; overflow: auto;">{{ bulk_json }}</textarea>
+    <script>
+      document.getElementById('btn-copy-json').addEventListener('click', function () {
+        var ta = document.getElementById('bulk-json');
+        ta.select();
+        document.execCommand('copy');
+        var s = document.getElementById('copy-status');
+        s.textContent = '✓ kopiert';
+        s.style.color = 'var(--status-ok)';
+        setTimeout(function () { s.textContent = ''; }, 2000);
+      });
+    </script>
+  </section>
+{% endif %}
+
 {% if raw %}
   <section class="card" style="padding: var(--sp-4);">
     <h2 style="margin: 0 0 var(--sp-3);">

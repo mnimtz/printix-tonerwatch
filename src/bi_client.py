@@ -224,6 +224,35 @@ def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
                                               else dict(zip(cols, row))}
 
 
+def fetch_printers_raw(customer: dict, limit: int = 10) -> Optional[dict]:
+    """v0.23.8 — SELECT TOP N * FROM dbo.printers so the operator can
+    dump the FULL schema (columns + first N rows) into the diagnose
+    view. Returns::
+
+        {"columns": ["id", "name", ...],
+         "rows":    [{"id": "…", "name": "…", ...}, ...]}
+
+    Or ``None`` on any DB-side failure."""
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT TOP %d * FROM dbo.printers "
+                "WHERE meta_status = 'ACTIVE' ORDER BY name" % int(limit))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("fetch_printers_raw failed: %s", exc)
+            return None
+        cols = [d[0] for d in (cur.description or [])]
+        rows_raw = cur.fetchall()
+        rows = []
+        for r in rows_raw:
+            if isinstance(r, dict):
+                rows.append({k: r.get(k) for k in cols})
+            else:
+                rows.append(dict(zip(cols, r)))
+        return {"columns": cols, "rows": rows}
+
+
 def list_printer_ids(customer: dict, limit: int = 30) -> list[dict]:
     """v0.23.7 — return (id, name) pairs so the diagnose view can offer
     a picker."""

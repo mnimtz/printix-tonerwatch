@@ -408,19 +408,36 @@ async def toner_printer_raw(request: Request):
 
     printer_choices: list = []
     raw = None
+    # v0.23.8 — if no printer_id is provided, dump the first 10 printers
+    # with the full schema as JSON so the operator can paste it into a
+    # ticket/message.
+    bulk_json = ""
+    bulk_cols: list = []
+    bulk_row_count = 0
     if selected_cust:
         printer_choices = bi_client.list_printer_ids(
             bi_client.customer_for_bi(selected_cust), limit=200)
         if printer_id:
             raw = bi_client.fetch_printer_raw(
                 bi_client.customer_for_bi(selected_cust), printer_id)
+        else:
+            dump = bi_client.fetch_printers_raw(
+                bi_client.customer_for_bi(selected_cust), limit=10)
+            if dump:
+                import json as _json
+                bulk_cols = dump["columns"]
+                bulk_row_count = len(dump["rows"])
+                bulk_json = _json.dumps(
+                    dump, indent=2, ensure_ascii=False, default=str)
 
     return request.app.state.templates.TemplateResponse(
         "toner/printer_raw.html",
         {"request": request, "lang": request.state.lang, "user": user,
          "customers": customers, "selected_cust": selected_cust,
          "printer_choices": printer_choices,
-         "printer_id": printer_id, "raw": raw},
+         "printer_id": printer_id, "raw": raw,
+         "bulk_json": bulk_json, "bulk_cols": bulk_cols,
+         "bulk_row_count": bulk_row_count},
     )
 
 
