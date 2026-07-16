@@ -201,12 +201,29 @@ _PRINTER_SUPPLIES_NEG_TTL = 60    # 1 min for empty reads (silent printers)
 _CACHE_LOCK = threading.Lock()
 
 
+def _safe_value(v):
+    """v0.23.12 — coerce anything into something Jinja can render
+    without crashing. bytes get UTF-8-decoded (or ``<N bytes>``);
+    datetimes/decimals/etc. get str()'d; None + primitives pass
+    through."""
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    if isinstance(v, (bytes, bytearray)):
+        try:
+            return bytes(v).decode("utf-8")
+        except UnicodeDecodeError:
+            return f"<{len(v)} bytes>"
+    try:
+        return str(v)
+    except Exception:  # noqa: BLE001
+        return "<unrepresentable>"
+
+
 def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
     """v0.23.7 — return the FULL row of dbo.printers for one printer id,
-    plus every column name Printix BI exposes. Used by the diagnose
-    view so the operator can see which field carries the
-    Anywhere-marker in their tenant (the 6 columns we normally read
-    might miss it)."""
+    plus every column name Printix BI exposes.
+    v0.23.12 — all values are pre-sanitised via _safe_value so the
+    template can't fall over on bytes / datetime / decimal columns."""
     with _connect(customer) as conn:
         cur = conn.cursor()
         try:
@@ -218,10 +235,11 @@ def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
         row = cur.fetchone()
         if row is None:
             return None
-        # cur.description = [(name, type, ...), ...] — extract names.
         cols = [d[0] for d in (cur.description or [])]
-        return {"columns": cols, "values": dict(row) if isinstance(row, dict)
-                                              else dict(zip(cols, row))}
+        row_dict = (dict(row) if isinstance(row, dict)
+                    else dict(zip(cols, row)))
+        return {"columns": cols,
+                "values": {k: _safe_value(v) for k, v in row_dict.items()}}
 
 
 def fetch_printers_raw(customer: dict, limit: int = 10,
@@ -256,9 +274,13 @@ def fetch_printers_raw(customer: dict, limit: int = 10,
         rows = []
         for r in rows_raw:
             if isinstance(r, dict):
-                rows.append({k: r.get(k) for k in cols})
+                base = {k: r.get(k) for k in cols}
             else:
-                rows.append(dict(zip(cols, r)))
+                base = dict(zip(cols, r))
+            # v0.23.12 — same sanitisation as fetch_printer_raw so the
+            # JSON dump doesn't stumble on datetime/bytes/decimal even
+            # with default=str; keeps the payload cleaner too.
+            rows.append({k: _safe_value(v) for k, v in base.items()})
         return {"columns": cols, "rows": rows}
 
 

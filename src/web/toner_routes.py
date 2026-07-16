@@ -478,16 +478,41 @@ async def toner_printer_raw(request: Request):
         raw_error = (f"{type(exc).__name__}: {exc}\n\n"
                       + _tb.format_exc()[:2000])
 
-    return request.app.state.templates.TemplateResponse(
-        "toner/printer_raw.html",
-        {"request": request, "lang": request.state.lang, "user": user,
-         "customers": customers, "selected_cust": selected_cust,
-         "printer_choices": printer_choices,
-         "printer_id": printer_id, "raw": raw, "raw_error": raw_error,
-         "name_filter": name_filter,
-         "bulk_json": bulk_json, "bulk_cols": bulk_cols,
-         "bulk_row_count": bulk_row_count, "bulk_error": bulk_error},
-    )
+    # v0.23.12 — render + return the template inside a try; on any
+    # Jinja / Starlette render failure fall back to a plain HTML page
+    # that surfaces the traceback rather than letting FastAPI serve a
+    # bare "Internal Server Error".
+    try:
+        return request.app.state.templates.TemplateResponse(
+            "toner/printer_raw.html",
+            {"request": request, "lang": request.state.lang, "user": user,
+             "customers": customers, "selected_cust": selected_cust,
+             "printer_choices": printer_choices,
+             "printer_id": printer_id, "raw": raw, "raw_error": raw_error,
+             "name_filter": name_filter,
+             "bulk_json": bulk_json, "bulk_cols": bulk_cols,
+             "bulk_row_count": bulk_row_count, "bulk_error": bulk_error},
+        )
+    except Exception as exc:  # noqa: BLE001
+        _log.exception("[printer_raw] template render failed")
+        from html import escape as _esc
+        fallback = (
+            "<!doctype html><meta charset=utf-8><title>printer_raw render fail</title>"
+            "<pre style='font-family:ui-monospace,monospace;padding:24px;"
+            "background:#FEE2E2;color:#991B1B;white-space:pre-wrap;'>"
+            "Template render failed. Falling back to raw output.\n\n"
+            f"Exception: {_esc(type(exc).__name__)}: {_esc(str(exc))}\n\n"
+            f"{_esc(_tb.format_exc()[:4000])}\n\n"
+            "----\nraw:\n"
+            f"{_esc(repr(raw)[:4000])}\n\n"
+            "raw_error:\n"
+            f"{_esc(raw_error[:2000])}\n\n"
+            "bulk_error:\n"
+            f"{_esc(bulk_error[:2000])}"
+            "</pre>"
+        )
+        from fastapi.responses import HTMLResponse as _HTML
+        return _HTML(fallback, status_code=200)
 
 
 def _looks_like_anywhere(p: dict) -> bool:
