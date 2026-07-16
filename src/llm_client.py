@@ -285,11 +285,31 @@ def _chat_gemini(system: str, user: str, cfg: dict[str, Any],
     except httpx.HTTPError as e:
         raise LLMError(f"gemini: {e.__class__.__name__}: {e}") from e
     if r.status_code >= 400:
-        raise LLMError(f"gemini: HTTP {r.status_code}: {r.text[:200]}")
-    data = r.json()
+        # v0.23.1: Gemini returns 404 on unknown model names; help the
+        # admin figure out that "flash" alone isn't a valid ID.
+        hint = ""
+        if r.status_code == 404 and "/" not in model and "-" not in model:
+            hint = (f" — {model!r} probably isn't a full model ID. "
+                    "Try 'gemini-1.5-flash' or click the ↻ list button "
+                    "to see what your key can access.")
+        raise LLMError(f"gemini: HTTP {r.status_code}: {r.text[:200]}{hint}")
+    try:
+        data = r.json()
+    except ValueError as e:
+        raise LLMError(f"gemini: response wasn't JSON: {e}") from e
     parts = ((data.get("candidates") or [{}])[0]
              .get("content", {}).get("parts") or [])
     text = "".join(p.get("text", "") for p in parts).strip()
+    if not text:
+        # Gemini can return an empty candidates array when it blocks the
+        # prompt — surface that with the finishReason for clarity.
+        cand = (data.get("candidates") or [{}])[0]
+        reason = cand.get("finishReason", "")
+        block  = (data.get("promptFeedback") or {}).get("blockReason", "")
+        detail = "empty response"
+        if block:  detail += f" (promptFeedback.blockReason={block})"
+        if reason: detail += f" (finishReason={reason})"
+        raise LLMError(f"gemini: {detail}")
     return ChatResponse(
         text=text, model=model, provider="gemini",
         usage=data.get("usageMetadata") or {},

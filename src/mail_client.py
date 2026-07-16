@@ -336,8 +336,29 @@ def _send_graph(recipients: list[str], subject: str,
     except httpx.HTTPError as e:
         raise MailSendError(f"Graph sendMail: {e}") from e
     if r.status_code not in (200, 202):
+        # v0.23.1 — the two "silent misconfig" Graph errors get a
+        # tailored hint so the admin knows exactly which portal step is
+        # missing. Anything else falls back to the raw error text.
+        raw = r.text or ""
+        hint = ""
+        if r.status_code == 403 and "ErrorAccessDenied" in raw:
+            hint = (" — the Entra app registration is missing the "
+                    "**Mail.Send** application permission (Microsoft "
+                    "Graph, Application, not Delegated) or it hasn't "
+                    "been admin-consented. Add + consent it in Azure "
+                    "Portal → Microsoft Entra ID → App registrations "
+                    "→ your app → API permissions.")
+        elif r.status_code == 404 and "MailboxNotEnabledForRESTAPI" in raw:
+            hint = (f" — the mailbox {mailbox_upn!r} isn't licensed "
+                    "for Exchange Online or is on a plan without "
+                    "REST API access.")
+        elif r.status_code == 404:
+            hint = (f" — mailbox {mailbox_upn!r} not found in this "
+                    "tenant. Click 'list mailboxes' to see valid UPNs.")
+        elif r.status_code == 401:
+            hint = " — token was rejected; check client_secret hasn't expired."
         raise MailSendError(
-            f"Graph sendMail HTTP {r.status_code}: {r.text[:300]}")
+            f"Graph sendMail HTTP {r.status_code}: {raw[:300]}{hint}")
     logger.info("mail: graph OK to %d recipient(s) via %s",
                  len(to_recipients), mailbox_upn)
     # sendMail returns 202 Accepted with no body / no message-id.

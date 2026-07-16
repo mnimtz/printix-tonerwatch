@@ -490,6 +490,13 @@ async def settings_llm_save(request: Request):
 
 @router.post("/settings/llm/test", include_in_schema=False)
 async def settings_llm_test(request: Request):
+    """v0.23.1 — a Gemini config with an unusual model name (e.g.
+    just 'flash') used to return HTML 500 because httpx/JSON-parse
+    errors slipped through the narrow LLMError catch. Broaden to
+    Exception so ALL failures come back as a readable
+    ?error=llm_test_... on /settings#llm."""
+    import logging as _logging
+    _log = _logging.getLogger("tonerwatch.llm")
     auth.require_admin(request)
     try:
         r = llm_client.chat(
@@ -497,7 +504,13 @@ async def settings_llm_test(request: Request):
             "Say 'hello'.")
     except llm_client.LLMError as e:
         return RedirectResponse(
-            f"/settings?error=llm_test_{str(e)[:120].replace('&','')}#llm",
+            f"/settings?error=llm_test_{str(e)[:200].replace('&','')}#llm",
+            status_code=303)
+    except Exception as e:  # noqa: BLE001
+        _log.exception("[LLM test] unexpected exception")
+        return RedirectResponse(
+            f"/settings?error=llm_test_{type(e).__name__}%3A%20"
+            f"{str(e)[:180].replace('&','')}#llm",
             status_code=303)
     return RedirectResponse(
         f"/settings?info=llm_test_ok_{r.provider}#llm", status_code=303)
