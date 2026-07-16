@@ -409,38 +409,62 @@ async def toner_printer_raw(request: Request):
 
     printer_choices: list = []
     raw = None
+    raw_error = ""
     # v0.23.8 — if no printer_id is provided, dump the first 10 printers
     # with the full schema as JSON so the operator can paste it into a
     # ticket/message.
     bulk_json = ""
     bulk_cols: list = []
     bulk_row_count = 0
+    bulk_error = ""
     if selected_cust:
-        printer_choices = bi_client.list_printer_ids(
-            bi_client.customer_for_bi(selected_cust), limit=200)
+        try:
+            printer_choices = bi_client.list_printer_ids(
+                bi_client.customer_for_bi(selected_cust), limit=200)
+        except Exception as exc:  # noqa: BLE001
+            printer_choices = []
+            bulk_error = f"list_printer_ids: {type(exc).__name__}: {exc}"
         if printer_id:
-            raw = bi_client.fetch_printer_raw(
-                bi_client.customer_for_bi(selected_cust), printer_id)
+            try:
+                raw = bi_client.fetch_printer_raw(
+                    bi_client.customer_for_bi(selected_cust), printer_id)
+                if raw is None:
+                    raw_error = ("fetch_printer_raw returned None — either "
+                                  "no row matched or the DB query raised. "
+                                  "Check container logs for the actual "
+                                  "warning line.")
+            except Exception as exc:  # noqa: BLE001
+                import traceback as _tb
+                raw_error = (f"{type(exc).__name__}: {exc}\n\n"
+                              + _tb.format_exc()[:2000])
         else:
-            dump = bi_client.fetch_printers_raw(
-                bi_client.customer_for_bi(selected_cust),
-                limit=10, name_filter=name_filter)
-            if dump:
-                import json as _json
-                bulk_cols = dump["columns"]
-                bulk_row_count = len(dump["rows"])
-                bulk_json = _json.dumps(
-                    dump, indent=2, ensure_ascii=False, default=str)
+            try:
+                dump = bi_client.fetch_printers_raw(
+                    bi_client.customer_for_bi(selected_cust),
+                    limit=10, name_filter=name_filter)
+                if dump:
+                    import json as _json
+                    bulk_cols = dump["columns"]
+                    bulk_row_count = len(dump["rows"])
+                    bulk_json = _json.dumps(
+                        dump, indent=2, ensure_ascii=False, default=str)
+                else:
+                    bulk_error = ("fetch_printers_raw returned None — "
+                                   "check container logs.")
+            except Exception as exc:  # noqa: BLE001
+                import traceback as _tb
+                bulk_error = (f"{type(exc).__name__}: {exc}\n\n"
+                               + _tb.format_exc()[:2000])
 
     return request.app.state.templates.TemplateResponse(
         "toner/printer_raw.html",
         {"request": request, "lang": request.state.lang, "user": user,
          "customers": customers, "selected_cust": selected_cust,
          "printer_choices": printer_choices,
-         "printer_id": printer_id, "raw": raw,
+         "printer_id": printer_id, "raw": raw, "raw_error": raw_error,
          "name_filter": name_filter,
          "bulk_json": bulk_json, "bulk_cols": bulk_cols,
-         "bulk_row_count": bulk_row_count},
+         "bulk_row_count": bulk_row_count, "bulk_error": bulk_error},
     )
 
 

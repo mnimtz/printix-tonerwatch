@@ -58,6 +58,17 @@
   {% endif %}
 </form>
 
+{% if raw_error %}
+  <div class="alert alert-error"
+       style="white-space: pre-wrap; font-family: var(--font-mono);
+              font-size: 0.82rem;">{{ raw_error }}</div>
+{% endif %}
+{% if bulk_error %}
+  <div class="alert alert-error"
+       style="white-space: pre-wrap; font-family: var(--font-mono);
+              font-size: 0.82rem;">{{ bulk_error }}</div>
+{% endif %}
+
 {% if bulk_json %}
   <section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
     <h2 style="margin: 0 0 var(--sp-3);">
