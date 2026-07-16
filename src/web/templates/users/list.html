@@ -4,7 +4,7 @@
 
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between;
-            gap: var(--sp-4); margin-bottom: var(--sp-6);">
+            gap: var(--sp-4); margin-bottom: var(--sp-4);">
   <div>
     <h1>{{ _('user.list_title', lang) }}</h1>
     <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
@@ -12,6 +12,39 @@
     </p>
   </div>
   <a href="/users/new" class="btn">+ {{ _('user.new_button', lang) }}</a>
+</div>
+
+{# v0.18.5: role chips + freetext live search. Chips are server-side
+   (session-sticky filter); the search box narrows what's already on
+   the page client-side (data-search on each row). #}
+<div class="user-toolbar" data-noloader
+     style="display: flex; align-items: center; gap: var(--sp-2);
+            margin-bottom: var(--sp-3); flex-wrap: wrap;">
+  <a href="/users?role=all"
+     class="chip {{ 'active' if not filter_role else '' }}" data-noloader>
+    {{ _('user.filter.all', lang) }}
+    <span style="opacity: 0.7; font-weight: 400;">({{ counts.total }})</span>
+  </a>
+  <a href="/users?role=admin"
+     class="chip {{ 'active' if filter_role == 'admin' else '' }}"
+     data-noloader
+     style="{% if filter_role == 'admin' %}background: var(--tw-primary); color: white; border-color: var(--tw-primary);{% endif %}">
+    {{ _('user.role.admin', lang) }}
+    <span style="opacity: 0.7; font-weight: 400;">({{ counts.admin }})</span>
+  </a>
+  <a href="/users?role=technician"
+     class="chip {{ 'active' if filter_role == 'technician' else '' }}"
+     data-noloader>
+    {{ _('user.role.technician', lang) }}
+    <span style="opacity: 0.7; font-weight: 400;">({{ counts.technician }})</span>
+  </a>
+
+  <input type="search" name="q" id="user-live-search"
+         class="search"
+         placeholder="{{ _('user.filter.search_placeholder', lang) }}"
+         style="flex: 1; min-width: 200px; max-width: 360px;
+                margin-left: auto;"
+         autocomplete="off" spellcheck="false">
 </div>
 
 <div class="card" style="padding: 0; overflow: hidden;">
@@ -42,7 +75,9 @@
     </thead>
     <tbody>
     {% for u in users %}
-      <tr style="border-top: 1px solid var(--tw-gray-300);">
+      <tr class="user-row"
+          data-search="{{ ((u.email or '') ~ ' ' ~ (u.name or '') ~ ' ' ~ (u.role or ''))|lower }}"
+          style="border-top: 1px solid var(--tw-gray-300);">
         <td style="padding: var(--sp-3) var(--sp-4); font-family: var(--font-mono);
                    font-size: 0.9rem;">
           {{ u.email }}
@@ -89,4 +124,27 @@
     </tbody>
   </table>
 </div>
+
+<script>
+(function () {
+  var input = document.getElementById('user-live-search');
+  if (!input) return;
+  var rows = document.querySelectorAll('.user-row[data-search]');
+  var timer = null;
+  function apply() {
+    var q = (input.value || '').toLowerCase().trim();
+    var parts = q ? q.split(/\s+/).filter(Boolean) : [];
+    rows.forEach(function (r) {
+      if (!parts.length) { r.style.display = ''; return; }
+      var hay = r.getAttribute('data-search') || '';
+      var match = parts.every(function (p) { return hay.indexOf(p) !== -1; });
+      r.style.display = match ? '' : 'none';
+    });
+  }
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 60);
+  });
+})();
+</script>
 {% endblock %}

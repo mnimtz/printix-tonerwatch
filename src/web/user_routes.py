@@ -41,13 +41,46 @@ def _all_users() -> list[dict]:
 async def users_list(request: Request):
     admin = auth.require_admin(request)
     templates = request.app.state.templates
+    # v0.18.5: role filter — sticky in session so a reload keeps it.
+    # Same pattern as the toner/orders customer filter.
+    raw = (request.query_params.get("role") or "").strip().lower()
+    if raw == "all":
+        filter_role = ""
+        try:
+            request.session.pop("users_role", None)
+        except AssertionError:
+            pass
+    elif raw in ("admin", "technician"):
+        filter_role = raw
+        try:
+            request.session[f"users_role"] = raw
+        except AssertionError:
+            pass
+    else:
+        try:
+            sess = request.session.get("users_role", "")
+        except AssertionError:
+            sess = ""
+        filter_role = sess if sess in ("admin", "technician") else ""
+
+    rows = _all_users()
+    counts = {
+        "total":      len(rows),
+        "admin":      sum(1 for r in rows if r["role"] == "admin"),
+        "technician": sum(1 for r in rows if r["role"] == "technician"),
+    }
+    if filter_role:
+        rows = [r for r in rows if r["role"] == filter_role]
+
     return templates.TemplateResponse(
         "users/list.html",
         {
             "request": request,
             "lang": request.state.lang,
             "user": admin,
-            "users": _all_users(),
+            "users": rows,
+            "counts": counts,
+            "filter_role": filter_role,
         },
     )
 
