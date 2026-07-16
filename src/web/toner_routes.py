@@ -516,12 +516,16 @@ async def toner_printer_raw(request: Request):
 
 
 def _looks_like_anywhere(p: dict) -> bool:
-    """Same predicate as v0.23.5 hide-Anywhere filter — kept in one
-    place so the diagnose view can flag exactly what would be hidden."""
+    """v0.23.13 — the actual Anywhere marker in Printix BI lives in
+    the ``type`` column (NETWORK vs ANYWHERE) — Marcus's raw dump
+    finally confirmed it. Keep the old vendor/model/name heuristics
+    as a safety net for tenants with a different schema variant."""
     vendor = (p.get("vendor") or "").strip().lower()
     model  = (p.get("model") or "").strip().lower()
     name   = (p.get("printer_name") or "").strip().lower()
-    return (vendor == "printix"
+    ptype  = (p.get("type") or "").strip().lower()
+    return (ptype == "anywhere"
+            or vendor == "printix"
             or "anywhere" in model
             or "anywhere" in name)
 

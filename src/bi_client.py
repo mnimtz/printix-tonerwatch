@@ -239,7 +239,10 @@ def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
         row_dict = (dict(row) if isinstance(row, dict)
                     else dict(zip(cols, row)))
         return {"columns": cols,
-                "values": {k: _safe_value(v) for k, v in row_dict.items()}}
+                # v0.23.13 — key renamed from 'values' → 'row' because
+                # Jinja resolves `raw.values` to dict.values() (the
+                # bound method), not our key. UndefinedError on .get().
+                "row": {k: _safe_value(v) for k, v in row_dict.items()}}
 
 
 def fetch_printers_raw(customer: dict, limit: int = 10,
@@ -437,21 +440,34 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
         # schema (older Printix BI dumps don't expose it), so the caller
         # never sees a missing key.
         try:
+            # v0.23.13 — pull `type` too (NETWORK / ANYWHERE …) so the
+            # hide-Anywhere filter finally has the real marker.
             cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
                                   model_name AS model, vendor_name AS vendor,
-                                  serial_number
+                                  serial_number, type AS printer_type
                              FROM dbo.printers
                             WHERE meta_status = 'ACTIVE'""")
             printers = cur.fetchall()
         except Exception:
-            # Legacy schema without serial_number column.
-            cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
-                                  model_name AS model, vendor_name AS vendor
-                             FROM dbo.printers
-                            WHERE meta_status = 'ACTIVE'""")
-            printers = cur.fetchall()
-            for p in printers:
-                p["serial_number"] = ""
+            # Legacy schema without serial_number / type columns.
+            try:
+                cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
+                                      model_name AS model, vendor_name AS vendor,
+                                      type AS printer_type
+                                 FROM dbo.printers
+                                WHERE meta_status = 'ACTIVE'""")
+                printers = cur.fetchall()
+                for p in printers:
+                    p["serial_number"] = ""
+            except Exception:
+                cur.execute("""SELECT id AS printer_id, name AS printer_name, location,
+                                      model_name AS model, vendor_name AS vendor
+                                 FROM dbo.printers
+                                WHERE meta_status = 'ACTIVE'""")
+                printers = cur.fetchall()
+                for p in printers:
+                    p["serial_number"] = ""
+                    p["printer_type"] = ""
 
         rows: list[dict] = []
         for p in printers:
@@ -479,6 +495,7 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
                 "location":      p.get("location") or "",
                 "model":         p.get("model") or "",
                 "vendor":        p.get("vendor") or "",
+                "type":          p.get("printer_type") or "",
                 "serial_number": p.get("serial_number") or "",
                 "supplies":       _parse_markers(reading.get("additional_readings") if reading else None),
                 "error_states":   _parse_error_states(reading.get("detected_error_states") if reading else None),

@@ -122,7 +122,7 @@
       </thead>
       <tbody>
         {% for col in raw.columns %}
-          {% set v = raw.values.get(col) %}
+          {% set v = raw.row.get(col) %}
           <tr style="border-top: 1px solid var(--tw-gray-200);">
             <td style="padding: 6px 10px; font-family: var(--font-mono);
                        color: var(--tw-primary); font-weight: 600;">
