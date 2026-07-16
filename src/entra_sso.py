@@ -47,7 +47,12 @@ SETTINGS_KEY = "entra_sso"
 # ``offline_access`` also gets a refresh_token so future syncs can
 # renew silently without prompting the user again.
 _AUTHORITY_TMPL = "https://login.microsoftonline.com/{tenant}"
-_SCOPES: list[str] = ["User.Read", "offline_access"]
+_SCOPES: list[str] = ["User.Read"]
+# NOTE: MSAL adds `openid`, `profile`, and `offline_access` itself and
+# actively rejects any request that lists them explicitly (raises
+# ValueError "You cannot use any scope value that is reserved"). This
+# was in the initial code and only surfaced in v0.18.6 once we started
+# showing every SSO exception as a readable error instead of a 500.
 
 # Fallback authority for multi-tenant apps that accept sign-ins
 # from any Entra tenant. Used when the operator leaves tenant_id
