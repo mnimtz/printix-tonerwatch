@@ -380,6 +380,16 @@
       {% endif %}
     {% elif err.reason == 'fetch_failed' %}
       — {{ _('toner.error.fetch_failed', lang) }}
+    {% elif err.reason == 'cache_cold' %}
+      — {{ _('toner.error.cache_cold', lang) }}
+      <form method="post" action="/toner/refresh"
+            style="margin-left: auto; display: inline;" data-noloader>
+        {% include "_csrf_input.html" %}
+        <button type="submit" class="btn btn-secondary"
+                style="padding: 4px 10px; font-size: 0.78rem;">
+          ↻ {{ _('toner.error.cache_cold.refresh', lang) }}
+        </button>
+      </form>
     {% endif %}
   </div>
 {% endfor %}

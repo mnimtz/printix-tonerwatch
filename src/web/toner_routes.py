@@ -90,11 +90,17 @@ def _collect_printer_rows(user: dict) -> tuple[list[dict], list[dict]]:
                            "reason": "no_credentials"})
             continue
 
+        # v0.21.0 — read from the cache only. A background warmer
+        # (bi_cache.py, running every N minutes per settings.runner)
+        # keeps the cache hot. This makes /toner grid render in
+        # constant time regardless of Azure SQL latency, and gives the
+        # operator a "warming up" banner instead of a spinning wheel
+        # while the first fetch runs.
         bi_customer = bi_client.customer_for_bi(c)
-        printers = bi_client.fetch_all_printer_supplies(bi_customer)
+        printers = bi_client.fetch_all_printer_supplies_cached_only(bi_customer)
         if printers is None:
             errors.append({"customer_id": c["id"], "customer_name": c["name"],
-                           "reason": "fetch_failed"})
+                           "reason": "cache_cold"})
             continue
         if not printers:
             # No active printers under the tenant — not an error, just empty.
@@ -318,11 +324,21 @@ def _bucket_by_group(printers: list[dict]) -> list[tuple[str, list[dict]]]:
 
 @router.post("/toner/refresh", include_in_schema=False)
 async def toner_refresh(request: Request):
-    """Drop the cache for the customers the user can see, then bounce back
-    to /toner. Cheap way to force a fresh BI-DB pull without a full server
-    restart."""
+    """Drop the cache for the customers the user can see, then do one
+    synchronous fetch so /toner comes back with fresh data (not a
+    "cache_cold" banner). Cheap way to force a fresh BI-DB pull
+    without waiting for the background warmer."""
     user = auth.require_user(request)
     for c in _visible_customers(user):
         bi_client.invalidate_customer_cache(c["id"])
+        # v0.21.0 — kick off a synchronous refetch so the user's next
+        # GET /toner reads from a hot cache. Errors are silently
+        # swallowed — the render path handles the fallback via the
+        # cache_cold banner.
+        try:
+            bi_customer = bi_client.customer_for_bi(c)
+            bi_client.fetch_all_printer_supplies(bi_customer)
+        except Exception:  # noqa: BLE001
+            pass
     db.audit(user["id"], "toner.cache_flushed")
     return RedirectResponse("/toner", status_code=303)
