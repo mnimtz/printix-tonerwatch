@@ -699,6 +699,14 @@
         <div class="foot-inner">
           <span>{{ _('footer.copyright', lang) }}</span>
           <span>{{ _('footer.tungsten_note', lang) }}</span>
+          {# v0.19.1: version tag visible without login, matching the
+             sidebar's "running version" indicator. Same source, so
+             they can never diverge. #}
+          <span style="opacity: 0.7; font-family: var(--font-mono);
+                       font-size: 0.72rem; white-space: nowrap;"
+                title="{{ _('footer.version_title', lang) }}">
+            v{{ APP_VERSION }}
+          </span>
         </div>
       </footer>
     </div>

@@ -131,6 +131,7 @@ _EN: dict[str, str] = {
     # Footer
     "footer.copyright":             "© 2026 Printix TonerWatch — released under the Apache License 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ and the Tungsten Automation logo are trademarks of Tungsten Automation Corporation.",
+    "footer.version_title":         "Running application version",
     # -- Customer management (P1) -----------------------------------------
     "customer.list_title":            "Customers",
     "customer.list_intro":            "All Printix tenants monitored by this instance.",
@@ -694,6 +695,7 @@ _FR: dict[str, str] = {
     "common.not_found":             "La page recherchée est introuvable.",
     "footer.copyright":             "© 2026 Printix TonerWatch — publié sous licence Apache 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ et le logo Tungsten Automation sont des marques déposées de Tungsten Automation Corporation.",
+    "footer.version_title":         "Version de l'application en cours d'exécution",
     # -- Gestion des clients (P1) ----------------------------------------
     "customer.list_title":            "Clients",
     "customer.list_intro":            "Tous les tenants Printix supervisés par cette instance.",
@@ -1257,6 +1259,7 @@ _IT: dict[str, str] = {
     "common.not_found":             "La pagina richiesta non è stata trovata.",
     "footer.copyright":             "© 2026 Printix TonerWatch — rilasciato sotto Apache License 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ e il logo Tungsten Automation sono marchi di Tungsten Automation Corporation.",
+    "footer.version_title":         "Versione dell'applicazione in esecuzione",
     # -- Gestione clienti (P1) -------------------------------------------
     "customer.list_title":            "Clienti",
     "customer.list_intro":            "Tutti i tenant Printix monitorati da questa istanza.",
@@ -1820,6 +1823,7 @@ _DE: dict[str, str] = {
     "common.not_found":             "Die gesuchte Seite wurde nicht gefunden.",
     "footer.copyright":             "© 2026 Printix TonerWatch — veröffentlicht unter der Apache-Lizenz 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ und das Tungsten-Automation-Logo sind Marken der Tungsten Automation Corporation.",
+    "footer.version_title":         "Aktuell laufende Anwendungsversion",
     # -- Kundenverwaltung (P1) -------------------------------------------
     "customer.list_title":            "Kunden",
     "customer.list_intro":            "Alle Printix-Tenants, die diese Instanz überwacht.",
@@ -2383,6 +2387,7 @@ _ES: dict[str, str] = {
     "common.not_found":             "No se ha encontrado la página que buscas.",
     "footer.copyright":             "© 2026 Printix TonerWatch — publicado bajo la licencia Apache 2.0",
     "footer.tungsten_note":         "Tungsten Automation®, Tungsten Printix™ y el logotipo de Tungsten Automation son marcas comerciales de Tungsten Automation Corporation.",
+    "footer.version_title":         "Versión de la aplicación en ejecución",
     # -- Gestión de clientes (P1) ----------------------------------------
     "customer.list_title":            "Clientes",
     "customer.list_intro":            "Todos los tenants de Printix supervisados por esta instancia.",
