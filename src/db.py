@@ -133,6 +133,78 @@ def _create_engine(url: str) -> Engine:
     return create_engine(url, **kwargs)
 
 
+def describe_active_backend() -> dict[str, Any]:
+    """v0.23.0 — one-shot description of the currently-connected
+    database so the settings UI can show 'you're on SQLite at
+    /data/tonerwatch.sqlite' or 'you're on Azure SQL server X, DB Y'.
+    Never returns the password."""
+    url = database_url()
+    parsed = make_url(url)
+    backend = parsed.get_backend_name()
+    if backend == "sqlite":
+        return {"provider": "sqlite",
+                "sqlite_path": parsed.database or "",
+                "url_masked": url,
+                "source": ("DATABASE_URL env" if os.environ.get("DATABASE_URL")
+                            else "default"),
+                "host": "", "database": "", "username": ""}
+    return {"provider": "azure_sql" if "mssql" in backend else backend,
+            "sqlite_path": "",
+            "url_masked": _mask_password(url),
+            "source": "DATABASE_URL env",
+            "host":     parsed.host or "",
+            "database": parsed.database or "",
+            "username": parsed.username or ""}
+
+
+def _mask_password(url: str) -> str:
+    parsed = make_url(url)
+    if parsed.password:
+        return str(parsed.set(password="********"))
+    return url
+
+
+def build_azure_sql_url(server: str, database: str,
+                         username: str, password: str) -> str:
+    """v0.23.0 — compose a SQLAlchemy URL for an Azure SQL database.
+    Uses pyodbc + ODBC Driver 18 for SQL Server (available in the
+    container image). Encoded so the settings UI can copy-paste it
+    into Azure App Service → Application Settings → DATABASE_URL."""
+    from urllib.parse import quote_plus
+    conn_str = (
+        f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+        f"SERVER=tcp:{server},1433;"
+        f"DATABASE={database};"
+        f"UID={username};"
+        f"PWD={password};"
+        f"Encrypt=yes;TrustServerCertificate=no;Connection Timeout=15;"
+    )
+    return "mssql+pyodbc:///?odbc_connect=" + quote_plus(conn_str)
+
+
+def try_connect(url: str, timeout: float = 8.0) -> tuple[bool, str]:
+    """Best-effort connectivity test against an arbitrary SQLAlchemy
+    URL WITHOUT switching the running engine. Runs a single
+    ``SELECT 1`` and reports success or the driver error text.
+    Used by /settings/database/test so the admin can validate an
+    Azure SQL config before pasting it into Application Settings."""
+    from sqlalchemy import create_engine as _ce, text as _text
+    try:
+        eng = _ce(url, pool_pre_ping=False,
+                   connect_args={"timeout": int(timeout)}
+                   if _is_sqlite(url) else {})
+    except Exception as e:  # noqa: BLE001
+        return False, f"{type(e).__name__}: {e}"
+    try:
+        with eng.connect() as conn:
+            conn.execute(_text("SELECT 1"))
+        return True, "ok"
+    except Exception as e:  # noqa: BLE001
+        return False, f"{type(e).__name__}: {str(e)[:400]}"
+    finally:
+        eng.dispose()
+
+
 @contextmanager
 def get_conn() -> Iterator[Connection]:
     """Yield a Connection inside a transaction — commits on clean exit,

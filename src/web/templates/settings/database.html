@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}{{ _('settings.database.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/settings" data-noloader>{{ _('settings.title', lang) }}</a> /
+  {{ _('settings.database.title', lang) }}
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-3);">
+  💾 {{ _('settings.database.title', lang) }}
+</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-5);">
+  {{ _('settings.database.intro', lang) }}
+</p>
+
+{% if info %}<div class="alert alert-info">{{ info }}</div>{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-3);">
+    {{ _('settings.database.active', lang) }}
+  </h2>
+  <table style="width: 100%; font-family: var(--font-mono);
+                font-size: 0.85rem; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue); width: 200px;">
+        {{ _('settings.database.provider', lang) }}
+      </td>
+      <td>
+        {% if active.provider == 'sqlite' %}
+          <span style="color: var(--tw-primary); font-weight: 700;">SQLite</span>
+          <span style="color: var(--tw-muted-blue); margin-left: 8px;">
+            ({{ _('settings.database.provider.sqlite.hint', lang) }})
+          </span>
+        {% elif active.provider == 'azure_sql' %}
+          <span style="color: var(--tw-primary); font-weight: 700;">Azure SQL</span>
+          <span style="color: var(--tw-muted-blue); margin-left: 8px;">
+            ({{ _('settings.database.provider.azure.hint', lang) }})
+          </span>
+        {% else %}
+          {{ active.provider }}
+        {% endif %}
+      </td>
+    </tr>
+    {% if active.sqlite_path %}
+      <tr>
+        <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">
+          {{ _('settings.database.sqlite_path', lang) }}
+        </td>
+        <td>{{ active.sqlite_path }}</td>
+      </tr>
+    {% endif %}
+    {% if active.host %}
+      <tr>
+        <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">
+          {{ _('settings.database.host', lang) }}
+        </td>
+        <td>{{ active.host }}</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">
+          {{ _('settings.database.database', lang) }}
+        </td>
+        <td>{{ active.database }}</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">
+          {{ _('settings.database.username', lang) }}
+        </td>
+        <td>{{ active.username }}</td>
+      </tr>
+    {% endif %}
+    <tr>
+      <td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">
+        {{ _('settings.database.source', lang) }}
+      </td>
+      <td>{{ active.source }}</td>
+    </tr>
+  </table>
+</section>
+
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-3);">
+    {{ _('settings.database.test_title', lang) }}
+  </h2>
+  <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-3);">
+    {{ _('settings.database.test_intro', lang) }}
+  </p>
+  <form id="dbtest-form" data-noloader>
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--sp-3);
+                margin-bottom: var(--sp-3);">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="db-server">{{ _('settings.database.server_fqdn', lang) }}</label>
+        <input id="db-server" name="server" type="text" required
+               placeholder="myserver.database.windows.net">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="db-database">{{ _('settings.database.database', lang) }}</label>
+        <input id="db-database" name="database" type="text" required
+               placeholder="tonerwatch">
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+                margin-bottom: var(--sp-3);">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="db-username">{{ _('settings.database.username', lang) }}</label>
+        <input id="db-username" name="username" type="text" required
+               autocomplete="off">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="db-password">{{ _('settings.database.password', lang) }}</label>
+        <input id="db-password" name="password" type="password" required
+               autocomplete="new-password">
+      </div>
+    </div>
+    <button type="submit" class="btn">
+      🔌 {{ _('settings.database.test_button', lang) }}
+    </button>
+  </form>
+  <div id="dbtest-status" style="margin-top: var(--sp-3); font-size: 0.85rem;"></div>
+  <div id="dbtest-result" style="margin-top: var(--sp-3); display: none;">
+    <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                  text-transform: uppercase; letter-spacing: 0.08em;
+                  font-weight: 700;">
+      {{ _('settings.database.copy_url', lang) }}
+    </label>
+    <textarea id="dbtest-url" readonly style="width: 100%; height: 80px;
+                 font-family: var(--font-mono); font-size: 0.78rem;
+                 padding: 8px; border: 1px solid var(--tw-gray-300);
+                 border-radius: 6px; margin-top: 6px;"></textarea>
+    <button type="button" id="dbtest-copy" class="btn btn-secondary"
+            data-noloader style="margin-top: 8px;">
+      📋 {{ _('settings.database.copy_button', lang) }}
+    </button>
+    <p style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 8px;">
+      {{ _('settings.database.copy_instructions', lang) }}
+    </p>
+  </div>
+</section>
+
+<script>
+(function () {
+  var form = document.getElementById('dbtest-form');
+  var status = document.getElementById('dbtest-status');
+  var result = document.getElementById('dbtest-result');
+  var urlBox = document.getElementById('dbtest-url');
+  var copyBtn = document.getElementById('dbtest-copy');
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    status.textContent = {{ _('settings.database.testing', lang)|tojson }};
+    status.style.color = 'var(--tw-muted-blue)';
+    result.style.display = 'none';
+    var fd = new FormData(form);
+    fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+    try {
+      var r = await fetch('/settings/database/test', {method: 'POST', body: fd,
+        credentials: 'same-origin',
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+      var j = await r.json();
+      if (!j.ok) {
+        status.innerHTML = '✗ ' + (j.error || 'error');
+        status.style.color = 'var(--status-critical)';
+        return;
+      }
+      status.innerHTML = '✓ ' + j.detail;
+      status.style.color = 'var(--status-ok)';
+      urlBox.value = j.database_url;
+      result.style.display = '';
+    } catch (e) {
+      status.innerHTML = '✗ ' + (e.message || e);
+      status.style.color = 'var(--status-critical)';
+    }
+  });
+  copyBtn.addEventListener('click', function () {
+    urlBox.select();
+    document.execCommand('copy');
+    copyBtn.textContent = '✓ {{ _('settings.database.copied', lang)|e }}';
+    setTimeout(function () {
+      copyBtn.textContent = '📋 {{ _('settings.database.copy_button', lang)|e }}';
+    }, 1500);
+  });
+})();
+</script>
+{% endblock %}

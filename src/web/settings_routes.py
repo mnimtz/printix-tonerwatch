@@ -43,6 +43,51 @@ async def settings_page(request: Request):
     )
 
 
+@router.get("/settings/database", response_class=HTMLResponse,
+            include_in_schema=False)
+async def settings_database_page(request: Request):
+    """v0.23.0 — dedicated Database Setup page. Shows what backend
+    the running process is actually talking to, lets the admin test
+    an Azure SQL configuration WITHOUT flipping the live engine,
+    and hands back a copy-ready DATABASE_URL for Azure App Service."""
+    admin = auth.require_admin(request)
+    return request.app.state.templates.TemplateResponse(
+        "settings/database.html",
+        {"request": request, "lang": request.state.lang,
+         "user": admin, "active": db.describe_active_backend(),
+         "info":  request.query_params.get("info", ""),
+         "error": request.query_params.get("error", "")},
+    )
+
+
+@router.post("/settings/database/test", include_in_schema=False)
+async def settings_database_test(request: Request):
+    """Test-connect against an Azure SQL config supplied via the form.
+    Returns JSON so the settings page can update its status inline.
+    Never persists anything."""
+    auth.require_admin(request)
+    form = await request.form()
+    server   = (form.get("server") or "").strip()
+    database = (form.get("database") or "").strip()
+    username = (form.get("username") or "").strip()
+    password = (form.get("password") or "").strip()
+    if not (server and database and username and password):
+        return JSONResponse(
+            {"ok": False, "error": "server/database/username/password required"},
+            status_code=400)
+    url = db.build_azure_sql_url(server, database, username, password)
+    ok, detail = db.try_connect(url, timeout=8.0)
+    if not ok:
+        return JSONResponse(
+            {"ok": False, "error": detail,
+             "database_url_masked": db._mask_password(url)},
+            status_code=400)
+    return JSONResponse(
+        {"ok": True, "detail": "SELECT 1 succeeded",
+         "database_url": url,
+         "database_url_masked": db._mask_password(url)})
+
+
 @router.get("/settings/mail/graph/mailboxes", include_in_schema=False)
 async def settings_mail_graph_mailboxes(request: Request):
     """v0.22.0 — populate the sender-mailbox dropdown for the Graph

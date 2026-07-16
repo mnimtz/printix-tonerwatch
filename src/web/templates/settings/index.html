@@ -772,6 +772,28 @@
 
   <!-- v0.10: backup -->
   <div class="tab-panel" data-tab-panel="backup">
+
+  {# v0.23.0 — cross-link to the dedicated Database Setup page. #}
+  <div class="card" style="padding: var(--sp-3) var(--sp-4);
+                            margin-bottom: var(--sp-3);
+                            background: linear-gradient(90deg,
+                                rgba(0,235,134,0.06), rgba(0,160,251,0.06));
+                            display: flex; align-items: center;
+                            gap: var(--sp-3); flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 240px;">
+      <div style="font-weight: 700; color: var(--tw-primary);">
+        💾 {{ _('settings.database.title', lang) }}
+      </div>
+      <div style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 2px;">
+        {{ _('settings.database.intro', lang) }}
+      </div>
+    </div>
+    <a href="/settings/database" class="btn btn-secondary" data-noloader
+       style="white-space: nowrap;">
+      {{ _('settings.database.open', lang) }} →
+    </a>
+  </div>
+
   <div class="card" id="backup">
     <h3>{{ _('settings.backup.section', lang) }}</h3>
     <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
