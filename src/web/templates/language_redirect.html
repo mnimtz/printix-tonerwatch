@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}…{% endblock %}
+{% block content %}
+{# v0.18: /language GET now renders this tiny auto-submitting form so
+   the language change goes via a POST + CSRF token, closing the
+   GET-mutates-DB gap without breaking old anchor links. #}
+<form id="lang-form" method="post" action="/language" data-noloader>
+  {% include "_csrf_input.html" %}
+  <input type="hidden" name="lang" value="{{ target_lang }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <noscript>
+    <p style="text-align:center; padding: var(--sp-6);">
+      <button type="submit" class="btn">{{ _('language.switch_to', lang) }}</button>
+    </p>
+  </noscript>
+</form>
+<script>document.getElementById('lang-form').submit();</script>
+{% endblock %}

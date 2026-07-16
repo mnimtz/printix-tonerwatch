@@ -20,6 +20,7 @@
               <form method="post" action="/toner/views/{{ v.id }}/delete"
                     onsubmit="return confirm('{{ _('toner.views.confirm_delete', lang) }}')"
                     data-noloader style="display: inline; margin: 0;">
+                {% include "_csrf_input.html" %}
                 <button type="submit" class="sv-del"
                         title="{{ _('common.delete', lang) }}">✕</button>
               </form>
@@ -33,6 +34,7 @@
        the current state doesn't match an existing view. #}
     {% if (filter_customer or filter_severity or filter_group or filter_search) and not active_view_id %}
       <form method="post" action="/toner/views" class="sv-save" data-noloader>
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="customer" value="{{ filter_customer or '' }}">
         <input type="hidden" name="severity" value="{{ filter_severity or '' }}">
         <input type="hidden" name="group"    value="{{ filter_group or '' }}">

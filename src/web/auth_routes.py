@@ -63,7 +63,26 @@ def _reset_login_throttle(request: Request, email: str) -> None:
 # --------------------------------------------------------------------------
 
 @router.get("/language", include_in_schema=False)
-async def switch_language(request: Request, lang: str = "en", next: str = "/"):
+async def switch_language_get(request: Request, lang: str = "en", next: str = "/"):
+    """v0.18: /language is now POST-only for state changes.
+    Kept as GET for backward compat with old bookmarks — but this
+    doesn't write anything, it renders a tiny auto-submit form so the
+    change goes via a proper CSRF-protected POST."""
+    templates = request.app.state.templates
+    if lang not in i18n.SUPPORTED_LANGS:
+        lang = i18n.DEFAULT_LANG
+    return templates.TemplateResponse(
+        "language_redirect.html",
+        {"request": request, "lang": request.state.lang,
+         "target_lang": lang, "next": _safe_next(next)},
+    )
+
+
+@router.post("/language", include_in_schema=False)
+async def switch_language(request: Request):
+    form = await request.form()
+    lang = (form.get("lang") or "").strip()
+    next_ = form.get("next") or "/"
     if lang in i18n.SUPPORTED_LANGS:
         request.session["lang"] = lang
         user = auth.current_user(request)
@@ -72,10 +91,7 @@ async def switch_language(request: Request, lang: str = "en", next: str = "/"):
                 conn.execute(
                     update(users).where(users.c.id == user["id"]).values(lang=lang)
                 )
-    # v0.17.1: block open-redirect via protocol-relative URLs. `_safe_next`
-    # rejects both non-`/` prefixes and the `//evil.com` shape which a
-    # naive startswith("/") check would let through.
-    return RedirectResponse(_safe_next(next), status_code=303)
+    return RedirectResponse(_safe_next(next_), status_code=303)
 
 
 # --------------------------------------------------------------------------

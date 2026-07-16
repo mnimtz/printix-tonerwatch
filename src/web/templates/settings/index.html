@@ -64,6 +64,7 @@
     <div style="display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-4);">
       <h3>{{ _('settings.mail.section', lang) }}</h3>
       <form method="post" action="/settings/mail/test" style="margin: 0;">
+        {% include "_csrf_input.html" %}
         <button type="submit" class="btn btn-secondary"
                 style="padding: 6px 12px; font-size: 0.85rem;"
                 {% if mail.provider == 'disabled' %}disabled title="{{ _('settings.mail.enable_first', lang) }}"{% endif %}>
@@ -77,6 +78,7 @@
     </p>
 
     <form method="post" action="/settings/mail" autocomplete="off">
+      {% include "_csrf_input.html" %}
       <div class="form-group">
         <label for="provider">{{ _('settings.mail.provider', lang) }}</label>
         <select id="provider" name="provider"
@@ -179,6 +181,7 @@
     </p>
 
     <form method="post" action="/settings/runner" style="margin-top: var(--sp-4);">
+      {% include "_csrf_input.html" %}
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
         <div class="form-group">
           <label for="alert_interval">{{ _('settings.runner.alert_interval', lang) }}</label>
@@ -255,6 +258,7 @@
       {{ _('settings.graph.requires_hint', lang) }}
     </p>
     <form method="post" action="/settings/graph" style="margin-top: var(--sp-3);">
+      {% include "_csrf_input.html" %}
       <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
         <input type="checkbox" id="graph_enabled" name="enabled"
                {% if graph.enabled %}checked{% endif %}>
@@ -349,6 +353,7 @@
       {{ _('settings.llm.intro', lang) }}
     </p>
     <form method="post" action="/settings/llm" style="margin-top: var(--sp-3);">
+      {% include "_csrf_input.html" %}
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
         <div class="form-group">
           <label for="llm_provider">{{ _('settings.llm.provider', lang) }}</label>
@@ -457,6 +462,7 @@
     </div>
 
     <form method="post" action="/settings/entra" style="margin-top: var(--sp-3);">
+      {% include "_csrf_input.html" %}
       <div class="form-group" style="display: flex; align-items: center; gap: 6px;">
         <input type="checkbox" id="entra_enabled" name="enabled"
                {% if entra.enabled %}checked{% endif %}>
@@ -579,6 +585,7 @@
 
     <!-- Azure Blob config -->
     <form method="post" action="/settings/backup" style="margin-top: var(--sp-5);">
+      {% include "_csrf_input.html" %}
       <h4 style="margin-bottom: var(--sp-3);">
         {{ _('settings.backup.azure.title', lang) }}
       </h4>
@@ -744,7 +751,8 @@
   async function poll() {
     try {
       var r = await fetch('/settings/entra/autosetup/poll', {
-        method: 'POST', credentials: 'same-origin'});
+        method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
       var j = await r.json();
       if (j.status === 'success' || j.status === 'done') {
         stop();
@@ -812,7 +820,8 @@
                  {{ _('settings.entra.autosetup.creating', lang)|tojson }} + '</div>');
             try {
               var r2 = await fetch('/settings/entra/autosetup/replace', {
-                method:'POST', credentials:'same-origin'});
+                method:'POST', credentials:'same-origin',
+                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
               var j2 = await r2.json();
               if (j2.status === 'done') {
                 show(
@@ -867,7 +876,8 @@
          {{ _('settings.entra.autosetup.starting', lang)|tojson }} + '</div>');
     try {
       var r = await fetch('/settings/entra/autosetup/start', {
-        method: 'POST', credentials: 'same-origin'});
+        method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
       var j = await r.json();
       if (!j.ok) {
         show('<div style="color:#991B1B;">✗ ' + esc(j.error || 'error') + '</div>');

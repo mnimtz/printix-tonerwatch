@@ -647,6 +647,7 @@
               <span>{{ user.role }}</span>
             </div>
             <form method="post" action="/logout">
+              {% include "_csrf_input.html" %}
               <button type="submit" class="signout-btn"
                       title="{{ _('nav.sign_out', lang) }}"
                       aria-label="{{ _('nav.sign_out', lang) }}">
@@ -706,6 +707,11 @@
   {# Global matrix-rain loader — auto-shows on <a> clicks + form submits.
      Opt-out per element with data-noloader; force splash with
      data-matrix-splash (used by the login/setup forms below). #}
+  {# v0.18: expose CSRF token for JS `fetch` POST calls.
+     Forms use the hidden input from `_csrf_input.html`; scripts use
+     `window.__CSRF_TOKEN__` sent as an X-CSRF-Token header. #}
+  <script>window.__CSRF_TOKEN__ = "{{ request.state.csrf_token }}";</script>
+
   {% include "_matrix_loader.html" %}
 
   {# Searchable-select (v0.14.2). Any <select data-searchable> in the

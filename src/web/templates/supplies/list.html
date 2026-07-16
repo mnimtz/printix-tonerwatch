@@ -151,6 +151,7 @@
               <form method="post" action="/supplies/{{ t.id }}/delete"
                     onsubmit="return confirm('{{ _('supplies.confirm_delete', lang) }}')"
                     data-noloader>
+                {% include "_csrf_input.html" %}
                 <button type="submit" class="btn-link danger">{{ _('common.delete', lang) }}</button>
               </form>
             </td>
@@ -166,6 +167,7 @@
     <div class="btn-group">
       <a href="/supplies/new" class="btn">+ {{ _('supplies.new', lang) }}</a>
       <form method="post" action="/supplies/seed" style="margin: 0;">
+        {% include "_csrf_input.html" %}
         <button type="submit" class="btn btn-secondary"
                 onclick="return confirm('{{ _('supplies.confirm_seed', lang) }}')">
           {{ _('supplies.seed_button', lang) }}

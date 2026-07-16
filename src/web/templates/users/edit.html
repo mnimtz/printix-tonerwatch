@@ -22,6 +22,7 @@
     <form method="post"
           action="{% if is_new %}/users/new{% else %}/users/{{ form.id }}/edit{% endif %}"
           autocomplete="off">
+      {% include "_csrf_input.html" %}
       <div class="form-group">
         <label for="email">{{ _('user.field.email', lang) }} *</label>
         <input id="email" name="email" type="email" required

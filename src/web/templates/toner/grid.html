@@ -334,6 +334,7 @@
     </p>
   </div>
   <form method="post" action="/toner/refresh" style="margin: 0;">
+    {% include "_csrf_input.html" %}
     <button type="submit" class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem;">
       ↻ {{ _('toner.refresh', lang) }}
     </button>

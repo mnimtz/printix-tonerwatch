@@ -46,6 +46,7 @@
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
 <form method="post" action="{{ form_action }}" class="supply-form">
+  {% include "_csrf_input.html" %}
   <div class="row-3col">
     <div class="form-group">
       <label for="color">{{ _('supplies.col.color', lang) }} *</label>
@@ -186,8 +187,10 @@
     var fd = new FormData();
     fd.append('printer_model', model);
     fd.append('color', color);
+    fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
     try {
-      var r = await fetch('/supplies/ai/suggest', {method: 'POST', body: fd});
+      var r = await fetch('/supplies/ai/suggest', {method: 'POST', body: fd,
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
       var j = await r.json();
       if (!j.ok) {
         var msg = j.error === 'llm_not_configured'

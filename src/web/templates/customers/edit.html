@@ -21,6 +21,7 @@
   <form method="post"
         action="{% if is_new %}/customers/new{% else %}/customers/{{ form.id }}/edit{% endif %}"
         id="customer-form" autocomplete="off">
+    {% include "_csrf_input.html" %}
 
     <!-- Basic info -->
     <div class="card">
@@ -253,6 +254,7 @@
     </p>
     <form method="post" action="/customers/{{ form.id }}/delete"
           onsubmit="return confirm('{{ _('customer.deactivate_confirm', lang) }}');">
+      {% include "_csrf_input.html" %}
       <button type="submit" class="btn btn-danger">
         {{ _('customer.deactivate', lang) }}
       </button>

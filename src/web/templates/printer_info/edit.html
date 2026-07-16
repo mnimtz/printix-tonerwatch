@@ -86,6 +86,7 @@
 {% if form_error %}<div class="alert alert-error">{{ form_error }}</div>{% endif %}
 
 <form method="post" action="/toner/{{ customer.id }}/{{ printer.printer_id or printer.id }}/info">
+  {% include "_csrf_input.html" %}
   <!-- Location + serial (with BI fallback shown as placeholder) -->
   <div class="info-card">
     <h3>{{ _('printer_info.section.identity', lang) }}</h3>

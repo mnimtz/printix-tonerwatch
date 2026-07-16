@@ -23,6 +23,7 @@
   </p>
 
   <form method="post" action="/users/{{ target.id }}/access">
+    {% include "_csrf_input.html" %}
     {% if all_customers %}
       <div class="card" style="padding: 0; overflow: hidden;">
         <table style="width: 100%; border-collapse: collapse;">

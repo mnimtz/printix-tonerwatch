@@ -1,0 +1,5 @@
+{# One-line CSRF hidden input for every POST form. Include with
+   `{% include "_csrf_input.html" %}` right after the opening
+   <form method="post"...>. Reads from `request.state.csrf_token`
+   set by CSRFMiddleware. #}
+<input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">

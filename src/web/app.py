@@ -105,15 +105,21 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
 
-    # Session cookie is Secure by default. Override with
     # Middleware order matters: Starlette wraps in add-order-REVERSED,
-    # so the LAST add is the OUTERMOST. We want the request path to be
-    # SecurityHeaders → SessionMiddleware → LanguageMiddleware → app,
-    # because LanguageMiddleware reads and writes `request.session`
-    # (needs Session to be set up first). Add in reverse of that path.
+    # so the LAST add is the OUTERMOST. Request path we want:
+    #   SecurityHeaders → Session → CSRF → Language → app
+    # Rationale:
+    #   * Session must run before CSRF (CSRF reads session).
+    #   * Language must run after CSRF so any 403 from CSRF fires
+    #     before we bother resolving a language, and the language
+    #     middleware still has access to request.state.csrf_token
+    #     via templates.
+    # Add in reverse of that path (last-add = outermost).
     # SESSION_HTTPS_ONLY=false when running behind a plain-HTTP dev
     # environment (docker compose on localhost, for instance).
+    from .csrf import CSRFMiddleware
     app.add_middleware(LanguageMiddleware)
+    app.add_middleware(CSRFMiddleware)
     app.add_middleware(
         SessionMiddleware,
         secret_key=auth.session_secret(),

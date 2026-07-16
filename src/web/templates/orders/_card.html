@@ -35,28 +35,34 @@
 
     {% if status == 'draft' %}
       <form method="post" action="/orders/{{ o.id }}/status">
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="status" value="ordered">
         <button type="submit" class="primary">✓ {{ _('orders.action.mark_ordered', lang) }}</button>
       </form>
       <form method="post" action="/orders/{{ o.id }}/delete"
             onsubmit="return confirm('{{ _('orders.confirm.delete_draft', lang) }}')">
+        {% include "_csrf_input.html" %}
         <button type="submit" class="danger">✕ {{ _('common.delete', lang) }}</button>
       </form>
     {% elif status == 'ordered' %}
       <form method="post" action="/orders/{{ o.id }}/status">
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="status" value="delivered">
         <button type="submit" class="primary">📦 {{ _('orders.action.mark_delivered', lang) }}</button>
       </form>
       <form method="post" action="/orders/{{ o.id }}/status">
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="status" value="cancelled">
         <button type="submit" class="danger">✕ {{ _('orders.action.cancel', lang) }}</button>
       </form>
     {% elif status == 'delivered' %}
       <form method="post" action="/orders/{{ o.id }}/status">
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="status" value="installed">
         <button type="submit" class="primary">🔧 {{ _('orders.action.mark_installed', lang) }}</button>
       </form>
       <form method="post" action="/orders/{{ o.id }}/status">
+        {% include "_csrf_input.html" %}
         <input type="hidden" name="status" value="cancelled">
         <button type="submit" class="danger">✕ {{ _('orders.action.cancel', lang) }}</button>
       </form>

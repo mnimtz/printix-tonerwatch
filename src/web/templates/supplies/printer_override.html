@@ -115,6 +115,7 @@
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
 <form method="post" action="/toner/{{ customer.id }}/{{ printer.id }}/supply">
+  {% include "_csrf_input.html" %}
   {% for row in rows %}
     {% set c = row.color %}
     {% set ov = row.override %}

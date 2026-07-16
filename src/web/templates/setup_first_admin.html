@@ -17,6 +17,7 @@
     <form method="post" action="/setup" autocomplete="off"
           data-matrix-splash
           data-matrix-msg="{{ _('matrix.setting_up', lang) }}">
+      {% include "_csrf_input.html" %}
       <div class="form-group">
         <label for="name">{{ _('setup.name', lang) }}</label>
         <input id="name" name="name" type="text" required
