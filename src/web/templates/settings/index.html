@@ -463,15 +463,49 @@
               {{ _('settings.entra.configured.client', lang) }}:
               <span style="color: var(--tw-primary);">{{ entra.client_id }}</span><br>
               {{ _('settings.entra.configured.secret', lang) }}:
-              <span style="color: #065F46;">✓ {{ _('settings.entra.configured.stored', lang) }}</span>
+              <span style="color: #065F46;">✓ {{ _('settings.entra.configured.stored', lang) }}</span><br>
+              {# v0.18.3: enabled state is the ONE thing that gates the
+                 login-page button. Show it prominently and provide a
+                 one-click toggle so admins never end up with valid
+                 credentials but a silently hidden sign-in option. #}
+              {{ _('settings.entra.configured.status', lang) }}:
+              {% if entra.enabled %}
+                <span style="color: #065F46;">✓ {{ _('settings.entra.configured.status.on', lang) }}</span>
+              {% else %}
+                <span style="color: #B45309;">⚠ {{ _('settings.entra.configured.status.off', lang) }}</span>
+              {% endif %}
             </div>
           </div>
-          <button type="button" id="btn-entra-autosetup" class="btn btn-secondary"
-                  data-noloader style="white-space: nowrap;"
-                  title="{{ _('settings.entra.configured.reconfigure_hint', lang) }}">
-            🔄 {{ _('settings.entra.configured.reconfigure', lang) }}
-          </button>
+          <div style="display: flex; flex-direction: column; gap: 6px;
+                      align-items: stretch; min-width: 180px;">
+            <form method="post" action="/settings/entra/toggle" data-noloader
+                  style="margin: 0;">
+              {% include "_csrf_input.html" %}
+              <button type="submit"
+                      class="btn {% if entra.enabled %}btn-secondary{% else %}btn-primary{% endif %}"
+                      data-noloader style="white-space: nowrap; width: 100%;">
+                {% if entra.enabled %}
+                  ⏻ {{ _('settings.entra.configured.disable', lang) }}
+                {% else %}
+                  ⚡ {{ _('settings.entra.configured.enable', lang) }}
+                {% endif %}
+              </button>
+            </form>
+            <button type="button" id="btn-entra-autosetup" class="btn btn-secondary"
+                    data-noloader style="white-space: nowrap;"
+                    title="{{ _('settings.entra.configured.reconfigure_hint', lang) }}">
+              🔄 {{ _('settings.entra.configured.reconfigure', lang) }}
+            </button>
+          </div>
         </div>
+        {% if not entra.enabled %}
+          <div style="margin-top: var(--sp-3); padding: var(--sp-3);
+                      background: #FFFBEB; border: 1px solid #FCD34D;
+                      border-radius: var(--r); color: #92400E;
+                      font-size: 0.85rem;">
+            ⚠ {{ _('settings.entra.configured.disabled_hint', lang) }}
+          </div>
+        {% endif %}
       {% else %}
         <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
           <div style="flex: 1; min-width: 200px;">

@@ -256,6 +256,26 @@ async def settings_runner_save(request: Request):
                             status_code=303)
 
 
+@router.post("/settings/entra/toggle", include_in_schema=False)
+async def settings_entra_toggle(request: Request):
+    """v0.18.3: flip only the `enabled` flag without touching the
+    credentials. Fixes the "I configured SSO but the login button
+    doesn't show up" trap: credentials are stored, but `enabled=False`
+    hides the button. The manual-config form's Enable checkbox
+    silently overwrites the auto-setup's `enabled=True` when the
+    admin re-saves it without ticking the box; this endpoint gives
+    them a one-click way back in."""
+    admin = auth.require_admin(request)
+    cfg = entra_sso.load_config()
+    cfg["enabled"] = not cfg["enabled"]
+    entra_sso.save_config(cfg)
+    db.audit(admin["id"], "settings.entra_toggled",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({"enabled": cfg["enabled"]}))
+    return RedirectResponse("/settings?info=entra_toggled#entra",
+                            status_code=303)
+
+
 @router.post("/settings/entra", include_in_schema=False)
 async def settings_entra_save(request: Request):
     admin = auth.require_admin(request)
