@@ -3,7 +3,8 @@
    `reported_state_meta` / `is_hidden_state` jinja globals. Extracted
    in v0.17.2 so the grid can render either a flat list or one card
    deck per group without duplicating the card body. #}
-<div class="printer-card sev-{{ p.worst_severity }}">
+<div class="printer-card sev-{{ p.worst_severity }}"
+     data-search="{{ ((p.printer_name or '') ~ ' ' ~ (p.location or '') ~ ' ' ~ (p.model or '') ~ ' ' ~ (p.serial_number or '') ~ ' ' ~ (p.vendor or '') ~ ' ' ~ (p.asset_tag or '') ~ ' ' ~ (p.notes or '') ~ ' ' ~ (p.customer_name or '') ~ ' ' ~ (p.group_name or ''))|lower }}">
   <div class="printer-header">
     <img src="/assets/printers/{{ p.icon_key }}.svg" alt="" width="42" height="42">
     <div class="meta">

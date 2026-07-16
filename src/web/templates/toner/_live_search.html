@@ -1,0 +1,61 @@
+{# v0.18.2: client-side live filter for the toner grid + list.
+   Matches against the [data-search] attribute rendered on each
+   .printer-card (grid) and .printer-row (list). Keeps the server
+   ?q=… form working for deep-links + saved views: the JS just
+   narrows what's already on the page and shows a small counter.
+
+   Assumes there's exactly one <input type="search" name="q">
+   in the toolbar — we grab it and wire the listener on load. #}
+<script>
+(function () {
+  var input = document.querySelector('input[type="search"][name="q"]');
+  if (!input) return;
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('spellcheck', 'false');
+
+  var items = document.querySelectorAll('.printer-card[data-search], .printer-row[data-search]');
+  if (!items.length) return;
+
+  // Counter chip inserted next to the input.
+  var counter = document.createElement('span');
+  counter.style.cssText = 'margin-left:8px;font-size:0.78rem;color:var(--tw-muted-blue);white-space:nowrap;display:none;';
+  if (input.parentNode) input.parentNode.appendChild(counter);
+
+  function normalize(s) {
+    return (s || '').toString().toLowerCase().trim();
+  }
+
+  function applyFilter() {
+    var q = normalize(input.value);
+    if (!q) {
+      items.forEach(function (el) { el.style.display = ''; });
+      counter.style.display = 'none';
+      // If nothing else keeps the group-section container non-empty,
+      // showing all is safe.
+      return;
+    }
+    // Split on whitespace so "hp 4711" narrows by both words.
+    var parts = q.split(/\s+/).filter(Boolean);
+    var visible = 0;
+    items.forEach(function (el) {
+      var hay = el.getAttribute('data-search') || '';
+      var match = parts.every(function (p) { return hay.indexOf(p) !== -1; });
+      el.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    counter.textContent = visible + ' / ' + items.length;
+    counter.style.display = '';
+  }
+
+  var timer = null;
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(applyFilter, 80);
+  });
+
+  // Apply once on load — value may be pre-populated from ?q=… so the
+  // client filter matches what the server returned before the operator
+  // starts typing.
+  applyFilter();
+})();
+</script>

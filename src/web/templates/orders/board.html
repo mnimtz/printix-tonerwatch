@@ -215,6 +215,38 @@
   </div>
 </div>
 
+{# v0.18.2: filter kanban by one customer. Same shape as the toner
+   grid's customer dropdown so admins with tens of tenants can focus
+   on one. Session-sticky. #}
+{% if customer_choices and customer_choices|length > 1 %}
+  <form method="get" action="/orders" class="orders-filter" data-noloader
+        style="margin: 0 0 var(--sp-3); display: flex; align-items: center; gap: var(--sp-2);">
+    <label for="orders-customer"
+           style="font-size: 0.85rem; color: var(--tw-muted-blue);">
+      {{ _('orders.filter.customer', lang) }}
+    </label>
+    <select id="orders-customer" name="customer"
+            onchange="this.form.submit()"
+            style="min-width: 240px;">
+      <option value="all" {% if not filter_customer %}selected{% endif %}>
+        {{ _('orders.filter.customer.all', lang) }}
+      </option>
+      {% for cid, cname in customer_choices %}
+        <option value="{{ cid }}"
+                {% if filter_customer == cid|string %}selected{% endif %}>
+          {{ cname }}
+        </option>
+      {% endfor %}
+    </select>
+    {% if filter_customer %}
+      <a href="/orders?customer=all" class="reset-link" data-noloader
+         style="font-size: 0.82rem;">
+        {{ _('common.reset', lang) }}
+      </a>
+    {% endif %}
+  </form>
+{% endif %}
+
 {% if info %}
   <div class="alert alert-info">
     {% if info.startswith('order_') %}{{ _('orders.info.' + info[6:], lang) }}

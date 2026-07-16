@@ -36,10 +36,33 @@ async def orders_board(request: Request):
     user = auth.require_user(request)
     visible = auth.visible_customer_ids(user)
 
+    # v0.18.2: single-customer filter, sticky in session so a reload keeps it.
+    q = request.query_params
+    raw = q.get("customer", "").strip()
+    if raw == "all":
+        filter_customer = ""
+        try:
+            request.session.pop("orders_customer", None)
+        except AssertionError:
+            pass
+    elif raw.isdigit() and int(raw) in visible:
+        filter_customer = raw
+        try:
+            request.session["orders_customer"] = raw
+        except AssertionError:
+            pass
+    else:
+        try:
+            sess = request.session.get("orders_customer", "")
+        except AssertionError:
+            sess = ""
+        filter_customer = sess if (sess.isdigit() and int(sess) in visible) else ""
+
+    scope = [int(filter_customer)] if filter_customer else visible
     active_orders = orders.list_orders(
-        visible, statuses=("draft", "ordered", "delivered"))
+        scope, statuses=("draft", "ordered", "delivered"))
     recent_closed = orders.list_orders(
-        visible, statuses=("installed", "cancelled"), limit=30)
+        scope, statuses=("installed", "cancelled"), limit=30)
 
     # Fill each card with the customer display name and the resolved
     # supply record so the template can render a "reorder" link even
@@ -55,6 +78,11 @@ async def orders_board(request: Request):
 
     grouped = orders.group_by_status(active_orders)
 
+    # Dropdown source: every customer the operator can see (not just
+    # ones with active orders) so the filter stays discoverable when
+    # a tenant is quiet.
+    customer_choices = sorted(customer_names.items(), key=lambda kv: kv[1].lower())
+
     return request.app.state.templates.TemplateResponse(
         "orders/board.html",
         {
@@ -63,6 +91,8 @@ async def orders_board(request: Request):
             "user": user,
             "grouped": grouped,
             "recent_closed": recent_closed,
+            "filter_customer":   filter_customer,
+            "customer_choices":  customer_choices,
             "info":  request.query_params.get("info", ""),
             "error": request.query_params.get("error", ""),
         },

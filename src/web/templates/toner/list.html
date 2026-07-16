@@ -376,7 +376,8 @@
     </thead>
     <tbody>
       {% for p in printers %}
-        <tr class="sev-{{ p.worst_severity }}">
+        <tr class="sev-{{ p.worst_severity }} printer-row"
+            data-search="{{ ((p.printer_name or '') ~ ' ' ~ (p.location or '') ~ ' ' ~ (p.model or '') ~ ' ' ~ (p.serial_number or '') ~ ' ' ~ (p.vendor or '') ~ ' ' ~ (p.asset_tag or '') ~ ' ' ~ (p.notes or '') ~ ' ' ~ (p.customer_name or '') ~ ' ' ~ (p.group_name or ''))|lower }}">
           <td>
             <div class="printer-cell">
               <img src="/assets/printers/{{ p.icon_key }}.svg" alt="" width="28" height="28">
@@ -447,4 +448,6 @@
     {% endif %}
   </div>
 {% endif %}
+
+{% include 'toner/_live_search.html' %}
 {% endblock %}
