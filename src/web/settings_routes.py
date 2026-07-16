@@ -365,6 +365,47 @@ async def settings_entra_save(request: Request):
     return RedirectResponse("/settings?info=entra_saved#entra", status_code=303)
 
 
+@router.post("/settings/llm/models", include_in_schema=False)
+async def settings_llm_models(request: Request):
+    """v0.19.0 — probe the LLM provider for its model list so the
+    admin can pick from a real dropdown instead of typing a model
+    identifier from memory (and getting a 404 at first use).
+
+    Called via JS from settings/index.html after the admin picks a
+    provider and enters an api_key. Uses the freshly-typed key even
+    if the settings haven't been saved yet — otherwise the admin
+    would have to save+refresh+edit to see the list."""
+    auth.require_admin(request)
+    form = await request.form()
+    provider = (form.get("provider") or "").strip().lower()
+    api_key  = (form.get("api_key") or "").strip()
+    endpoint = (form.get("endpoint") or "").strip()
+    azure_api_version = (form.get("azure_api_version") or "2024-06-01").strip()
+
+    # If the admin left api_key blank (e.g. "keep existing"), fall
+    # back to whatever's stored so they don't have to re-enter it.
+    if not api_key:
+        stored = llm_client.load_config()
+        if stored.get("provider") == provider and stored.get("api_key"):
+            api_key = stored["api_key"]
+        if not endpoint and stored.get("endpoint"):
+            endpoint = stored["endpoint"]
+
+    try:
+        models = llm_client.list_models(
+            provider, api_key=api_key, endpoint=endpoint,
+            azure_api_version=azure_api_version)
+    except llm_client.ModelListError as e:
+        return JSONResponse({"ok": False, "error": str(e)[:300]},
+                             status_code=400)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(
+            {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"},
+            status_code=500)
+    return JSONResponse({"ok": True, "provider": provider,
+                          "models": models})
+
+
 @router.post("/settings/llm", include_in_schema=False)
 async def settings_llm_save(request: Request):
     admin = auth.require_admin(request)

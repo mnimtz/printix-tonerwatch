@@ -358,3 +358,130 @@ def _chat_ollama(system: str, user: str, cfg: dict[str, Any],
         text=text, model=model, provider="ollama",
         usage={"total_duration": data.get("total_duration")},
     )
+
+
+# ---------------------------------------------------------------------------
+# Model discovery — v0.19.0
+# ---------------------------------------------------------------------------
+
+class ModelListError(Exception):
+    """Provider-side error while fetching the model list. Callers
+    downgrade to a free-text input rather than blocking config."""
+
+
+def list_models(provider: str, *, api_key: str = "", endpoint: str = "",
+                azure_api_version: str = "2024-06-01",
+                timeout: float = 8.0) -> list[str]:
+    """Fetch the model IDs a provider exposes for the supplied key.
+    Returns a curated (sorted, deduped, chat-only-ish) list. Raises
+    ModelListError on any provider-side failure — the settings UI
+    catches that and falls back to the free-text model field."""
+    provider = (provider or "").strip().lower()
+    api_key = (api_key or "").strip()
+    endpoint = (endpoint or "").strip().rstrip("/")
+
+    if provider == "openai":
+        if not api_key:
+            raise ModelListError("api_key required")
+        return _fetch_openai_models(api_key, timeout)
+    if provider == "azure_openai":
+        if not (api_key and endpoint):
+            raise ModelListError("api_key + endpoint required for Azure OpenAI")
+        return _fetch_azure_openai_deployments(
+            endpoint, api_key, azure_api_version, timeout)
+    if provider == "gemini":
+        if not api_key:
+            raise ModelListError("api_key required")
+        return _fetch_gemini_models(api_key, timeout)
+    if provider == "anthropic":
+        if not api_key:
+            raise ModelListError("api_key required")
+        return _fetch_anthropic_models(api_key, timeout)
+    if provider == "ollama":
+        return _fetch_ollama_models(endpoint or "http://localhost:11434",
+                                     timeout)
+    raise ModelListError(f"unknown provider: {provider}")
+
+
+def _fetch_openai_models(api_key: str, timeout: float) -> list[str]:
+    try:
+        r = httpx.get("https://api.openai.com/v1/models",
+                       headers={"Authorization": f"Bearer {api_key}"},
+                       timeout=timeout)
+    except httpx.HTTPError as e:
+        raise ModelListError(f"openai: {e.__class__.__name__}: {e}") from e
+    if r.status_code >= 400:
+        raise ModelListError(f"openai: HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    ids = [m.get("id", "") for m in data.get("data", [])]
+    # OpenAI dumps every embedding + tts + moderation + whisper model
+    # into /v1/models. Prefilter to chat/completion families so the
+    # dropdown isn't a wall of noise.
+    chat = [i for i in ids if any(
+        i.startswith(p) for p in ("gpt-", "o1", "o3", "o4", "chatgpt-"))]
+    return sorted(set(chat))
+
+
+def _fetch_azure_openai_deployments(endpoint: str, api_key: str,
+                                     api_version: str,
+                                     timeout: float) -> list[str]:
+    # Azure OpenAI addresses deployments by NAME, not model id.
+    url = f"{endpoint}/openai/deployments?api-version={api_version}"
+    try:
+        r = httpx.get(url, headers={"api-key": api_key}, timeout=timeout)
+    except httpx.HTTPError as e:
+        raise ModelListError(f"azure: {e.__class__.__name__}: {e}") from e
+    if r.status_code >= 400:
+        raise ModelListError(f"azure: HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    names = [d.get("id") or d.get("name") for d in data.get("data", [])]
+    return sorted(set(n for n in names if n))
+
+
+def _fetch_gemini_models(api_key: str, timeout: float) -> list[str]:
+    url = ("https://generativelanguage.googleapis.com/v1beta/models"
+           f"?key={api_key}")
+    try:
+        r = httpx.get(url, timeout=timeout)
+    except httpx.HTTPError as e:
+        raise ModelListError(f"gemini: {e.__class__.__name__}: {e}") from e
+    if r.status_code >= 400:
+        raise ModelListError(f"gemini: HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    ids = []
+    for m in data.get("models", []):
+        # Only models that support generateContent — skip embedders.
+        if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+            continue
+        name = (m.get("name") or "").split("/", 1)[-1]  # strip "models/"
+        if name:
+            ids.append(name)
+    return sorted(set(ids))
+
+
+def _fetch_anthropic_models(api_key: str, timeout: float) -> list[str]:
+    try:
+        r = httpx.get(
+            "https://api.anthropic.com/v1/models",
+            headers={"x-api-key": api_key,
+                     "anthropic-version": "2023-06-01"},
+            timeout=timeout)
+    except httpx.HTTPError as e:
+        raise ModelListError(f"anthropic: {e.__class__.__name__}: {e}") from e
+    if r.status_code >= 400:
+        raise ModelListError(f"anthropic: HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    ids = [m.get("id", "") for m in data.get("data", [])]
+    return sorted(set(i for i in ids if i))
+
+
+def _fetch_ollama_models(endpoint: str, timeout: float) -> list[str]:
+    try:
+        r = httpx.get(f"{endpoint}/api/tags", timeout=timeout)
+    except httpx.HTTPError as e:
+        raise ModelListError(f"ollama: {e.__class__.__name__}: {e}") from e
+    if r.status_code >= 400:
+        raise ModelListError(f"ollama: HTTP {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    ids = [m.get("name", "") for m in data.get("models", [])]
+    return sorted(set(i for i in ids if i))

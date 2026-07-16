@@ -58,14 +58,65 @@ async def dashboard(request: Request):
 
     # Recent audit events (across all customers the user can see; admins
     # see everything).
+    # v0.19.0 — LEFT JOIN users so the template can say "Marcus" instead
+    # of "user_id=1", and (best-effort) resolve customer/user target_ids
+    # into readable names.
+    from ..db import users as _users_tbl, customers as _customers_tbl
+    from sqlalchemy import select as _select
+    recent_events: list[dict] = []
     with db.get_conn() as conn:
-        recent = conn.execute(
-            select(audit_log.c.action, audit_log.c.created_at,
-                   audit_log.c.target_type, audit_log.c.target_id,
-                   audit_log.c.user_id)
+        raw_events = conn.execute(
+            _select(
+                audit_log.c.action, audit_log.c.created_at,
+                audit_log.c.target_type, audit_log.c.target_id,
+                audit_log.c.user_id, audit_log.c.meta_json,
+                _users_tbl.c.name.label("actor_name"),
+                _users_tbl.c.email.label("actor_email"),
+            )
+            .select_from(
+                audit_log.outerjoin(
+                    _users_tbl, _users_tbl.c.id == audit_log.c.user_id))
             .order_by(desc(audit_log.c.created_at))
             .limit(10)
         ).all()
+        cust_cache: dict[int, str] = {}
+        user_cache: dict[int, str] = {}
+        for r in raw_events:
+            row = dict(r._mapping)
+            # Resolve target_id to a human label for the two most common
+            # target types. Keeps the SELECT above dialect-portable.
+            label = ""
+            if row["target_type"] == "customer" and row["target_id"]:
+                try:
+                    cid = int(row["target_id"])
+                except (TypeError, ValueError):
+                    cid = 0
+                if cid:
+                    if cid not in cust_cache:
+                        cust_row = conn.execute(
+                            _select(_customers_tbl.c.name)
+                            .where(_customers_tbl.c.id == cid)
+                        ).first()
+                        cust_cache[cid] = cust_row.name if cust_row else ""
+                    label = cust_cache[cid]
+            elif row["target_type"] == "user" and row["target_id"]:
+                try:
+                    uid = int(row["target_id"])
+                except (TypeError, ValueError):
+                    uid = 0
+                if uid:
+                    if uid not in user_cache:
+                        u_row = conn.execute(
+                            _select(_users_tbl.c.name, _users_tbl.c.email)
+                            .where(_users_tbl.c.id == uid)
+                        ).first()
+                        user_cache[uid] = (u_row.name or u_row.email
+                                            if u_row else "")
+                    label = user_cache[uid]
+            row["target_label"] = label or row["target_id"] or ""
+            row["actor_display"] = (row["actor_name"] or row["actor_email"]
+                                     or "system")
+            recent_events.append(row)
 
     templates = request.app.state.templates
     return templates.TemplateResponse(
@@ -82,6 +133,6 @@ async def dashboard(request: Request):
                 "unknown":   unknown_count,
             },
             "per_customer": per_customer_stats,
-            "recent_events": [dict(r._mapping) for r in recent],
+            "recent_events": recent_events,
         },
     )

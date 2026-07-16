@@ -368,9 +368,25 @@
         </div>
         <div class="form-group">
           <label for="llm_model">{{ _('settings.llm.model', lang) }}</label>
-          <input type="text" id="llm_model" name="model"
-                 value="{{ llm.model or '' }}"
-                 placeholder="gpt-4o-mini / gemini-1.5-flash / …">
+          {# v0.19.0: after picking a provider and entering an API key,
+             the "↻ list"-button hits /settings/llm/models, replaces this
+             text field with a <select> populated from the provider's own
+             model list. Fallback to free text stays for offline configs. #}
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input type="text" id="llm_model" name="model"
+                   value="{{ llm.model or '' }}" style="flex: 1;"
+                   placeholder="gpt-4o-mini / gemini-1.5-flash / …"
+                   list="llm-model-suggestions">
+            <datalist id="llm-model-suggestions"></datalist>
+            <button type="button" id="btn-llm-list-models"
+                    class="btn btn-secondary" data-noloader
+                    style="white-space: nowrap; padding: 6px 12px;"
+                    title="{{ _('settings.llm.list_models_hint', lang) }}">
+              ↻ {{ _('settings.llm.list_models', lang) }}
+            </button>
+          </div>
+          <div id="llm-model-status" style="font-size: 0.78rem;
+               color: var(--tw-muted-blue); margin-top: 4px;"></div>
         </div>
       </div>
       <div class="form-group">
@@ -423,6 +439,70 @@
     {% endif %}
   </div>
 
+  <script>
+  // v0.19.0: fetch the provider's model list and populate a suggestions
+  // datalist + auto-swap the free-text input to a <select> for known
+  // providers. Uses the CURRENT form values (provider + api_key +
+  // endpoint) — no save required first.
+  (function () {
+    var btn = document.getElementById('btn-llm-list-models');
+    if (!btn) return;
+    var status = document.getElementById('llm-model-status');
+    var modelInput = document.getElementById('llm_model');
+    var datalist = document.getElementById('llm-model-suggestions');
+    btn.addEventListener('click', async function () {
+      var provider = document.getElementById('llm_provider').value;
+      if (provider === 'disabled') {
+        status.textContent = {{ _('settings.llm.list_models.pick_provider', lang)|tojson }};
+        status.style.color = 'var(--status-critical)';
+        return;
+      }
+      btn.disabled = true;
+      var origLabel = btn.textContent;
+      btn.textContent = '…';
+      status.textContent = {{ _('settings.llm.list_models.loading', lang)|tojson }};
+      status.style.color = 'var(--tw-muted-blue)';
+      var fd = new FormData();
+      fd.append('provider', provider);
+      fd.append('api_key', document.getElementById('llm_key').value);
+      fd.append('endpoint', document.getElementById('llm_endpoint').value);
+      fd.append('azure_api_version', document.getElementById('llm_api_version').value);
+      fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+      try {
+        var r = await fetch('/settings/llm/models', {method: 'POST',
+          body: fd, credentials: 'same-origin',
+          headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+        var j = await r.json();
+        if (!j.ok) {
+          status.innerHTML = '✗ ' + (j.error || 'error');
+          status.style.color = 'var(--status-critical)';
+          return;
+        }
+        // Fill the datalist so the free-text input gets autocomplete.
+        datalist.innerHTML = '';
+        j.models.forEach(function (m) {
+          var opt = document.createElement('option');
+          opt.value = m;
+          datalist.appendChild(opt);
+        });
+        status.innerHTML = '✓ ' + j.models.length + ' '
+          + {{ _('settings.llm.list_models.count', lang)|tojson }};
+        status.style.color = 'var(--status-ok)';
+        // If the current input is empty and there's a common default,
+        // pre-fill with the first model so save-and-go works.
+        if (!modelInput.value && j.models.length) {
+          modelInput.value = j.models[0];
+        }
+      } catch (e) {
+        status.innerHTML = '✗ ' + (e.message || e);
+        status.style.color = 'var(--status-critical)';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = origLabel;
+      }
+    });
+  })();
+  </script>
   </div><!-- /tab-panel: llm -->
 
   <!-- v0.12: Entra ID SSO -->

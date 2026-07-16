@@ -215,22 +215,99 @@
 
 <!-- Recent activity -->
 {% if recent_events %}
+  {# v0.19.0: readable activity feed — icon + natural-language sentence
+     + relative time. Falls back gracefully for actions with no i18n key. #}
+  {% set _icons = {
+      'settings': '⚙',
+      'user':     '👤',
+      'customer': '🏢',
+      'toner':    '🖨',
+      'order':    '📦',
+      'supply':   '🛒',
+      'auth':     '🔐',
+      'backup':   '💾',
+      'restore':  '♻',
+  } %}
   <div class="activity">
     <h3 style="margin-bottom: var(--sp-3);">
       {{ _('dashboard.recent_activity', lang) }}
     </h3>
     <ul>
       {% for e in recent_events %}
-        <li>
-          <span><code>{{ e.action }}</code>
-            {% if e.target_type %}
-              → {{ e.target_type }}:{{ e.target_id }}
+        {% set _prefix = (e.action.split('.')[0] if '.' in e.action else e.action) %}
+        {% set _icon = _icons.get(_prefix, '•') %}
+        {% set _msg_key = 'activity.' + e.action %}
+        {% set _msg = _(_msg_key, lang) %}
+        {# v0.19.0: for login/logout actions, the user IS the target,
+           so skip the redundant target label. Also strip when the
+           target_id equals the actor's own name. #}
+        {% set _skip_target = (e.action.startswith('user.login')
+                                or e.action == 'user.logout'
+                                or e.target_label == e.actor_display) %}
+        <li style="display: flex; align-items: center;
+                   gap: var(--sp-3); padding: 10px 0;">
+          <span style="font-size: 1.05rem; width: 22px; text-align: center;">
+            {{ _icon }}
+          </span>
+          <span style="flex: 1; font-size: 0.9rem; line-height: 1.4;">
+            <strong style="color: var(--tw-primary);">{{ e.actor_display }}</strong>
+            {% if _msg != _msg_key %}
+              {{ _msg }}
+              {% if e.target_label and not _skip_target %}
+                <span style="color: var(--tw-primary); font-weight: 600;">{{ e.target_label }}</span>
+              {% endif %}
+            {% else %}
+              <code style="font-size: 0.78rem;">{{ e.action }}</code>
+              {% if e.target_label and not _skip_target %}→ {{ e.target_label }}{% endif %}
             {% endif %}
           </span>
-          <time>{{ e.created_at }}</time>
+          <time datetime="{{ e.created_at }}" data-relative
+                style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                       white-space: nowrap;">
+            {{ e.created_at }}
+          </time>
         </li>
       {% endfor %}
     </ul>
   </div>
+
+  <script>
+  // v0.19.0 — hydrate <time data-relative> into "2 min ago" style.
+  (function () {
+    var STR = {
+      s: {{ _('activity.rel.sec', lang)|tojson }},
+      m: {{ _('activity.rel.min', lang)|tojson }},
+      h: {{ _('activity.rel.hour', lang)|tojson }},
+      d: {{ _('activity.rel.day', lang)|tojson }},
+      just_now: {{ _('activity.rel.just_now', lang)|tojson }},
+      ago:        {{ _('activity.rel.ago', lang)|tojson }},
+      ago_prefix: {{ _('activity.rel.ago_prefix', lang)|tojson }}
+    };
+    function fmt(n, unit) {
+      // "ago" style keys use "prefix N unit suffix" so DE can prefix
+      // "vor" and EN can suffix "ago" without hand-rolling a translation
+      // string per bucket.
+      var parts = [STR.ago_prefix, String(n), unit, STR.ago].filter(Boolean);
+      return parts.join(' ');
+    }
+    function rel(iso) {
+      var d = new Date(iso.indexOf('T') === -1 ? iso.replace(' ', 'T') + 'Z' : iso);
+      if (isNaN(d)) return iso;
+      var secs = Math.max(0, (Date.now() - d.getTime()) / 1000);
+      if (secs < 45) return STR.just_now;
+      var mins = Math.round(secs / 60);
+      if (mins < 60) return fmt(mins, STR.m);
+      var hours = Math.round(mins / 60);
+      if (hours < 24) return fmt(hours, STR.h);
+      var days = Math.round(hours / 24);
+      return fmt(days, STR.d);
+    }
+    document.querySelectorAll('time[data-relative]').forEach(function (t) {
+      var iso = t.getAttribute('datetime') || t.textContent.trim();
+      t.title = iso;
+      t.textContent = rel(iso);
+    });
+  })();
+  </script>
 {% endif %}
 {% endblock %}
