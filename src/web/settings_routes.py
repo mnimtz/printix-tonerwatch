@@ -174,6 +174,51 @@ async def entra_autosetup_start(request: Request):
     })
 
 
+@router.post("/settings/entra/autosetup/rotate_secret", include_in_schema=False)
+async def entra_autosetup_rotate_secret(request: Request):
+    """v0.23.4 — mint a new client_secret on the EXISTING app
+    registration (rather than creating a whole new orphan app the way
+    /replace does). Uses the access_token from the device-code poll
+    that put us on the "existing_found" panel, and the object_id
+    from the form (populated by the JS from the existing[0] result).
+    Only the client_secret in the entra_sso settings row changes —
+    tenant_id, client_id, redirect_uri, provisioning flags are
+    preserved."""
+    admin = auth.require_admin(request)
+    try:
+        access_token = request.session.pop("entra_setup_access_token", "")
+    except AssertionError:
+        access_token = ""
+    if not access_token:
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": "no_access_token_in_session"},
+                             status_code=400)
+    form = await request.form()
+    object_id = (form.get("object_id") or "").strip()
+    if not object_id:
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": "object_id required"},
+                             status_code=400)
+    try:
+        rot = entra_sso.rotate_client_secret(access_token, object_id)
+    except entra_sso.EntraSSOError as e:
+        db.audit(admin["id"], "settings.entra_secret_rotate_failed",
+                 target_type="settings", target_id="entra_sso",
+                 meta_json=json.dumps({"error": str(e)[:300]}))
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": str(e)[:400]}, status_code=500)
+    # Merge into existing config: only replace client_secret.
+    cfg = entra_sso.load_config()
+    cfg["client_secret"] = rot["client_secret"]
+    entra_sso.save_config(cfg)
+    db.audit(admin["id"], "settings.entra_secret_rotated",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({"object_id": object_id,
+                                    "expires_at": rot["secret_expires_at"]}))
+    return JSONResponse({"ok": True, "status": "done",
+                          "secret_expires_at": rot["secret_expires_at"]})
+
+
 @router.post("/settings/entra/autosetup/replace", include_in_schema=False)
 async def entra_autosetup_replace(request: Request):
     """v0.17.2: admin saw existing apps in the "existing_found"

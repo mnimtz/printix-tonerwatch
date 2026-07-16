@@ -518,6 +518,36 @@ def find_existing_apps(access_token: str, app_name: str) -> list[dict[str, Any]]
     return list(r.json().get("value", []))
 
 
+def rotate_client_secret(access_token: str, object_id: str,
+                          app_name: str = "TonerWatch (rotated)"
+                          ) -> dict[str, Any]:
+    """v0.23.4 — mint a fresh client_secret on an EXISTING App
+    registration. Doesn't touch redirect URIs, consent, or
+    permissions — the whole point is that the app's identity + its
+    granted permissions carry over, only the secret changes. Used by
+    the "🔑 Rotate secret only" button when Auto-Setup's
+    existing_found panel fires."""
+    import httpx as _httpx
+    h = _graph(access_token)
+    try:
+        r = _httpx.post(
+            f"{_GRAPH_URL}/applications/{object_id}/addPassword",
+            headers=h,
+            json={"passwordCredential": {"displayName": app_name}},
+            timeout=15.0)
+    except _httpx.HTTPError as e:
+        raise EntraSSOError(f"Graph addPassword: {e}") from e
+    if r.status_code not in (200, 201):
+        raise EntraSSOError(
+            f"Secret rotation failed: HTTP {r.status_code}: {r.text[:200]}")
+    sec = r.json()
+    return {
+        "client_secret":     sec.get("secretText", ""),
+        "secret_expires_at": sec.get("endDateTime", ""),
+        "object_id":         object_id,
+    }
+
+
 def auto_register_app(
     access_token: str, redirect_uri: str,
     app_name: str = "Printix TonerWatch",

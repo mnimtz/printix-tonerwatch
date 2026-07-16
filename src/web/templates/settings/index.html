@@ -1173,13 +1173,56 @@
           '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Redirect URIs</th>' +
           '</tr></thead><tbody>' + rows + '</tbody></table>' +
           '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<button type="button" class="btn btn-primary" id="btn-entra-create-anyway" data-noloader>➕ ' +
+          // v0.23.4: recommended path is to rotate the secret on the
+          // existing app — avoids orphan app registrations and the
+          // "Reconfigure loop" that Marcus hit repeatedly.
+          '<button type="button" class="btn btn-primary" id="btn-entra-rotate-secret" data-noloader>🔑 ' +
+             {{ _('settings.entra.autosetup.rotate_secret', lang)|tojson }} + '</button>' +
+          '<button type="button" class="btn btn-secondary" id="btn-entra-create-anyway" data-noloader>➕ ' +
              {{ _('settings.entra.autosetup.create_anyway', lang)|tojson }} + '</button>' +
           '<button type="button" class="btn btn-secondary" onclick="location.reload()" data-noloader>' +
              {{ _('common.cancel', lang)|tojson }} + '</button>' +
+          '</div>' +
+          '<div style="margin-top:8px;font-size:0.78rem;opacity:0.8;">' +
+             {{ _('settings.entra.autosetup.rotate_secret.hint', lang)|tojson }} +
           '</div></div>');
-        // Wire the "create anyway" button — hits the replace endpoint
-        // which reuses the access-token stashed in the session
+        // v0.23.4: wire the "🔑 Rotate secret only" button — the safe
+        // path that keeps the app + its permissions, only mints a
+        // fresh client_secret on it.
+        var btnRot = document.getElementById('btn-entra-rotate-secret');
+        if (btnRot) {
+          btnRot.addEventListener('click', async function() {
+            btnRot.disabled = true;
+            show('<div style="color: var(--tw-muted-blue);">' +
+                 {{ _('settings.entra.autosetup.rotating', lang)|tojson }} + '</div>');
+            try {
+              var firstApp = (j.existing || [])[0] || {};
+              var fd = new FormData();
+              fd.append('object_id', firstApp.id || '');
+              fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+              var r2 = await fetch('/settings/entra/autosetup/rotate_secret', {
+                method:'POST', credentials:'same-origin', body: fd,
+                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+              var j2 = await r2.json();
+              if (j2.status === 'done') {
+                show(
+                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
+                        'border-radius: var(--r); color: #065F46;">' +
+                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
+                     {{ _('settings.entra.autosetup.secret_rotated', lang)|tojson }} +
+                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
+                        'border-radius: 4px; font-size: 0.78rem;">' +
+                     'secret_expires_at: ' + esc(j2.secret_expires_at) +
+                  '</pre></div>');
+                setTimeout(function() { location.reload(); }, 2500);
+              } else {
+                show('<div style="color:#991B1B;">✗ ' + esc(j2.error || 'error') + '</div>');
+              }
+            } catch (e) {
+              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+            }
+          });
+        }
         var btn2 = document.getElementById('btn-entra-create-anyway');
         if (btn2) {
           btn2.addEventListener('click', async function() {
