@@ -88,6 +88,16 @@ async def settings_database_test(request: Request):
          "database_url_masked": db._mask_password(url)})
 
 
+@router.get("/settings/mail/graph/auth_probe", include_in_schema=False)
+async def settings_mail_graph_auth_probe(request: Request):
+    """v0.23.3 — non-destructive Graph client-credentials sanity check.
+    Runs one POST /oauth2/v2.0/token, reports success or an actionable
+    AADSTS diagnosis. Admin-only. Never sends mail."""
+    auth.require_admin(request)
+    result = mail_client.graph_auth_probe()
+    return JSONResponse(result, status_code=(200 if result.get("ok") else 400))
+
+
 @router.get("/settings/mail/graph/mailboxes", include_in_schema=False)
 async def settings_mail_graph_mailboxes(request: Request):
     """v0.22.0 — populate the sender-mailbox dropdown for the Graph

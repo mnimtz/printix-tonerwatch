@@ -307,8 +307,31 @@ def _send_graph(recipients: list[str], subject: str,
     except httpx.HTTPError as e:
         raise MailSendError(f"Graph token endpoint: {e}") from e
     if r.status_code >= 400:
+        # v0.23.3 — the four "silent misconfig" token errors get a
+        # tailored hint. Anything else falls back to the raw error text.
+        raw = r.text or ""
+        hint = ""
+        if "AADSTS7000215" in raw:
+            hint = (" — the stored client_secret is wrong. Two common "
+                    "causes: (a) you pasted the Secret ID instead of "
+                    "the Secret VALUE (Azure shows both on the "
+                    "Certificates & secrets page — the Value is the "
+                    "long string, only visible ONCE right after "
+                    "creation); (b) the Auto-Setup-generated secret "
+                    "expired. Fix: click 'Reconfigure' on Settings → "
+                    "Entra ID to mint a fresh secret via Auto-Setup.")
+        elif "AADSTS700016" in raw:
+            hint = (" — the client_id doesn't exist in this tenant. "
+                    "Check tenant_id + client_id under Settings → "
+                    "Entra ID → Diagnose.")
+        elif "AADSTS90002" in raw:
+            hint = (" — tenant not found. Check tenant_id.")
+        elif "AADSTS7000222" in raw:
+            hint = (" — the client secret expired. Rotate it in Azure "
+                    "Portal → Certificates & secrets, or click "
+                    "'Reconfigure' on Settings → Entra ID.")
         raise MailSendError(
-            f"Graph token HTTP {r.status_code}: {r.text[:200]}")
+            f"Graph token HTTP {r.status_code}: {raw[:300]}{hint}")
     token = r.json().get("access_token", "")
     if not token:
         raise MailSendError("Graph token response had no access_token")
@@ -363,6 +386,56 @@ def _send_graph(recipients: list[str], subject: str,
                  len(to_recipients), mailbox_upn)
     # sendMail returns 202 Accepted with no body / no message-id.
     return f"graph:{mailbox_upn}"
+
+
+def graph_auth_probe() -> dict:
+    """v0.23.3 — do JUST the client-credentials token step, no mail.
+    Returns::
+
+        {"ok": True,  "token_len": 1234, "expires_in": 3599}
+        {"ok": False, "status": 401, "error": "AADSTS7000215: …", "hint": "…"}
+
+    Lets the Settings page verify tenant_id + client_id +
+    client_secret without needing Mail.Send permission first."""
+    from . import entra_sso as _sso
+    entra = _sso.load_config()
+    tenant_id     = (entra.get("tenant_id") or "").strip()
+    client_id     = (entra.get("client_id") or "").strip()
+    client_secret = (entra.get("client_secret") or "").strip()
+    if not (tenant_id and client_id and client_secret):
+        return {"ok": False, "status": 0,
+                "error": "Entra ID isn't configured yet — set it up "
+                          "under Settings → Entra ID first.",
+                "hint": "auto_setup_required"}
+    try:
+        r = httpx.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+            data={"client_id": client_id, "client_secret": client_secret,
+                  "scope": "https://graph.microsoft.com/.default",
+                  "grant_type": "client_credentials"}, timeout=15.0)
+    except httpx.HTTPError as e:
+        return {"ok": False, "status": 0,
+                "error": f"{type(e).__name__}: {e}",
+                "hint": "network"}
+    if r.status_code >= 400:
+        raw = r.text or ""
+        # Parse-friendly hint the JS can key off to render an actionable
+        # button ("Open Reconfigure" vs "Open Diagnose").
+        hint = "unknown"
+        if "AADSTS7000215" in raw or "AADSTS7000222" in raw:
+            hint = "secret_wrong_or_expired"
+        elif "AADSTS700016" in raw:
+            hint = "client_id_wrong"
+        elif "AADSTS90002" in raw:
+            hint = "tenant_wrong"
+        return {"ok": False, "status": r.status_code,
+                "error": raw[:400], "hint": hint}
+    token = r.json().get("access_token", "")
+    if not token:
+        return {"ok": False, "status": r.status_code,
+                "error": "response had no access_token", "hint": "unknown"}
+    return {"ok": True, "token_len": len(token),
+            "expires_in": r.json().get("expires_in", 0)}
 
 
 def list_graph_mailboxes(cfg: dict | None = None) -> list[dict]:

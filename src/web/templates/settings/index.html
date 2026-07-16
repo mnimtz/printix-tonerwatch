@@ -235,6 +235,23 @@
           </div>
         </div>
 
+        {# v0.23.3 — probe the client-credentials token flow BEFORE
+           trying to send mail. Diagnoses the 4 common AADSTS misconfigs. #}
+        <div class="form-group" style="margin-bottom: var(--sp-3);">
+          <label>{{ _('settings.mail.graph_authtest.label', lang) }}</label>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button type="button" id="btn-graph-auth-probe"
+                    class="btn btn-secondary" data-noloader
+                    style="padding: 6px 12px;">
+              🔐 {{ _('settings.mail.graph_authtest.button', lang) }}
+            </button>
+            <span id="graph-auth-status" style="font-size: 0.85rem;
+                  color: var(--tw-muted-blue);">
+              {{ _('settings.mail.graph_authtest.hint', lang) }}
+            </span>
+          </div>
+        </div>
+
         <div class="form-group" style="margin-bottom: var(--sp-3);">
           <label for="graph_mailbox_upn">{{ _('settings.mail.graph_mailbox_upn', lang) }}</label>
           <div style="display: flex; gap: 6px; align-items: center;">
@@ -257,6 +274,46 @@
       </div>
 
       <script>
+      // v0.23.3 — probe the client-credentials token flow.
+      (function () {
+        var btn = document.getElementById('btn-graph-auth-probe');
+        if (!btn) return;
+        var status = document.getElementById('graph-auth-status');
+        btn.addEventListener('click', async function () {
+          btn.disabled = true;
+          status.textContent = {{ _('settings.mail.graph_authtest.loading', lang)|tojson }};
+          status.style.color = 'var(--tw-muted-blue)';
+          try {
+            var r = await fetch('/settings/mail/graph/auth_probe',
+              {credentials: 'same-origin'});
+            var j = await r.json();
+            if (j.ok) {
+              status.innerHTML = '✓ ' + {{ _('settings.mail.graph_authtest.ok', lang)|tojson }}
+                + ' (' + j.expires_in + 's)';
+              status.style.color = 'var(--status-ok)';
+            } else {
+              var hint = '';
+              if (j.hint === 'secret_wrong_or_expired') {
+                hint = ' — ' + {{ _('settings.mail.graph_authtest.hint.secret', lang)|tojson }};
+              } else if (j.hint === 'client_id_wrong') {
+                hint = ' — ' + {{ _('settings.mail.graph_authtest.hint.client_id', lang)|tojson }};
+              } else if (j.hint === 'tenant_wrong') {
+                hint = ' — ' + {{ _('settings.mail.graph_authtest.hint.tenant', lang)|tojson }};
+              } else if (j.hint === 'auto_setup_required') {
+                hint = ' — ' + {{ _('settings.mail.graph_authtest.hint.setup', lang)|tojson }};
+              }
+              status.innerHTML = '✗ ' + (j.error || 'error').slice(0, 300) + hint;
+              status.style.color = 'var(--status-critical)';
+            }
+          } catch (e) {
+            status.innerHTML = '✗ ' + (e.message || e);
+            status.style.color = 'var(--status-critical)';
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      })();
+
       // v0.22.0 — populate the Graph mailbox datalist from a live
       // Graph query when the admin clicks "↻ list". Reuses the Entra
       // SSO client_id/secret; needs User.Read.All application grant.
