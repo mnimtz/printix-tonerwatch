@@ -39,6 +39,23 @@ logger = logging.getLogger(__name__)
 
 SETTINGS_KEY = "llm"
 
+
+def _safe_int(v, default: int, lo: int, hi: int) -> int:
+    """v0.17.2: form values arrive as strings — clamp instead of crash."""
+    try:
+        i = int(v) if v not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, i))
+
+
+def _safe_float(v, default: float, lo: float, hi: float) -> float:
+    try:
+        f = float(v) if v not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, f))
+
 PROVIDERS = ("disabled", "openai", "azure_openai", "gemini",
              "anthropic", "ollama")
 
@@ -103,8 +120,8 @@ def save_config(cfg: dict[str, Any]) -> None:
         "model":             (cfg.get("model") or "").strip(),
         "endpoint":          (cfg.get("endpoint") or "").strip(),
         "azure_api_version": (cfg.get("azure_api_version") or "2024-06-01").strip(),
-        "temperature":       float(cfg.get("temperature") or 0.2),
-        "max_tokens":        int(cfg.get("max_tokens") or 512),
+        "temperature":       _safe_float(cfg.get("temperature"), 0.2, 0.0, 2.0),
+        "max_tokens":        _safe_int(cfg.get("max_tokens"), 512, 16, 16384),
     }
     key = cfg.get("api_key") or ""
     if key:

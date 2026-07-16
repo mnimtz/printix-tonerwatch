@@ -181,12 +181,28 @@ def create_draft_if_none(
     """Idempotent draft creation: (order_id, created). If an active
     order already exists for the slot, returns its id + False. Used by
     the alert runner so a stuck printer doesn't spawn one draft per
-    poll tick."""
+    poll tick.
+
+    v0.17.2: check-then-insert isn't atomic — if a manual
+    /customers/{id}/alerts/run collides with the scheduler tick,
+    both see no active order, both call create_draft, second insert
+    violates the partial unique index. Catch that and re-query
+    instead of surfacing a 500.
+    """
+    from sqlalchemy.exc import IntegrityError as _IE
     existing = active_order_for(customer_id, printer_id, color)
     if existing is not None:
         return existing["id"], False
-    return create_draft(customer_id, printer_id, printer_name, color,
-                        sku=sku, quantity=quantity), True
+    try:
+        oid = create_draft(customer_id, printer_id, printer_name, color,
+                           sku=sku, quantity=quantity)
+    except _IE:
+        # Race: the other caller committed first. Re-query.
+        existing = active_order_for(customer_id, printer_id, color)
+        if existing is not None:
+            return existing["id"], False
+        raise
+    return oid, True
 
 
 def transition(

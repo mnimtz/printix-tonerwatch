@@ -156,6 +156,22 @@ async def toner_grid(request: Request):
     filter_severity = q.get("severity", "")
     filter_group    = q.get("group", "")
     filter_search   = q.get("q", "").strip().lower()
+    # v0.17.2: opt-in grouping — printers get partitioned into
+    # sections by group_name (all "" go into a single "Ungrouped"
+    # section). Toggle sits next to the view-toggle and persists
+    # in the session so a reload keeps the operator's choice.
+    group_by_raw = q.get("group_by", "")
+    if group_by_raw in ("1", "0"):
+        group_by = (group_by_raw == "1")
+        try:
+            request.session["toner_group_by"] = "1" if group_by else "0"
+        except AssertionError:
+            pass
+    else:
+        try:
+            group_by = request.session.get("toner_group_by", "0") == "1"
+        except AssertionError:
+            group_by = False
     # View mode — persist in session so page reloads / navigation keep it.
     view_mode = q.get("view", "").strip().lower()
     if view_mode in ("grid", "list"):
@@ -254,8 +270,28 @@ async def toner_grid(request: Request):
             "active_view_id":  active_view_id,
             "view_saved_flag": q.get("view_saved") == "1",
             "view_deleted_flag": q.get("view_deleted") == "1",
+            "group_by":        group_by,
+            # Buckets: [(group_name_or_None, [printer, printer, …]), …]
+            # sorted by group name (ungrouped last). Only used when
+            # group_by is True; grid.html / list.html each decide
+            # whether to render buckets or the flat list.
+            "grouped_printers": _bucket_by_group(filtered),
         },
     )
+
+
+def _bucket_by_group(printers: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Partition into [(group_name, printers), …]. Ungrouped devices
+    (empty group_name) go into a synthetic "" bucket rendered last."""
+    buckets: dict[str, list[dict]] = {}
+    for p in printers:
+        g = (p.get("group_name") or "").strip()
+        buckets.setdefault(g, []).append(p)
+    # Named groups first, alphabetically; ungrouped last
+    named = sorted((k for k in buckets if k), key=str.lower)
+    if "" in buckets:
+        named.append("")
+    return [(g, buckets[g]) for g in named]
 
 
 @router.post("/toner/refresh", include_in_schema=False)

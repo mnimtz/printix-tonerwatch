@@ -1,0 +1,106 @@
+{# One printer card. Consumes `p` from the surrounding loop plus
+   `lang`, `customer_choices`, and the `error_state_meta` /
+   `reported_state_meta` / `is_hidden_state` jinja globals. Extracted
+   in v0.17.2 so the grid can render either a flat list or one card
+   deck per group without duplicating the card body. #}
+<div class="printer-card sev-{{ p.worst_severity }}">
+  <div class="printer-header">
+    <img src="/assets/printers/{{ p.icon_key }}.svg" alt="" width="42" height="42">
+    <div class="meta">
+      <div class="name" title="{{ p.printer_name }}">
+        {{ p.printer_name or _('toner.printer.unnamed', lang) }}
+      </div>
+      <div class="sub">
+        {% if p.location %}📍 {{ p.location }}{% else %}—{% endif %}
+        {% if p.model %} · {{ p.model }}{% endif %}
+      </div>
+      {% if p.serial_number %}
+        <div class="meta-row">
+          <span><span class="k">{{ _('toner.printer.serial', lang) }}:</span>
+                <span class="v">{{ p.serial_number }}</span></span>
+        </div>
+      {% endif %}
+      {% if customer_choices|length > 1 %}
+        <a href="/toner?customer={{ p.customer_id }}"
+           class="customer-badge" style="text-decoration: none;">
+          {{ p.customer_name }}
+        </a>
+      {% endif %}
+      {% if p.group_name %}
+        <a href="/toner?group={{ p.group_name|urlencode }}"
+           class="group-badge" style="text-decoration: none;">
+          🏷 {{ p.group_name }}
+        </a>
+      {% endif %}
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <a href="/toner/{{ p.customer_id }}/{{ p.id }}/supply"
+         class="supply-edit"
+         title="{{ _('supplies.link.edit', lang) }}">
+        📦 {{ _('supplies.link.edit', lang) }}
+      </a>
+      <a href="/toner/{{ p.customer_id }}/{{ p.id }}/info"
+         class="supply-edit"
+         title="{{ _('printer_info.link.edit', lang) }}">
+        ✎ {{ _('printer_info.link.edit', lang) }}
+      </a>
+    </div>
+  </div>
+
+  <div class="toner-bars">
+    {% if p.supplies %}
+      {% for s in p.supplies %}
+        <div class="toner-bar-row {{ s.severity|lower if s.severity != 'OK' else '' }}">
+          <div class="lbl">{{ s.color }}</div>
+          <div class="toner-bar {{ s.color }}">
+            <div class="fill" style="width: {{ s.level }}%;"></div>
+          </div>
+          <div class="pct">{{ s.level }}%</div>
+          <div class="sev">
+            {% if s.severity == 'CRITICAL' %}🔴
+            {% elif s.severity == 'WARN' %}⚠
+            {% endif %}
+          </div>
+          <div>
+          {% if s.supply and s.supply.supplier_url %}
+            <a href="{{ s.supply.supplier_url }}" target="_blank" rel="noopener"
+               class="order-link" data-noloader
+               title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">🛒</a>
+          {% elif s.supply and s.supply.sku %}
+            <span class="order-link" style="cursor: help;"
+                  title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">📦</span>
+          {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div style="color: var(--tw-muted-blue); font-size: 0.85rem;
+                  padding: var(--sp-2) 0; text-align: center;">
+        {{ _('toner.printer.no_marker_data', lang) }}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if p.error_states or (p.reported_state and not is_hidden_state(p.reported_state)) %}
+    <div class="printer-footer">
+      {# printer_reported_state → nice badge (IDLE/PRINTING skipped) #}
+      {% if p.reported_state and not is_hidden_state(p.reported_state) %}
+        {% set sev, icon, tkey = reported_state_meta(p.reported_state) %}
+        <span class="status-badge sev-{{ sev }}"
+              title="{{ p.reported_state }}">
+          <span class="ico">{{ icon }}</span>
+          {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ p.reported_state }}{% endif %}
+        </span>
+      {% endif %}
+      {# detected_error_states → colored pill each #}
+      {% for e in p.error_states %}
+        {% set sev, icon, tkey = error_state_meta(e) %}
+        <span class="status-badge sev-{{ sev if tkey else 'unknown' }}"
+              title="{{ e }}">
+          <span class="ico">{{ icon }}</span>
+          {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ e }}{% endif %}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -103,6 +103,44 @@ async def entra_autosetup_start(request: Request):
     })
 
 
+@router.post("/settings/entra/autosetup/replace", include_in_schema=False)
+async def entra_autosetup_replace(request: Request):
+    """v0.17.2: admin saw existing apps in the "existing_found"
+    branch and clicked "create new anyway". Reuses the access-token
+    from the session so no second device-code login is needed."""
+    admin = auth.require_admin(request)
+    try:
+        access_token = request.session.pop("entra_setup_access_token", "")
+    except AssertionError:
+        access_token = ""
+    if not access_token:
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": "no_access_token_in_session"},
+                             status_code=400)
+    redirect_uri = f"{str(request.base_url).rstrip('/')}/auth/entra/callback"
+    try:
+        result = entra_sso.auto_register_app(
+            access_token, redirect_uri=redirect_uri,
+            app_name="Printix TonerWatch")
+    except entra_sso.EntraSSOError as e:
+        db.audit(admin["id"], "settings.entra_autosetup_failed",
+                 target_type="settings", target_id="entra_sso",
+                 meta_json=json.dumps({"error": str(e)[:300]}))
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": str(e)[:400]}, status_code=500)
+    entra_sso.apply_auto_setup_result(result, redirect_uri=redirect_uri)
+    db.audit(admin["id"], "settings.entra_autosetup_done",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps({"tenant_id": result["tenant_id"],
+                                    "client_id": result["client_id"],
+                                    "replaced_existing": True}))
+    return JSONResponse({"ok": True, "status": "done",
+                          "tenant_id": result["tenant_id"],
+                          "client_id": result["client_id"],
+                          "admin_consent": result["admin_consent"],
+                          "secret_expires_at": result["secret_expires_at"]})
+
+
 @router.post("/settings/entra/autosetup/poll", include_in_schema=False)
 async def entra_autosetup_poll(request: Request):
     """Poll Microsoft's token endpoint once. If the admin has
@@ -138,6 +176,36 @@ async def entra_autosetup_poll(request: Request):
 
     access_token = poll["access_token"]
     redirect_uri = f"{str(request.base_url).rstrip('/')}/auth/entra/callback"
+
+    # v0.17.2: refuse to blindly create a second/third/fourth App
+    # Registration named "Printix TonerWatch". If one exists, hand
+    # the decision back to the admin — usually they want to reuse
+    # the existing app (secret rotation → mint fresh) rather than
+    # accumulate orphan registrations.
+    if not (form_flag := (request.query_params.get("confirm_replace") == "1")):
+        existing = entra_sso.find_existing_apps(access_token, "Printix TonerWatch")
+        if existing:
+            # Stash the access_token so the admin's next action
+            # (replace / reuse / cancel) doesn't need to redo the
+            # device-code flow.
+            try:
+                request.session["entra_setup_access_token"] = access_token
+            except AssertionError:
+                pass
+            db.audit(admin["id"], "settings.entra_autosetup_existing_found",
+                     target_type="settings", target_id="entra_sso",
+                     meta_json=json.dumps({"count": len(existing)}))
+            return JSONResponse({
+                "ok": True, "status": "existing_found",
+                "existing": [{
+                    "id":               a.get("id"),
+                    "appId":            a.get("appId"),
+                    "displayName":      a.get("displayName"),
+                    "createdDateTime":  a.get("createdDateTime"),
+                    "redirectUris":     (a.get("web") or {}).get("redirectUris") or [],
+                } for a in existing[:10]],
+            })
+
     try:
         result = entra_sso.auto_register_app(
             access_token, redirect_uri=redirect_uri,

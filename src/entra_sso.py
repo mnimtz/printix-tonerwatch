@@ -462,6 +462,35 @@ def _graph(access_token: str) -> dict[str, str]:
             "Content-Type":  "application/json"}
 
 
+def find_existing_apps(access_token: str, app_name: str) -> list[dict[str, Any]]:
+    """v0.17.2: check whether an App Registration with our display
+    name already exists in the target tenant. Every Auto-Setup click
+    would otherwise create a new App + a new secret; over time an
+    admin who plays with the button leaves a trail of orphans.
+
+    Returns a (possibly empty) list of dicts with id / appId /
+    displayName / createdDateTime. The caller decides whether to
+    warn the admin, offer reuse, or proceed with a fresh app.
+    """
+    import httpx as _httpx
+    from urllib.parse import quote
+    h = _graph(access_token)
+    # $filter is case-sensitive on displayName. escaped for OData:
+    #   displayName eq 'Printix TonerWatch'
+    escaped = app_name.replace("'", "''")
+    url = (f"{_GRAPH_URL}/applications"
+           f"?$filter=displayName eq '{quote(escaped)}'"
+           f"&$select=id,appId,displayName,createdDateTime,web"
+           f"&$top=25")
+    try:
+        r = _httpx.get(url, headers=h, timeout=10.0)
+    except _httpx.HTTPError:
+        return []
+    if r.status_code != 200:
+        return []
+    return list(r.json().get("value", []))
+
+
 def auto_register_app(
     access_token: str, redirect_uri: str,
     app_name: str = "Printix TonerWatch",

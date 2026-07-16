@@ -468,116 +468,59 @@
         ☰ {{ _('toner.view.list', lang) }}
       </a>
     </div>
+
+    {# v0.17.2: group-by-group section headers. Only visible when at
+       least one printer has a group assigned. #}
+    {% if group_choices %}
+      <a href="?group_by={{ '0' if group_by else '1' }}{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
+         class="chip {{ 'active' if group_by else '' }}"
+         style="margin-left: 4px;" data-noloader
+         title="{{ _('toner.group_by.hint', lang) }}">
+        🏷 {{ _('toner.group_by.toggle', lang) }}
+      </a>
+    {% endif %}
   </div>
 {% endif %}
 
 <!-- Printer grid -->
 {% if printers %}
-  <div class="toner-grid">
-    {% for p in printers %}
-      <div class="printer-card sev-{{ p.worst_severity }}">
-        <div class="printer-header">
-          <img src="/assets/printers/{{ p.icon_key }}.svg" alt="" width="42" height="42">
-          <div class="meta">
-            <div class="name" title="{{ p.printer_name }}">
-              {{ p.printer_name or _('toner.printer.unnamed', lang) }}
-            </div>
-            <div class="sub">
-              {% if p.location %}📍 {{ p.location }}{% else %}—{% endif %}
-              {% if p.model %} · {{ p.model }}{% endif %}
-            </div>
-            {% if p.serial_number %}
-              <div class="meta-row">
-                <span><span class="k">{{ _('toner.printer.serial', lang) }}:</span>
-                      <span class="v">{{ p.serial_number }}</span></span>
-              </div>
-            {% endif %}
-            {% if customer_choices|length > 1 %}
-              <a href="/toner?customer={{ p.customer_id }}"
-                 class="customer-badge" style="text-decoration: none;">
-                {{ p.customer_name }}
-              </a>
-            {% endif %}
-            {% if p.group_name %}
-              <a href="/toner?group={{ p.group_name|urlencode }}"
-                 class="group-badge" style="text-decoration: none;">
-                🏷 {{ p.group_name }}
-              </a>
-            {% endif %}
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <a href="/toner/{{ p.customer_id }}/{{ p.id }}/supply"
-               class="supply-edit"
-               title="{{ _('supplies.link.edit', lang) }}">
-              📦 {{ _('supplies.link.edit', lang) }}
-            </a>
-            <a href="/toner/{{ p.customer_id }}/{{ p.id }}/info"
-               class="supply-edit"
-               title="{{ _('printer_info.link.edit', lang) }}">
-              ✎ {{ _('printer_info.link.edit', lang) }}
-            </a>
-          </div>
-        </div>
-
-        <div class="toner-bars">
-          {% if p.supplies %}
-            {% for s in p.supplies %}
-              <div class="toner-bar-row {{ s.severity|lower if s.severity != 'OK' else '' }}">
-                <div class="lbl">{{ s.color }}</div>
-                <div class="toner-bar {{ s.color }}">
-                  <div class="fill" style="width: {{ s.level }}%;"></div>
-                </div>
-                <div class="pct">{{ s.level }}%</div>
-                <div class="sev">
-                  {% if s.severity == 'CRITICAL' %}🔴
-                  {% elif s.severity == 'WARN' %}⚠
-                  {% endif %}
-                </div>
-                <div>
-                {% if s.supply and s.supply.supplier_url %}
-                  <a href="{{ s.supply.supplier_url }}" target="_blank" rel="noopener"
-                     class="order-link" data-noloader
-                     title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">🛒</a>
-                {% elif s.supply and s.supply.sku %}
-                  <span class="order-link" style="cursor: help;"
-                        title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">📦</span>
-                {% endif %}
-                </div>
-              </div>
-            {% endfor %}
+  {% if group_by and grouped_printers %}
+    {# v0.17.2: grouped mode — one card deck per group, with a
+       sticky-ish section header carrying the count. #}
+    {% for group_name, group_printers in grouped_printers %}
+      <div class="group-section" style="margin-top: var(--sp-4);">
+        <h3 style="display: flex; align-items: center; gap: 8px;
+                    font-size: 0.85rem; letter-spacing: 0.08em;
+                    text-transform: uppercase; color: var(--tw-primary);
+                    font-weight: 800; margin: 0 0 var(--sp-3);
+                    padding-bottom: 6px;
+                    border-bottom: 2px solid var(--tw-gray-200);">
+          {% if group_name %}
+            🏷 {{ group_name }}
           {% else %}
-            <div style="color: var(--tw-muted-blue); font-size: 0.85rem;
-                        padding: var(--sp-2) 0; text-align: center;">
-              {{ _('toner.printer.no_marker_data', lang) }}
-            </div>
+            <span style="color: var(--tw-muted-blue);">
+              — {{ _('toner.group_by.ungrouped', lang) }}
+            </span>
           {% endif %}
+          <span style="margin-left: auto; font-family: var(--font-mono);
+                       color: var(--tw-muted-blue); font-size: 0.72rem;">
+            {{ group_printers|length }}
+          </span>
+        </h3>
+        <div class="toner-grid">
+          {% for p in group_printers %}
+            {% include 'toner/_printer_card.html' %}
+          {% endfor %}
         </div>
-
-        {% if p.error_states or (p.reported_state and not is_hidden_state(p.reported_state)) %}
-          <div class="printer-footer">
-            {# printer_reported_state → nice badge (IDLE/PRINTING skipped) #}
-            {% if p.reported_state and not is_hidden_state(p.reported_state) %}
-              {% set sev, icon, tkey = reported_state_meta(p.reported_state) %}
-              <span class="status-badge sev-{{ sev }}"
-                    title="{{ p.reported_state }}">
-                <span class="ico">{{ icon }}</span>
-                {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ p.reported_state }}{% endif %}
-              </span>
-            {% endif %}
-            {# detected_error_states → colored pill each #}
-            {% for e in p.error_states %}
-              {% set sev, icon, tkey = error_state_meta(e) %}
-              <span class="status-badge sev-{{ sev if tkey else 'unknown' }}"
-                    title="{{ e }}">
-                <span class="ico">{{ icon }}</span>
-                {% if tkey %}{{ _(tkey, lang) }}{% else %}{{ e }}{% endif %}
-              </span>
-            {% endfor %}
-          </div>
-        {% endif %}
       </div>
     {% endfor %}
-  </div>
+  {% else %}
+    <div class="toner-grid">
+      {% for p in printers %}
+        {% include 'toner/_printer_card.html' %}
+      {% endfor %}
+    </div>
+  {% endif %}
 {% else %}
   <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);
                           color: var(--tw-muted-blue);">

@@ -54,6 +54,15 @@ logger = logging.getLogger(__name__)
 SETTINGS_KEY = "backup"
 
 
+def _safe_int(v, default: int, lo: int, hi: int) -> int:
+    """v0.17.2: form values arrive as strings — clamp instead of crash."""
+    try:
+        i = int(v) if v not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, i))
+
+
 # ---------------------------------------------------------------------------
 # Config persistence (Azure Blob)
 # ---------------------------------------------------------------------------
@@ -92,7 +101,7 @@ def save_config(cfg: dict[str, Any]) -> None:
     payload: dict[str, Any] = {
         "azure_enabled":       bool(cfg.get("azure_enabled")),
         "azure_container":     (cfg.get("azure_container") or "tonerwatch-backups").strip(),
-        "azure_interval_hours": max(1, int(cfg.get("azure_interval_hours") or 24)),
+        "azure_interval_hours": _safe_int(cfg.get("azure_interval_hours"), 24, 1, 720),
         "azure_include_fernet": bool(cfg.get("azure_include_fernet", True)),
     }
     conn_str = cfg.get("azure_conn_str") or ""

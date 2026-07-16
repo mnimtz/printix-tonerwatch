@@ -774,6 +774,69 @@
         pollTimer = setTimeout(poll, pollInterval);
         return;
       }
+      if (j.status === 'existing_found') {
+        // v0.17.2: warn the admin before creating an nth orphan
+        stop();
+        var rows = (j.existing || []).map(function(app) {
+          var uris = (app.redirectUris || []).map(esc).join('<br>');
+          return '<tr>' +
+                 '<td style="padding:6px 10px;font-family:var(--font-mono);font-size:0.78rem;">' + esc(app.appId) + '</td>' +
+                 '<td style="padding:6px 10px;font-size:0.78rem;">' + esc(app.createdDateTime || '') + '</td>' +
+                 '<td style="padding:6px 10px;font-size:0.78rem;color:var(--tw-muted-blue);">' + (uris || '—') + '</td>' +
+                 '</tr>';
+        }).join('');
+        show(
+          '<div style="padding: var(--sp-3); background: #FFFBEB; ' +
+                'border: 1px solid #FCD34D; border-radius: var(--r); color: #92400E;">' +
+          '<strong>⚠ ' + {{ _('settings.entra.autosetup.existing_title', lang)|tojson }} + '</strong><br>' +
+             {{ _('settings.entra.autosetup.existing_hint', lang)|tojson }} +
+          '<table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:0.82rem;background:var(--tw-white);border-radius:4px;overflow:hidden;">' +
+          '<thead><tr style="background:var(--tw-gray-100);color:var(--tw-primary);">' +
+          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Client ID</th>' +
+          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Created</th>' +
+          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Redirect URIs</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table>' +
+          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button type="button" class="btn btn-primary" id="btn-entra-create-anyway" data-noloader>➕ ' +
+             {{ _('settings.entra.autosetup.create_anyway', lang)|tojson }} + '</button>' +
+          '<button type="button" class="btn btn-secondary" onclick="location.reload()" data-noloader>' +
+             {{ _('common.cancel', lang)|tojson }} + '</button>' +
+          '</div></div>');
+        // Wire the "create anyway" button — hits the replace endpoint
+        // which reuses the access-token stashed in the session
+        var btn2 = document.getElementById('btn-entra-create-anyway');
+        if (btn2) {
+          btn2.addEventListener('click', async function() {
+            btn2.disabled = true;
+            show('<div style="color: var(--tw-muted-blue);">' +
+                 {{ _('settings.entra.autosetup.creating', lang)|tojson }} + '</div>');
+            try {
+              var r2 = await fetch('/settings/entra/autosetup/replace', {
+                method:'POST', credentials:'same-origin'});
+              var j2 = await r2.json();
+              if (j2.status === 'done') {
+                show(
+                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
+                        'border-radius: var(--r); color: #065F46;">' +
+                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
+                     {{ _('settings.entra.autosetup.done', lang)|tojson }} +
+                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
+                        'border-radius: 4px; font-size: 0.78rem;">' +
+                     'tenant_id: ' + esc(j2.tenant_id) + '\n' +
+                     'client_id: ' + esc(j2.client_id) + '\n' +
+                     'admin_consent: ' + esc(j2.admin_consent) +
+                  '</pre><button type="button" class="btn" data-noloader onclick="location.reload()">' +
+                     {{ _('common.reload', lang)|tojson }} + '</button></div>');
+              } else {
+                show('<div style="color:#991B1B;">✗ ' + esc(j2.error || 'error') + '</div>');
+              }
+            } catch (e) {
+              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+            }
+          });
+        }
+        return;
+      }
       if (j.status === 'expired') {
         stop();
         show(

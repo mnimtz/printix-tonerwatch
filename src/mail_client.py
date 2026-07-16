@@ -41,6 +41,16 @@ logger = logging.getLogger(__name__)
 SETTINGS_KEY = "mail"
 
 
+def _safe_int(v, default: int, lo: int, hi: int) -> int:
+    """v0.17.2: Admin form fields land here as strings. `int("abc")`
+    would 500 the /settings/mail save. Clamp instead."""
+    try:
+        i = int(v) if v not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, i))
+
+
 class MailSendError(Exception):
     """Raised on any provider-side failure — caller logs + records."""
 
@@ -100,7 +110,7 @@ def save_config(cfg: dict) -> None:
         "from_email":     (cfg.get("from_email") or "").strip(),
         "from_name":      (cfg.get("from_name") or "").strip() or "Printix TonerWatch",
         "smtp_host":      (cfg.get("smtp_host") or "").strip(),
-        "smtp_port":      int(cfg.get("smtp_port") or 587),
+        "smtp_port":      _safe_int(cfg.get("smtp_port"), 587, 1, 65535),
         "smtp_username":  (cfg.get("smtp_username") or "").strip(),
         "smtp_starttls":  bool(cfg.get("smtp_starttls", True)),
     }

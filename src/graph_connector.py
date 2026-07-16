@@ -40,6 +40,15 @@ logger = logging.getLogger(__name__)
 
 SETTINGS_KEY = "graph_connector"
 
+
+def _safe_int(v, default: int, lo: int, hi: int) -> int:
+    """v0.17.2: form values arrive as strings — clamp instead of crash."""
+    try:
+        i = int(v) if v not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, i))
+
 # Standard identifiers we use for the connection.
 DEFAULT_CONNECTION_ID   = "tonerwatch-printers"
 DEFAULT_CONNECTION_NAME = "Printix TonerWatch printers"
@@ -94,7 +103,7 @@ def save_config(cfg: dict[str, Any]) -> None:
         "connection_id": (cfg.get("connection_id") or DEFAULT_CONNECTION_ID).strip(),
         "connection_name": (cfg.get("connection_name") or DEFAULT_CONNECTION_NAME).strip(),
         "connection_desc": (cfg.get("connection_desc") or DEFAULT_CONNECTION_DESC).strip(),
-        "interval_hours": max(1, int(cfg.get("interval_hours") or 24)),
+        "interval_hours": _safe_int(cfg.get("interval_hours"), 24, 1, 720),
     }
     secret = cfg.get("client_secret") or ""
     if secret:
