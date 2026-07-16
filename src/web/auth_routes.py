@@ -179,10 +179,17 @@ async def login_form(request: Request, next: str = "/dashboard"):
     templates = request.app.state.templates
     if db.user_count() == 0:
         return RedirectResponse("/setup", status_code=303)
+    # v0.18.6 — surface ?error=… and ?info=… from the query string
+    # so that SSO/callback failures (which redirect here with a
+    # message) actually render. Prior versions dropped them on the
+    # floor and Marcus's browser looked like a silent loop.
+    q_error = (request.query_params.get("error") or "").strip()[:400]
+    q_info  = (request.query_params.get("info") or "").strip()[:400]
     return templates.TemplateResponse(
         "login.html",
         {"request": request, "lang": request.state.lang,
-         "error": None, "info": None,
+         "error": q_error or None,
+         "info":  q_info  or None,
          "sso_configured": entra_sso.is_configured(),
          "form": {"email": "", "next": _safe_next(next)}},
     )
@@ -259,15 +266,42 @@ async def logout_get():
 
 @router.get("/auth/entra/login", include_in_schema=False)
 async def entra_login(request: Request, next: str = "/dashboard"):
-    """Redirect the browser to Microsoft's /authorize."""
+    """Redirect the browser to Microsoft's /authorize.
+
+    v0.18.5 — the previous try/except only caught EntraSSOError.
+    MSAL itself can raise ValueError (bad authority URL from an
+    empty/whitespace tenant_id), ImportError (msal not in the venv),
+    or plain requests-side errors when it hydrates the tenant
+    metadata. Any of those became a 500 that told the user
+    "Internal Server Error" and nothing more. Catch broadly, log
+    with full traceback for Azure Log Stream, then redirect to
+    /login with a readable message."""
     if not entra_sso.is_configured():
-        return RedirectResponse("/login?error=sso_not_configured",
-                                status_code=303)
+        _entra_log.warning(
+            "[Entra login] is_configured() returned False — check the "
+            "diagnose page for which of the four required flags is missing")
+        return RedirectResponse(
+            "/login?error=" + quote_plus(
+                "SSO not fully configured — see /settings/entra/diagnose"),
+            status_code=303)
     try:
         url = entra_sso.build_auth_url(request, _safe_next(next))
     except entra_sso.EntraSSOError as e:
+        _entra_log.warning("[Entra login] build_auth_url raised: %s", e)
         return RedirectResponse(
-            f"/login?error={str(e)[:200].replace('&','')}",
+            "/login?error=" + quote_plus(f"SSO: {str(e)[:200]}"),
+            status_code=303)
+    except Exception as e:  # noqa: BLE001
+        _entra_log.exception(
+            "[Entra login] unexpected exception — check redirect_uri, "
+            "tenant_id, and client_secret. Falling back to /login "
+            "with visible error."
+        )
+        # Type + message so Marcus can tell "invalid_client" apart from
+        # "no msal package" without having to open the log.
+        return RedirectResponse(
+            "/login?error=" + quote_plus(
+                f"SSO ({type(e).__name__}): {str(e)[:200]}"),
             status_code=303)
     return RedirectResponse(url, status_code=303)
 

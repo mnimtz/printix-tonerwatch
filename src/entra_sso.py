@@ -182,16 +182,38 @@ def _msal_app(cfg: dict[str, Any]):
     """Lazy MSAL import — the package is ~4 MB and never needed if
     SSO isn't configured. Uses `common` when tenant_id is empty so
     an admin can enable multi-tenant sign-in without picking a
-    specific home tenant."""
-    import msal
+    specific home tenant.
+
+    v0.18.5 — wrap ImportError + ConfidentialClientApplication
+    construction so callers can catch a single EntraSSOError instead
+    of chasing MSAL-side exceptions."""
+    try:
+        import msal
+    except ImportError as e:
+        raise EntraSSOError(
+            "MSAL package not installed — the container image is missing "
+            "the `msal` Python package. Rebuild the image or `pip install "
+            "msal` in the environment.") from e
     tenant = (cfg.get("tenant_id") or "").strip()
     authority = (_AUTHORITY_TMPL.format(tenant=tenant)
                  if tenant else _MULTI_TENANT_AUTHORITY)
-    return msal.ConfidentialClientApplication(
-        client_id=cfg["client_id"],
-        client_credential=cfg["client_secret"],
-        authority=authority,
-    )
+    try:
+        return msal.ConfidentialClientApplication(
+            client_id=cfg["client_id"],
+            client_credential=cfg["client_secret"],
+            authority=authority,
+        )
+    except EntraSSOError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        # MSAL raises ValueError on bad tenant IDs, but the constructor
+        # ALSO fetches the tenant's openid metadata over HTTPS — network
+        # errors, TLS handshake failures, "tenant does not exist" (404
+        # from AAD) all surface here. One catch, one clear message.
+        raise EntraSSOError(
+            f"MSAL rejected the config or couldn't reach Microsoft — "
+            f"tenant_id={tenant!r}, {type(e).__name__}: {str(e)[:200]}"
+        ) from e
 
 
 def build_auth_url(request, next_url: str = "/") -> str:
