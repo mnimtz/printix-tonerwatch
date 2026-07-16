@@ -506,6 +506,12 @@
             ⚠ {{ _('settings.entra.configured.disabled_hint', lang) }}
           </div>
         {% endif %}
+        <div style="margin-top: var(--sp-3); font-size: 0.82rem;">
+          <a href="/settings/entra/diagnose" data-noloader
+             style="color: var(--tw-muted-blue); text-decoration: underline;">
+            🔍 {{ _('settings.entra.configured.diagnose', lang) }}
+          </a>
+        </div>
       {% else %}
         <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
           <div style="flex: 1; min-width: 200px;">

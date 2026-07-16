@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Entra SSO diagnose · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/settings" data-noloader>{{ _('settings.title', lang) }}</a> /
+  <a href="/settings?section=entra_sso" data-noloader>Entra ID</a> /
+  Diagnose
+{% endblock %}
+{% block content %}
+<h1 style="margin-bottom: var(--sp-3);">Entra SSO diagnose</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-4);">
+  Every fact the SSO flow depends on, on one screen. Use when the
+  <a href="/login">/login</a> "Sign in with Microsoft" button loops
+  between Microsoft and TonerWatch without a visible error.
+</p>
+
+<section class="card" style="margin-bottom: var(--sp-4); padding: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-3);">Configuration snapshot</h2>
+  <table class="kv" style="width: 100%; font-family: var(--font-mono);
+          font-size: 0.85rem; border-collapse: collapse;">
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">enabled</td>
+        <td>{% if cfg.enabled %}✓ true{% else %}✗ false — login button is hidden{% endif %}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">is_configured()</td>
+        <td>{% if cfg.is_configured %}✓ true{% else %}✗ false — gate closes login button{% endif %}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">tenant_id</td>
+        <td>{{ cfg.tenant_id or '(empty — uses `common`)' }}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">client_id</td>
+        <td>{{ cfg.client_id or '(empty)' }}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">client_secret</td>
+        <td>{{ cfg.client_secret_masked }}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">redirect_uri (configured)</td>
+        <td>{{ cfg.redirect_uri or '(empty — will derive from request)' }}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">redirect_uri (derived from request)</td>
+        <td>{{ derived_redirect }}
+          <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+            ↑ THIS must match an entry in Azure App Registration → Authentication →
+            Web platform. If it doesn't, Microsoft redirects back with an error
+            (or bounces you straight back to /login).
+          </div>
+        </td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">base_url (from FastAPI)</td>
+        <td>{{ base_url }}
+          <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+            If this shows <code>http://</code> but users reach the app over
+            HTTPS, the reverse proxy isn't forwarding <code>X-Forwarded-Proto</code>
+            (or Uvicorn wasn't launched with <code>--proxy-headers</code>).
+            Redirect URI ends up wrong.
+          </div>
+        </td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">allow_auto_provision</td>
+        <td>{% if cfg.allow_auto_provision %}✓ true{% else %}✗ false — SSO login FAILS if the user's email doesn't match a local user row{% endif %}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">auto_provision_domain</td>
+        <td>{{ cfg.auto_provision_domain or '(none — any email accepted when provisioning is on)' }}</td></tr>
+    <tr><td style="padding: 4px 12px 4px 0; color: var(--tw-muted-blue);">default_role</td>
+        <td>{{ cfg.default_role }}</td></tr>
+  </table>
+</section>
+
+<section class="card" style="margin-bottom: var(--sp-4); padding: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-3);">Local users the SSO flow could match</h2>
+  <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin: 0 0 var(--sp-3);">
+    An SSO login only succeeds when the incoming Microsoft account matches
+    a row here — either by <code>entra_oid</code> (previous SSO login) or by
+    <code>email</code>. If your Microsoft email doesn't appear in the list
+    below, either add a local user with the same email or enable
+    auto-provisioning above.
+  </p>
+  <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+    <thead>
+      <tr style="background: var(--tw-gray-100); text-align: left;">
+        <th style="padding: 6px 10px;">Email</th>
+        <th style="padding: 6px 10px;">Role</th>
+        <th style="padding: 6px 10px;">Active</th>
+        <th style="padding: 6px 10px;">SSO-linked (entra_oid)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users_summary %}
+      <tr style="border-top: 1px solid var(--tw-gray-200);">
+        <td style="padding: 6px 10px; font-family: var(--font-mono);">{{ u.email }}</td>
+        <td style="padding: 6px 10px;">{{ u.role }}</td>
+        <td style="padding: 6px 10px;">{% if u.active %}✓{% else %}—{% endif %}</td>
+        <td style="padding: 6px 10px; font-family: var(--font-mono); color: var(--tw-muted-blue);">
+          {{ u.entra_oid or '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="margin-bottom: var(--sp-4); padding: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-3);">Recent SSO audit events</h2>
+  {% if events %}
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+      <thead>
+        <tr style="background: var(--tw-gray-100); text-align: left;">
+          <th style="padding: 6px 10px;">When</th>
+          <th style="padding: 6px 10px;">User</th>
+          <th style="padding: 6px 10px;">Action</th>
+          <th style="padding: 6px 10px;">Meta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        <tr style="border-top: 1px solid var(--tw-gray-200);">
+          <td style="padding: 6px 10px; font-family: var(--font-mono); white-space: nowrap;">
+            {{ e.created_at }}
+          </td>
+          <td style="padding: 6px 10px;">{{ e.user_id or '—' }}</td>
+          <td style="padding: 6px 10px; font-family: var(--font-mono);">{{ e.action }}</td>
+          <td style="padding: 6px 10px; font-family: var(--font-mono);
+                     font-size: 0.75rem; color: var(--tw-muted-blue);
+                     max-width: 360px; word-break: break-word;">{{ e.meta }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p style="color: var(--tw-muted-blue);">
+      No SSO events yet — try clicking "Sign in with Microsoft" on
+      <a href="/login">/login</a>, then reload this page.
+    </p>
+  {% endif %}
+</section>
+
+<div style="margin-top: var(--sp-4);">
+  <a href="/settings?section=entra_sso" class="btn btn-secondary" data-noloader>← back to settings</a>
+</div>
+{% endblock %}

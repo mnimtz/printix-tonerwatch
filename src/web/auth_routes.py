@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,6 +14,8 @@ from sqlalchemy import insert, update
 from .. import auth, db, entra_sso
 from ..db import users
 from . import i18n
+
+_entra_log = logging.getLogger("tonerwatch.entra")
 
 
 router = APIRouter()
@@ -273,49 +277,50 @@ async def entra_callback(request: Request,
                          code: str = "", state: str = "",
                          error: str = "", error_description: str = ""):
     """Handle the OAuth2 callback. Log the user in or send them back
-    to /login with a descriptive message."""
-    templates = request.app.state.templates
-    lang = request.state.lang
+    to /login with a descriptive message.
 
+    v0.18.4 — surface errors as ?error=... URL params via a 303 so
+    the message survives a browser hitting the SSO button again.
+    Template-with-401 was invisible in production when the browser
+    (or Azure Front Door) automatically re-navigated straight back
+    to /auth/entra/login, making the loop look silent."""
     if error:
-        # Microsoft rejected the request (user cancelled, admin
-        # consent required, etc.) — surface the reason.
         msg = (error_description or error)[:200]
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "lang": lang,
-             "error": f"Microsoft: {msg}", "info": None,
-             "sso_configured": True,
-             "form": {"email": "", "next": "/dashboard"}},
-            status_code=401,
-        )
-    if not code or not state:
+        _entra_log.warning("[Entra callback] Microsoft error: %s (%s)",
+                            error, error_description[:200] if error_description else "")
         return RedirectResponse(
-            "/login?error=missing_code_or_state", status_code=303)
+            "/login?error=" + quote_plus(f"Microsoft: {msg}"),
+            status_code=303)
+    if not code or not state:
+        _entra_log.warning("[Entra callback] missing code/state — "
+                           "code_len=%d state_len=%d", len(code), len(state))
+        return RedirectResponse(
+            "/login?error=" + quote_plus("SSO callback missing code or state"),
+            status_code=303)
 
     try:
         claims = entra_sso.handle_callback(request, code, state)
     except entra_sso.EntraSSOError as e:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "lang": lang,
-             "error": f"SSO: {str(e)[:200]}", "info": None,
-             "sso_configured": True,
-             "form": {"email": "", "next": "/dashboard"}},
-            status_code=401,
-        )
+        _entra_log.warning("[Entra callback] token exchange failed: %s", e)
+        return RedirectResponse(
+            "/login?error=" + quote_plus(f"SSO: {str(e)[:200]}"),
+            status_code=303)
 
     user = entra_sso.resolve_or_create_user(claims)
     if user is None or not user["active"]:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "lang": lang,
-             "error": i18n.t("auth.sso_no_local_account", lang),
-             "info": None,
-             "sso_configured": True,
-             "form": {"email": "", "next": "/dashboard"}},
-            status_code=401,
-        )
+        _entra_log.warning(
+            "[Entra callback] no local account matches email=%r oid=%r "
+            "(auto-provision: %s). Options: (a) create a local user with "
+            "the same email in /users, (b) enable auto-provisioning in "
+            "settings, or (c) sign the tenant's email to an existing "
+            "user's `entra_oid` column directly.",
+            claims.get("email", ""), claims.get("oid", ""),
+            entra_sso.load_config().get("allow_auto_provision", False))
+        return RedirectResponse(
+            "/login?error=" + quote_plus(
+                i18n.t("auth.sso_no_local_account", request.state.lang)
+                + f" (email={claims.get('email', '')})"),
+            status_code=303)
 
     # Log the user in — same session shape as the local login path.
     # v0.17.1: read+clear+restore, same rationale as local login.

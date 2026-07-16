@@ -256,6 +256,73 @@ async def settings_runner_save(request: Request):
                             status_code=303)
 
 
+@router.get("/settings/entra/diagnose", response_class=HTMLResponse,
+            include_in_schema=False)
+async def entra_diagnose(request: Request):
+    """v0.18.4 — surface every fact the SSO flow depends on so an
+    admin can figure out WHY the login loop happens without needing
+    Azure Log Stream. Shows: current entra_sso config (secret
+    masked), the last 30 audit rows that mention SSO/entra, the
+    local user accounts that would match a given SSO email, and
+    the runtime redirect_uri the app would send to Microsoft."""
+    admin = auth.require_admin(request)
+    cfg = entra_sso.load_config()
+    from sqlalchemy import select as _sel, or_ as _or_
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            _sel(db.audit_log.c.created_at, db.audit_log.c.user_id,
+                 db.audit_log.c.action, db.audit_log.c.target_type,
+                 db.audit_log.c.target_id, db.audit_log.c.meta_json)
+            .where(_or_(
+                db.audit_log.c.action.like("settings.entra%"),
+                db.audit_log.c.action.like("user.login.entra%"),
+                db.audit_log.c.action.like("auth.sso%"),
+            ))
+            .order_by(db.audit_log.c.created_at.desc())
+            .limit(30)
+        ).all()
+        events = [{"created_at": r.created_at, "user_id": r.user_id,
+                    "action": r.action, "target": (r.target_type or "") + "/" + (r.target_id or ""),
+                    "meta": r.meta_json or ""} for r in rows]
+
+        # Which local users could match an incoming SSO login?
+        user_rows = conn.execute(
+            _sel(db.users.c.id, db.users.c.email,
+                 db.users.c.role, db.users.c.active,
+                 db.users.c.entra_oid)
+            .order_by(db.users.c.email)
+        ).all()
+        users_summary = [{"id": r.id, "email": r.email, "role": r.role,
+                          "active": bool(r.active),
+                          "entra_oid": (r.entra_oid or "")[:8] + "…" if r.entra_oid else ""}
+                         for r in user_rows]
+
+    base = str(request.base_url).rstrip("/")
+    derived_redirect = f"{base}/auth/entra/callback"
+    return request.app.state.templates.TemplateResponse(
+        "settings/entra_diagnose.html",
+        {
+            "request": request, "lang": request.state.lang, "user": admin,
+            "cfg": {
+                "enabled":              cfg["enabled"],
+                "tenant_id":            cfg["tenant_id"],
+                "client_id":            cfg["client_id"],
+                "client_secret_masked": ("*" * 8 + "(stored)"
+                                          if cfg["client_secret"] else "(missing)"),
+                "redirect_uri":         cfg["redirect_uri"],
+                "allow_auto_provision": cfg["allow_auto_provision"],
+                "auto_provision_domain": cfg["auto_provision_domain"],
+                "default_role":         cfg["default_role"],
+                "is_configured":        entra_sso.is_configured(),
+            },
+            "derived_redirect": derived_redirect,
+            "base_url":         base,
+            "events":           events,
+            "users_summary":    users_summary,
+        },
+    )
+
+
 @router.post("/settings/entra/toggle", include_in_schema=False)
 async def settings_entra_toggle(request: Request):
     """v0.18.3: flip only the `enabled` flag without touching the
