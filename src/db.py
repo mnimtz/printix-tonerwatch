@@ -191,6 +191,10 @@ customers = Table(
     Column("quiet_hours_end", Text, nullable=False, server_default=""),
     Column("digest_mode", Integer, nullable=False, server_default="0"),
     Column("auto_order_mode", Text, nullable=False, server_default="off"),
+    # v0.20.0: autonomous mode transitions drafts straight to "ordered"
+    # and emails the supplier. Cap protects against a runaway alert
+    # storm turning into a runaway P.O. spam.
+    Column("auto_order_daily_cap", Integer, nullable=False, server_default="10"),
 
     Column("active", Integer, nullable=False, server_default="1"),
     Column("created_at", Text, nullable=False, server_default=func.current_timestamp()),
@@ -200,7 +204,7 @@ customers = Table(
 
     CheckConstraint("alert_min_level IN ('INFO','WARN','CRITICAL')",
                     name="ck_customers_alert_min_level"),
-    CheckConstraint("auto_order_mode IN ('off','draft')",
+    CheckConstraint("auto_order_mode IN ('off','draft','autonomous')",
                     name="ck_customers_auto_order_mode"),
 )
 Index("idx_customers_active", customers.c.active)

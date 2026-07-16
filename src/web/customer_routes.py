@@ -54,6 +54,7 @@ def _customer_form_from_row(row: dict | None) -> dict:
             "timezone": "Europe/Berlin",
             "quiet_hours_start": "", "quiet_hours_end": "",
             "digest_mode": 0, "auto_order_mode": "off",
+            "auto_order_daily_cap": 10,
             "active": 1,
         }
     return {
@@ -244,13 +245,15 @@ def _values_from_form(form, *, is_new: bool, existing: dict | None = None) -> di
         "quiet_hours_end":     (form.get("quiet_hours_end") or "").strip(),
         "digest_mode":         _bool_form(form.get("digest_mode")),
         "auto_order_mode":     (form.get("auto_order_mode") or "off").lower(),
+        "auto_order_daily_cap": _parse_int(form.get("auto_order_daily_cap"),
+                                             default=10, lo=1, hi=100),
         "active":              _bool_form(form.get("active")),
     }
 
     # Normalise CHECK-constrained columns
     if values["alert_min_level"] not in ("INFO", "WARN", "CRITICAL"):
         values["alert_min_level"] = "WARN"
-    if values["auto_order_mode"] not in ("off", "draft"):
+    if values["auto_order_mode"] not in ("off", "draft", "autonomous"):
         values["auto_order_mode"] = "off"
 
     # Password: encrypt when provided, otherwise keep existing.

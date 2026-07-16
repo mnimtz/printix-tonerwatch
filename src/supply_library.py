@@ -251,6 +251,68 @@ def delete_override(customer_id: int, printer_id: str, color: str | None = None)
 _ALLOWED_COLORS = ("K", "C", "M", "Y", "other")
 
 
+def ai_suggest_supply(printer_model: str,
+                       color: str) -> dict[str, Any] | None:
+    """v0.20.0 — ask the configured LLM for the OEM cartridge SKU +
+    description for one printer/colour combo. Returns a dict of
+    {sku, description, manufacturer, yield_pages, provider, model}
+    on success, or ``None`` if LLM isn't configured or the response
+    can't be parsed. Shared by /supplies/ai/suggest (UI) and the
+    toner alert runner when auto-drafting for a printer whose
+    supply template has no SKU on file."""
+    from . import llm_client
+    if not llm_client.is_configured():
+        return None
+    color = (color or "K").strip().upper()
+    if color not in ("K", "C", "M", "Y", "OTHER"):
+        color = "K"
+    color_word = {"K": "black", "C": "cyan", "M": "magenta",
+                  "Y": "yellow", "OTHER": "other"}[color]
+
+    system = (
+        "You are a printer-supply lookup assistant. Given a printer "
+        "model and a toner colour, return the OEM cartridge SKU and "
+        "a one-line description. Never invent numbers you're unsure "
+        "about — if you don't know a value, return null. "
+        "Reply with ONE JSON object only, no prose, no code fences: "
+        "{\"sku\": \"…\", \"description\": \"…\", "
+        "\"manufacturer\": \"…\", \"yield_pages\": 12345}"
+    )
+    user = (f"Printer model: {printer_model}\n"
+            f"Toner slot colour: {color_word}\n"
+            "Return the OEM cartridge (not a compatible / generic).")
+
+    try:
+        resp = llm_client.chat(system, user)
+    except llm_client.LLMError as e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[ai_suggest_supply] LLM error for %s/%s: %s",
+            printer_model, color, e)
+        return None
+
+    import json as _json
+    raw = (resp.text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].lstrip("\n")
+    try:
+        data = _json.loads(raw)
+    except _json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {
+        "sku":          (data.get("sku") or "").strip() or None,
+        "description":  (data.get("description") or "").strip() or None,
+        "manufacturer": (data.get("manufacturer") or "").strip() or None,
+        "yield_pages":  _clean_int_or_none(data.get("yield_pages")),
+        "provider":     resp.provider,
+        "model":        resp.model,
+    }
+
+
 def _normalize_color(c: str) -> str:
     c = (c or "").strip()
     return c if c in _ALLOWED_COLORS else ""

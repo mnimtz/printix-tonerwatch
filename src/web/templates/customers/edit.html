@@ -220,13 +220,30 @@
           {{ _('customer.field.auto_order_mode', lang) }}
         </label>
         <select id="auto_order_mode" name="auto_order_mode">
-          <option value="off"   {% if form.auto_order_mode == 'off'   %}selected{% endif %}>
-            {{ _('customer.auto_order.off',   lang) }}
+          <option value="off"        {% if form.auto_order_mode == 'off'        %}selected{% endif %}>
+            {{ _('customer.auto_order.off',        lang) }}
           </option>
-          <option value="draft" {% if form.auto_order_mode == 'draft' %}selected{% endif %}>
-            {{ _('customer.auto_order.draft', lang) }}
+          <option value="draft"      {% if form.auto_order_mode == 'draft'      %}selected{% endif %}>
+            {{ _('customer.auto_order.draft',      lang) }}
+          </option>
+          <option value="autonomous" {% if form.auto_order_mode == 'autonomous' %}selected{% endif %}>
+            {{ _('customer.auto_order.autonomous', lang) }}
           </option>
         </select>
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('customer.auto_order.hint', lang) }}
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="auto_order_daily_cap">
+          {{ _('customer.field.auto_order_daily_cap', lang) }}
+        </label>
+        <input type="number" id="auto_order_daily_cap"
+               name="auto_order_daily_cap" min="1" max="100"
+               value="{{ form.auto_order_daily_cap or 10 }}">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('customer.field.auto_order_daily_cap.hint', lang) }}
+        </div>
       </div>
     </div>
 

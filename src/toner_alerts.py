@@ -213,6 +213,13 @@ def evaluate_and_notify(customer: dict, *,
     # record and either attach an existing active order or create a new
     # draft. The mail then carries the SKU + a one-click "Mark as
     # ordered" magic link per alert row.
+    # v0.20.0 read the customer's ordering mode + daily cap ONCE per
+    # tick so all transitions in this batch use consistent values,
+    # even if an admin flips the setting mid-run.
+    _order_mode = (customer.get("auto_order_mode") or "off").lower()
+    _daily_cap  = int(customer.get("auto_order_daily_cap") or 10)
+    _orders_today = orders.count_today(customer["id"]) if _order_mode == "autonomous" else 0
+
     for t in transitions_up:
         supply = supply_library.resolve_supply(
             customer["id"], t["printer_id"],
@@ -220,12 +227,61 @@ def evaluate_and_notify(customer: dict, *,
         t["supply"] = supply
         sku = (supply or {}).get("sku", "")
         qty = int((supply or {}).get("default_quantity") or 1)
-        order_id, _created = orders.create_draft_if_none(
+        order_id, created_new = orders.create_draft_if_none(
             customer["id"], t["printer_id"],
             t["printer_name"], t["color"],
             sku=sku, quantity=qty)
         t["order_id"] = order_id
         t["order_token"] = orders.sign_action_token(order_id, "ordered")
+
+        # v0.20.0 — AI SKU completion. Only fire when we JUST created
+        # the draft (created_new) AND the supply template gave us
+        # nothing. Doing this AFTER create_draft_if_none avoids paying
+        # LLM cost on every recovery/re-fire of the same slot.
+        if created_new and not sku and t.get("printer_model"):
+            ai = supply_library.ai_suggest_supply(
+                t["printer_model"], t["color"])
+            if ai and ai.get("sku"):
+                orders.update_draft_sku(
+                    order_id, ai["sku"],
+                    notes_append=(
+                        f"AI-suggested {ai['sku']}"
+                        + (f" ({ai['description']})"
+                            if ai.get("description") else "")
+                        + f" via {ai.get('provider', 'llm')}"))
+                t["ai_sku"] = ai["sku"]
+                t["ai_description"] = ai.get("description") or ""
+                _log_event(customer["id"], "order.ai_completed",
+                           meta={"order_id": order_id,
+                                  "sku": ai["sku"],
+                                  "provider": ai.get("provider")})
+
+        # v0.20.0 — autonomous mode: transition the fresh draft straight
+        # to "ordered", up to the customer's daily cap. Anything above
+        # the cap stays as a draft (operator must approve manually).
+        if (_order_mode == "autonomous" and created_new
+                and _orders_today < _daily_cap):
+            try:
+                orders.transition(order_id, "ordered",
+                                   user_id=None,
+                                   reason="auto-ordered by runner "
+                                          "(customer.auto_order_mode=autonomous)")
+                _orders_today += 1
+                t["auto_ordered"] = True
+                _log_event(customer["id"], "order.auto_ordered",
+                           meta={"order_id": order_id,
+                                  "orders_today": _orders_today,
+                                  "cap": _daily_cap})
+            except orders.OrderError as e:
+                logger.warning("auto-order transition failed for "
+                                "order %s: %s", order_id, e)
+        elif _order_mode == "autonomous" and created_new:
+            # Hit the cap — flag it so the mail template can surface it.
+            t["auto_order_cap_hit"] = True
+            _log_event(customer["id"], "order.auto_order_cap_hit",
+                       meta={"order_id": order_id,
+                              "orders_today": _orders_today,
+                              "cap": _daily_cap})
 
     # v0.17.1: when the alert is suppressed (quiet hours, no recipients),
     # DO NOT advance toner_state for the transitioning slots. Otherwise
@@ -418,6 +474,27 @@ def _alert_row_html(t: dict, *, recovered: bool = False,
                 f'text-decoration:none;font-weight:700;font-size:12px;">'
                 f'✓ Mark as ordered</a>'
             )
+        # v0.20.0 — surface autonomous/AI activity in the mail so the
+        # operator can tell at a glance whether they still need to act.
+        badge_html = ""
+        if t.get("auto_ordered"):
+            badge_html = (
+                '<div style="margin-top:6px;padding:6px 10px;'
+                'background:#ECFDF5;border:1px solid #10B981;'
+                'border-radius:6px;color:#065F46;font-weight:700;'
+                'font-size:11px;">🤖 Auto-ordered — no action needed</div>')
+        elif t.get("auto_order_cap_hit"):
+            badge_html = (
+                '<div style="margin-top:6px;padding:6px 10px;'
+                'background:#FFFBEB;border:1px solid #FCD34D;'
+                'border-radius:6px;color:#92400E;font-weight:700;'
+                'font-size:11px;">⚠ Daily auto-order cap reached — draft only</div>')
+        elif t.get("ai_sku"):
+            badge_html = (
+                '<div style="margin-top:6px;padding:6px 10px;'
+                'background:#EEF2FF;border:1px solid #A5B4FC;'
+                'border-radius:6px;color:#3730A3;font-weight:700;'
+                f'font-size:11px;">🧠 AI-suggested SKU: {_escape(t["ai_sku"])}</div>')
         order_html = f"""
       <tr>
         <td colspan="2" style="padding:0 10px 10px;">
@@ -426,6 +503,7 @@ def _alert_row_html(t: dict, *, recovered: bool = False,
                       font-size:12px;line-height:1.5;">
             {" · ".join(parts)}
             <div style="margin-top:8px;">{buttons_html}</div>
+            {badge_html}
           </div>
         </td>
       </tr>"""

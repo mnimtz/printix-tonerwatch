@@ -174,6 +174,35 @@ def create_draft(
     return order_id
 
 
+def update_draft_sku(order_id: int, sku: str,
+                      notes_append: str = "") -> None:
+    """v0.20.0 — after the runner enriches a draft with an AI-suggested
+    SKU, persist it. Only touches DRAFT orders so an admin who already
+    saw + edited the draft doesn't get it silently rewritten."""
+    with db.get_conn() as conn:
+        conn.execute(update(db.toner_orders)
+                     .where(db.toner_orders.c.id == order_id)
+                     .where(db.toner_orders.c.status == "draft")
+                     .values(sku=(sku or "").strip(),
+                             notes=(func.coalesce(db.toner_orders.c.notes, "")
+                                     + ("\n" + notes_append
+                                        if notes_append else ""))))
+
+
+def count_today(customer_id: int) -> int:
+    """v0.20.0 — how many orders were opened today for this customer?
+    Used by the autonomous-order path to enforce the daily cap.
+    Counts every non-cancelled row created since midnight UTC."""
+    with db.get_conn() as conn:
+        row = conn.execute(select(func.count(db.toner_orders.c.id))
+                            .where(db.toner_orders.c.customer_id == customer_id)
+                            .where(db.toner_orders.c.status != "cancelled")
+                            .where(db.toner_orders.c.created_at
+                                    >= func.date("now"))
+                            ).first()
+    return int(row[0] or 0) if row else 0
+
+
 def create_draft_if_none(
     customer_id: int, printer_id: str, printer_name: str, color: str,
     sku: str, quantity: int = 1,
