@@ -25,13 +25,23 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **Two views on the same data.** Card-based grid for quick triage or a
   sortable list view for spreadsheet-style scanning. Toggle persists per
   user in session.
+- **Live client-side search + filters.** Chip filters for severity, hide
+  Anywhere printers (Printix's virtual queues) with a live count, group
+  chips per printer group. Client-side freetext search (name, location,
+  model, serial, vendor, asset tag, notes, customer, group) narrows the
+  visible cards/rows as you type — no server round-trip.
+- **Human-readable activity feed on the dashboard.** Replaces the old raw
+  audit log with `👤 Marcus signed in · 3 min ago` and 30+ localized
+  action templates. Icons per family (⚙ settings, 👤 user, 🏢 customer,
+  🖨 toner, 📦 order, 🛒 supply).
 - **Human-friendly status badges.** Bare SNMP codes (`NO_PAPER`,
   `MARKER_SUPPLY_LOW`, `DOOR_OPEN`, …) rendered as colored pill badges
   with icons and translated captions; unknown codes fall back to the raw
   code, so a new firmware state still shows up sensibly.
-- **Live-look-alike, cache-fast.** Every render reads from a background
-  cache that a scheduler warms every 5 minutes — dashboards load in under
-  100 ms even when the BI DB is asleep.
+- **Cache-only fast path.** `/toner` reads exclusively from the
+  background cache that the scheduler warms — pages render in under
+  100 ms regardless of BI DB latency. Cold-cache banners with an inline
+  ↻ Refresh button when a customer hasn't been warmed yet.
 
 ### Alerting
 
@@ -39,10 +49,15 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   per customer.
 - **Digest mode + quiet hours.** Group per-customer transitions into one
   mail; hold notifications during a configurable window.
+- **Three mail providers.** Resend (HTTPS, Azure-friendly), SMTP fallback,
+  and **Microsoft Graph** (`/users/{upn}/sendMail`, reuses the Entra SSO
+  app registration). Graph provider auto-lists tenant mailboxes for the
+  sender picker + inline auth-probe button that pinpoints AADSTS misconfigs.
 - **Rich HTML mail with one-click ordering.** Every critical/warn row
   carries the SKU + description + a green **🛒 Order now** button + a blue
   **✓ Mark as ordered** magic link (14-day-signed, single action, POST
-  confirm to survive link-preview bots).
+  confirm to survive link-preview bots). Autonomous mode adds a
+  🤖 *Auto-ordered — no action needed* badge on rows the runner sent itself.
 - **Alert runner** on APScheduler; default 15 min, configurable via
   `ALERT_INTERVAL_MINUTES`.
 
@@ -53,10 +68,17 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **Auto-drafts on alert.** The runner creates one draft per
   (customer, printer, colour) slot; idempotent, so a stuck printer doesn't
   spawn a new draft every tick.
+- **AI SKU completion.** If the matching supply template has no SKU AND
+  an LLM provider is configured, the runner asks it for the OEM cartridge
+  ID + description + yield and merges the result into the fresh draft.
+- **Autonomous mode.** Per-customer opt-in (`auto_order_mode = autonomous`)
+  — the runner transitions freshly-created drafts straight to `ordered`
+  and emails the supplier. A per-customer `auto_order_daily_cap` (default
+  10) protects against runaway alerts turning into P.O. spam; excess
+  drafts stay as drafts.
 - **Three-column kanban** on `/orders` — Draft / Ordered / Delivered plus a
-  collapsible "recently closed" section. Every card has a green **🛒 Order
-  now** button (opens the supplier URL) and buttons for the next state
-  transition.
+  collapsible "recently closed" section, customer filter dropdown, and a
+  green **🛒 Order now** button per card.
 - **Magic-link handlers.** `/orders/action/{token}` lets an email
   recipient act on an order without logging in — landing page requires a
   POST confirm so mail-preview crawlers can't accidentally change state.
@@ -99,7 +121,22 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 ### Authentication
 
 - **Local password + optional Entra ID SSO.** Bcrypt-hashed passwords
-  with per-(IP, email) login throttling.
+  with per-(IP, email) login throttling; user list has a role chip
+  filter (Admin / Technician / All) plus a client-side live search.
+- **Entra Auto-Setup via device-code flow.** One click, one sign-in with
+  a Global Admin. TonerWatch mints the App Registration + Client Secret
+  + tenant-wide admin consent for the OIDC scopes via Microsoft Graph —
+  no manual portal work needed.
+- **Secret rotation without a new app.** Reconfigure detects the
+  existing app and offers 🔑 *Rotate secret only* — mints a fresh
+  `client_secret` on the same app registration; existing permissions
+  and consent carry over. Also fixes AADSTS7000215 (stored secret
+  invalid) without going to Azure Portal.
+- **Diagnose page** at `/settings/entra/diagnose` — snapshots the SSO
+  config, the effective redirect URI (with a warning if the reverse
+  proxy sends `http://`), all local users the SSO flow could match,
+  and the last 30 SSO audit events. Callback errors now redirect to
+  `/login?error=…` so the message survives.
 - **Sign in with Microsoft.** OAuth2 authorization-code flow via MSAL.
   Auto-provisioning with optional email-domain restriction, default role
   for new users.
@@ -116,14 +153,29 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   rest; container auto-created; interval configurable in hours;
   last-upload timestamp + blob name (or error) shown in Settings.
 
+### Database setup
+
+- **SQLite by default, Azure SQL as an alternative.** `/settings/database`
+  shows which backend is active + lets an admin non-destructively test an
+  Azure SQL config (server + database + credentials → `SELECT 1` in a
+  throwaway engine, never touches the running one) and copy a
+  ready-to-paste `DATABASE_URL` for Azure App Service → Application
+  Settings.
+
 ### AI / LLM integration
 
 - **Five providers**, one primitive. Chat() call is provider-agnostic;
   supports OpenAI, Azure OpenAI, Google Gemini, Anthropic Claude and
   Ollama (self-hosted). Adding a new provider is a ~30-line function.
+- **Model discovery.** After picking a provider and entering the API
+  key, the ↻ *list* button queries the provider's own `/v1/models` (or
+  equivalent) and populates an autocomplete datalist — no more typing a
+  model ID from memory.
 - **Fernet-encrypted API keys.** Never plaintext in the DB.
 - **Test-connection button** fires a one-word chat and reports the
-  provider on success.
+  provider on success. Every provider failure lands as a readable error
+  message on the settings page (no more raw 500s from a wrong model
+  name).
 
 ### Microsoft 365 Copilot Connector
 
