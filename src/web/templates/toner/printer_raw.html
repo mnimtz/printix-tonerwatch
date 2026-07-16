@@ -32,7 +32,7 @@
   </div>
   {% if selected_cust and printer_choices %}
     <div class="form-group" style="margin: 0; flex: 1; min-width: 260px;">
-      <label for="id">Drucker</label>
+      <label for="id">Drucker (einzeln)</label>
       <select id="id" name="id" onchange="this.form.submit()">
         <option value="">— wählen —</option>
         {% for p in printer_choices %}
@@ -43,6 +43,18 @@
         {% endfor %}
       </select>
     </div>
+  {% endif %}
+  {% if selected_cust %}
+    <div class="form-group" style="margin: 0;">
+      <label for="name">Name enthält (10er-Dump)</label>
+      <input id="name" name="name" type="text"
+             placeholder="mobileprint, anywhere, …"
+             value="{{ name_filter }}"
+             style="min-width: 200px;">
+    </div>
+    <button type="submit" class="btn btn-secondary" style="height: 34px;">
+      Filter
+    </button>
   {% endif %}
 </form>
 

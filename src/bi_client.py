@@ -224,21 +224,30 @@ def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
                                               else dict(zip(cols, row))}
 
 
-def fetch_printers_raw(customer: dict, limit: int = 10) -> Optional[dict]:
+def fetch_printers_raw(customer: dict, limit: int = 10,
+                        name_filter: str = "") -> Optional[dict]:
     """v0.23.8 — SELECT TOP N * FROM dbo.printers so the operator can
-    dump the FULL schema (columns + first N rows) into the diagnose
-    view. Returns::
+    dump the FULL schema (columns + first N rows). Returns::
 
         {"columns": ["id", "name", ...],
          "rows":    [{"id": "…", "name": "…", ...}, ...]}
 
-    Or ``None`` on any DB-side failure."""
+    v0.23.9 — ``name_filter`` narrows by LIKE '%…%' on the name
+    column so the operator can find a specific device (e.g.
+    "mobileprint", "anywhere") among hundreds of printers."""
     with _connect(customer) as conn:
         cur = conn.cursor()
+        # Build the SQL in one place. TOP N inline is safe (we cast to
+        # int); the name filter uses a parameter so it's SQL-safe.
+        sql_parts = [f"SELECT TOP {int(limit)} * FROM dbo.printers "
+                      "WHERE meta_status = 'ACTIVE'"]
+        params: tuple = ()
+        if name_filter:
+            sql_parts.append(" AND name LIKE %s")
+            params = (f"%{name_filter}%",)
+        sql_parts.append(" ORDER BY name")
         try:
-            cur.execute(
-                "SELECT TOP %d * FROM dbo.printers "
-                "WHERE meta_status = 'ACTIVE' ORDER BY name" % int(limit))
+            cur.execute("".join(sql_parts), params)
         except Exception as exc:  # noqa: BLE001
             logger.warning("fetch_printers_raw failed: %s", exc)
             return None

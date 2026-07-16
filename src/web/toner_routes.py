@@ -396,6 +396,7 @@ async def toner_printer_raw(request: Request):
     q = request.query_params
     cust_id_raw = q.get("customer", "").strip()
     printer_id  = q.get("id", "").strip()
+    name_filter = q.get("name", "").strip()
 
     customers = _visible_customers(user)
     selected_cust = None
@@ -422,7 +423,8 @@ async def toner_printer_raw(request: Request):
                 bi_client.customer_for_bi(selected_cust), printer_id)
         else:
             dump = bi_client.fetch_printers_raw(
-                bi_client.customer_for_bi(selected_cust), limit=10)
+                bi_client.customer_for_bi(selected_cust),
+                limit=10, name_filter=name_filter)
             if dump:
                 import json as _json
                 bulk_cols = dump["columns"]
@@ -436,6 +438,7 @@ async def toner_printer_raw(request: Request):
          "customers": customers, "selected_cust": selected_cust,
          "printer_choices": printer_choices,
          "printer_id": printer_id, "raw": raw,
+         "name_filter": name_filter,
          "bulk_json": bulk_json, "bulk_cols": bulk_cols,
          "bulk_row_count": bulk_row_count},
     )
