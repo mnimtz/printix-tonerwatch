@@ -385,6 +385,45 @@ async def toner_diagnose(request: Request):
     )
 
 
+@router.get("/toner/printer_raw", response_class=HTMLResponse,
+            include_in_schema=False)
+async def toner_printer_raw(request: Request):
+    """v0.23.7 — SELECT * FROM dbo.printers WHERE id = ?  and render
+    every field so the operator can see EXACTLY what Printix BI
+    reports. If our 6-column extract misses the Anywhere marker,
+    the missing field is visible here + we can extend the extract."""
+    user = auth.require_user(request)
+    q = request.query_params
+    cust_id_raw = q.get("customer", "").strip()
+    printer_id  = q.get("id", "").strip()
+
+    customers = _visible_customers(user)
+    selected_cust = None
+    if cust_id_raw.isdigit():
+        cid = int(cust_id_raw)
+        for c in customers:
+            if c["id"] == cid:
+                selected_cust = c
+                break
+
+    printer_choices: list = []
+    raw = None
+    if selected_cust:
+        printer_choices = bi_client.list_printer_ids(
+            bi_client.customer_for_bi(selected_cust), limit=200)
+        if printer_id:
+            raw = bi_client.fetch_printer_raw(
+                bi_client.customer_for_bi(selected_cust), printer_id)
+
+    return request.app.state.templates.TemplateResponse(
+        "toner/printer_raw.html",
+        {"request": request, "lang": request.state.lang, "user": user,
+         "customers": customers, "selected_cust": selected_cust,
+         "printer_choices": printer_choices,
+         "printer_id": printer_id, "raw": raw},
+    )
+
+
 def _looks_like_anywhere(p: dict) -> bool:
     """Same predicate as v0.23.5 hide-Anywhere filter — kept in one
     place so the diagnose view can flag exactly what would be hidden."""

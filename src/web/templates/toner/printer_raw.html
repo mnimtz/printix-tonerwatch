@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Raw-Ansicht · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/toner" data-noloader>{{ _('toner.title', lang) }}</a> /
+  <a href="/toner/diagnose" data-noloader>Diagnose</a> /
+  Raw-Ansicht
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-3);">🔬 Drucker-Rohdaten aus Printix BI</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-4);">
+  Zeigt <code>SELECT * FROM dbo.printers</code> für einen einzelnen
+  Drucker — inklusive Spalten, die TonerWatch normalerweise NICHT
+  liest. Damit siehst du sofort welches Feld den Anywhere-Marker
+  trägt.
+</p>
+
+<form method="get" action="/toner/printer_raw" data-noloader
+      style="display: flex; gap: var(--sp-2); align-items: end;
+             flex-wrap: wrap; margin-bottom: var(--sp-4);">
+  <div class="form-group" style="margin: 0;">
+    <label for="customer">Kunde</label>
+    <select id="customer" name="customer" onchange="this.form.submit()">
+      <option value="">— wählen —</option>
+      {% for c in customers %}
+        <option value="{{ c.id }}"
+                {% if selected_cust and selected_cust.id == c.id %}selected{% endif %}>
+          {{ c.name }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if selected_cust and printer_choices %}
+    <div class="form-group" style="margin: 0; flex: 1; min-width: 260px;">
+      <label for="id">Drucker</label>
+      <select id="id" name="id" onchange="this.form.submit()">
+        <option value="">— wählen —</option>
+        {% for p in printer_choices %}
+          <option value="{{ p.id }}"
+                  {% if printer_id == p.id %}selected{% endif %}>
+            {{ p.name or p.id }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+</form>
+
+{% if raw %}
+  <section class="card" style="padding: var(--sp-4);">
+    <h2 style="margin: 0 0 var(--sp-3);">
+      Spalten & Werte ({{ raw.columns|length }} Felder)
+    </h2>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+      <thead>
+        <tr style="background: var(--tw-gray-100); color: var(--tw-primary);
+                   text-align: left;">
+          <th style="padding: 6px 10px; width: 240px;">Spalte</th>
+          <th style="padding: 6px 10px;">Wert</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col in raw.columns %}
+          {% set v = raw.values.get(col) %}
+          <tr style="border-top: 1px solid var(--tw-gray-200);">
+            <td style="padding: 6px 10px; font-family: var(--font-mono);
+                       color: var(--tw-primary); font-weight: 600;">
+              {{ col }}
+            </td>
+            <td style="padding: 6px 10px; font-family: var(--font-mono);
+                       word-break: break-word;">
+              {% if v is none %}
+                <span style="color: var(--tw-muted-blue);">(null)</span>
+              {% elif v == '' %}
+                <span style="color: var(--tw-muted-blue);">(leer)</span>
+              {% else %}
+                {{ v }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% elif selected_cust and printer_id %}
+  <div class="alert alert-error">
+    Kein Datensatz für Drucker-ID <code>{{ printer_id }}</code> gefunden.
+  </div>
+{% endif %}
+
+<div style="margin-top: var(--sp-4);">
+  <a href="/toner/diagnose" class="btn btn-secondary" data-noloader>
+    ← zurück zur Diagnose-Übersicht
+  </a>
+</div>
+{% endblock %}

@@ -201,6 +201,50 @@ _PRINTER_SUPPLIES_NEG_TTL = 60    # 1 min for empty reads (silent printers)
 _CACHE_LOCK = threading.Lock()
 
 
+def fetch_printer_raw(customer: dict, printer_id: str) -> Optional[dict]:
+    """v0.23.7 — return the FULL row of dbo.printers for one printer id,
+    plus every column name Printix BI exposes. Used by the diagnose
+    view so the operator can see which field carries the
+    Anywhere-marker in their tenant (the 6 columns we normally read
+    might miss it)."""
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT * FROM dbo.printers WHERE id = %s",
+                         (printer_id,))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("fetch_printer_raw failed: %s", exc)
+            return None
+        row = cur.fetchone()
+        if row is None:
+            return None
+        # cur.description = [(name, type, ...), ...] — extract names.
+        cols = [d[0] for d in (cur.description or [])]
+        return {"columns": cols, "values": dict(row) if isinstance(row, dict)
+                                              else dict(zip(cols, row))}
+
+
+def list_printer_ids(customer: dict, limit: int = 30) -> list[dict]:
+    """v0.23.7 — return (id, name) pairs so the diagnose view can offer
+    a picker."""
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT TOP %d id, name FROM dbo.printers "
+                "WHERE meta_status = 'ACTIVE' ORDER BY name" % int(limit))
+        except Exception:  # noqa: BLE001
+            return []
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            if isinstance(r, dict):
+                out.append({"id": str(r.get("id", "")), "name": r.get("name") or ""})
+            else:
+                out.append({"id": str(r[0]), "name": r[1] or ""})
+        return out
+
+
 def fetch_printer_supplies(customer: dict, printer_id: str) -> Optional[list[dict]]:
     """Latest CMYK levels for one printer — cached for 5 min.
 

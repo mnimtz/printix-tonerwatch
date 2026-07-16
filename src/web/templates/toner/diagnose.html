@@ -93,9 +93,12 @@
 </section>
 {% endfor %}
 
-<div style="margin-top: var(--sp-4);">
+<div style="margin-top: var(--sp-4); display: flex; gap: var(--sp-2);">
   <a href="/toner" class="btn btn-secondary" data-noloader>
     ← zurück zum Tonerstatus
+  </a>
+  <a href="/toner/printer_raw" class="btn btn-secondary" data-noloader>
+    🔬 Rohdaten eines einzelnen Druckers ansehen
   </a>
 </div>
 {% endblock %}
