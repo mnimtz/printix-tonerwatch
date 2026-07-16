@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Anywhere-Filter Diagnose · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/toner" data-noloader>{{ _('toner.title', lang) }}</a> /
+  Diagnose
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-3);">🔍 Anywhere-Filter Diagnose</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-4);">
+  Was TonerWatch pro Kunde aus Printix BI liest — vendor / model /
+  printer_name. Zeilen mit ✓ würden vom "Anywhere ausblenden"-Filter
+  versteckt. Wenn deine echten Anywhere-Drucker hier ohne ✓ stehen,
+  weiß ich was der Filter zusätzlich matchen muss.
+</p>
+
+{% for d in diagnostics %}
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
+  <h2 style="margin: 0 0 var(--sp-2);">
+    🏢 {{ d.customer_name }}
+    {% if d.status == 'ok' %}
+      <span style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                   font-weight: 400;">
+        · {{ d.printer_count }} Drucker gesamt
+      </span>
+    {% endif %}
+  </h2>
+
+  {% if d.status == 'cache_cold_or_empty' %}
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem;">
+      Cache kalt oder keine Drucker. Auf /toner "↻ Von Printix aktualisieren"
+      klicken und diese Seite neu laden.
+    </p>
+  {% else %}
+    {# Häufigste Vendor-Werte — hilft Marcus sofort zu sehen ob "Printix"
+       überhaupt vorkommt. #}
+    <div style="margin-bottom: var(--sp-3);">
+      <div style="font-weight: 700; font-size: 0.82rem;
+                  color: var(--tw-muted-blue); text-transform: uppercase;
+                  letter-spacing: 0.06em; margin-bottom: 6px;">
+        Häufigste vendor-Werte
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        {% for v, n in d.vendor_counts %}
+          <span style="padding: 3px 10px; border-radius: 12px;
+                       background: var(--tw-gray-200); color: var(--tw-primary);
+                       font-family: var(--font-mono); font-size: 0.78rem;">
+            {{ v }} <strong style="opacity: 0.7;">×{{ n }}</strong>
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+      <thead>
+        <tr style="background: var(--tw-gray-100); color: var(--tw-primary);
+                   text-align: left;">
+          <th style="padding: 6px 10px;">Anywhere?</th>
+          <th style="padding: 6px 10px;">vendor</th>
+          <th style="padding: 6px 10px;">model</th>
+          <th style="padding: 6px 10px;">printer_name</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in d.rows %}
+        <tr style="border-top: 1px solid var(--tw-gray-200);">
+          <td style="padding: 6px 10px; text-align: center;">
+            {% if r.would_be_hidden %}
+              <span style="color: var(--status-ok); font-weight: 700;">✓</span>
+            {% else %}
+              <span style="color: var(--tw-muted-blue);">—</span>
+            {% endif %}
+          </td>
+          <td style="padding: 6px 10px; font-family: var(--font-mono);">
+            {{ r.vendor or '(empty)' }}
+          </td>
+          <td style="padding: 6px 10px; font-family: var(--font-mono);">
+            {{ r.model or '(empty)' }}
+          </td>
+          <td style="padding: 6px 10px; font-family: var(--font-mono);">
+            {{ r.printer_name or '(empty)' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if d.rows|length >= 50 %}
+      <p style="margin-top: 8px; font-size: 0.78rem; color: var(--tw-muted-blue);">
+        Nur die ersten 50 distinct-Kombinationen. Sollte für die Analyse reichen.
+      </p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endfor %}
+
+<div style="margin-top: var(--sp-4);">
+  <a href="/toner" class="btn btn-secondary" data-noloader>
+    ← zurück zum Tonerstatus
+  </a>
+</div>
+{% endblock %}

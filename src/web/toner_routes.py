@@ -334,6 +334,68 @@ def _bucket_by_group(printers: list[dict]) -> list[tuple[str, list[dict]]]:
     return [(g, buckets[g]) for g in named]
 
 
+@router.get("/toner/diagnose", response_class=HTMLResponse,
+            include_in_schema=False)
+async def toner_diagnose(request: Request):
+    """v0.23.6 — dump distinct (vendor, model, printer_name)
+    combinations per visible customer so an operator can see what
+    the BI-DB actually reports for their Anywhere queues. The
+    'hide anywhere' filter can only match what's actually in the
+    data — if it's not working, the operator needs to know which
+    field carries the Printix-Anywhere marker in their tenant."""
+    user = auth.require_user(request)
+    from collections import Counter as _Counter
+    diagnostics: list[dict] = []
+    for c in _visible_customers(user):
+        bi_customer = bi_client.customer_for_bi(c)
+        printers = bi_client.fetch_all_printer_supplies_cached_only(bi_customer)
+        if not printers:
+            diagnostics.append({"customer_id": c["id"],
+                                "customer_name": c["name"],
+                                "status": "cache_cold_or_empty",
+                                "rows": []})
+            continue
+        vendor_counts = _Counter((p.get("vendor") or "(empty)") for p in printers)
+        rows = []
+        seen = set()
+        for p in printers:
+            key = ((p.get("vendor") or "").strip(),
+                    (p.get("model") or "").strip(),
+                    (p.get("printer_name") or "").strip()[:60])
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({"vendor": p.get("vendor") or "",
+                          "model":  p.get("model") or "",
+                          "printer_name": p.get("printer_name") or "",
+                          "would_be_hidden": _looks_like_anywhere(p)})
+        rows.sort(key=lambda r: (not r["would_be_hidden"],
+                                   r["vendor"].lower(),
+                                   r["model"].lower()))
+        diagnostics.append({"customer_id": c["id"],
+                            "customer_name": c["name"],
+                            "status": "ok",
+                            "printer_count": len(printers),
+                            "vendor_counts": vendor_counts.most_common(10),
+                            "rows": rows[:50]})
+    return request.app.state.templates.TemplateResponse(
+        "toner/diagnose.html",
+        {"request": request, "lang": request.state.lang,
+         "user": user, "diagnostics": diagnostics},
+    )
+
+
+def _looks_like_anywhere(p: dict) -> bool:
+    """Same predicate as v0.23.5 hide-Anywhere filter — kept in one
+    place so the diagnose view can flag exactly what would be hidden."""
+    vendor = (p.get("vendor") or "").strip().lower()
+    model  = (p.get("model") or "").strip().lower()
+    name   = (p.get("printer_name") or "").strip().lower()
+    return (vendor == "printix"
+            or "anywhere" in model
+            or "anywhere" in name)
+
+
 @router.post("/toner/refresh", include_in_schema=False)
 async def toner_refresh(request: Request):
     """Drop the cache for the customers the user can see, then do one
