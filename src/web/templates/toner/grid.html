@@ -498,6 +498,11 @@
        style="margin-left: 4px;" data-noloader
        title="{{ _('toner.hide_anywhere.hint', lang) }}">
       {% if hide_anywhere %}☑{% else %}☐{% endif %} {{ _('toner.hide_anywhere.toggle', lang) }}
+      {% if anywhere_count %}
+        <span style="opacity: 0.7; font-weight: 400; margin-left: 4px;">
+          ({{ anywhere_count }})
+        </span>
+      {% endif %}
     </a>
   </div>
 {% endif %}
