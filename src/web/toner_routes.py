@@ -172,6 +172,21 @@ async def toner_grid(request: Request):
             group_by = request.session.get("toner_group_by", "0") == "1"
         except AssertionError:
             group_by = False
+    # v0.18.1: Printix Anywhere Printers are virtual (vendor="Printix"),
+    # they have no toner and would clutter every list. Hide by default;
+    # persist the operator's choice in the session so a reload keeps it.
+    hide_anywhere_raw = q.get("hide_anywhere", "")
+    if hide_anywhere_raw in ("1", "0"):
+        hide_anywhere = (hide_anywhere_raw == "1")
+        try:
+            request.session["toner_hide_anywhere"] = "1" if hide_anywhere else "0"
+        except AssertionError:
+            pass
+    else:
+        try:
+            hide_anywhere = request.session.get("toner_hide_anywhere", "1") == "1"
+        except AssertionError:
+            hide_anywhere = True
     # View mode — persist in session so page reloads / navigation keep it.
     view_mode = q.get("view", "").strip().lower()
     if view_mode in ("grid", "list"):
@@ -188,6 +203,12 @@ async def toner_grid(request: Request):
         view_mode = "grid"
 
     filtered = rows
+    if hide_anywhere:
+        # Anywhere printers surface as vendor="Printix" (Printix's own
+        # virtual print queue). They have no real supplies, so hide
+        # them by default. Any casing variant BI may throw at us.
+        filtered = [r for r in filtered
+                    if (r.get("vendor") or "").strip().lower() != "printix"]
     if filter_customer.isdigit():
         cid = int(filter_customer)
         filtered = [r for r in filtered if r["customer_id"] == cid]
@@ -271,6 +292,7 @@ async def toner_grid(request: Request):
             "view_saved_flag": q.get("view_saved") == "1",
             "view_deleted_flag": q.get("view_deleted") == "1",
             "group_by":        group_by,
+            "hide_anywhere":   hide_anywhere,
             # Buckets: [(group_name_or_None, [printer, printer, …]), …]
             # sorted by group name (ungrouped last). Only used when
             # group_by is True; grid.html / list.html each decide

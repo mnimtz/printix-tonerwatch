@@ -436,26 +436,58 @@
     {# v0.16: one-click auto-setup. Admin doesn't touch the Azure Portal
        — TW does the App Registration + Client Secret + tenant-wide
        consent via Graph API after the admin signs in once with a
-       device code. #}
+       device code.
+       v0.18.1: when Entra is already configured, hide the big pitch
+       and show a compact "configured" card with a "Reconfigure" button
+       instead. Keeping the loud Auto-Setup box next to a working
+       setup led admins to loop through device-code auth again and
+       again after the first success. #}
+    {% set entra_configured = (entra.client_id and entra.client_secret_present) %}
     <div id="entra-autosetup"
          style="margin-top: var(--sp-3); padding: var(--sp-4);
-                background: linear-gradient(90deg, rgba(0,235,134,0.06), rgba(0,160,251,0.06));
-                border: 1px solid rgba(0,40,84,0.15);
+                {% if entra_configured %}background: rgba(0,235,134,0.08); border: 1px solid rgba(5,150,105,0.35);{% else %}background: linear-gradient(90deg, rgba(0,235,134,0.06), rgba(0,160,251,0.06)); border: 1px solid rgba(0,40,84,0.15);{% endif %}
                 border-radius: var(--r-lg);">
-      <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 200px;">
-          <div style="font-weight: 700; color: var(--tw-primary);">
-            ⚡ {{ _('settings.entra.autosetup.title', lang) }}
+      {% if entra_configured %}
+        <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-weight: 700; color: #065F46;">
+              ✅ {{ _('settings.entra.configured.title', lang) }}
+            </div>
+            <div style="font-size: 0.82rem; color: var(--tw-muted-blue);
+                        margin-top: 6px; line-height: 1.5;
+                        font-family: var(--font-mono);">
+              {% if entra.tenant_id %}
+                {{ _('settings.entra.configured.tenant', lang) }}:
+                <span style="color: var(--tw-primary);">{{ entra.tenant_id }}</span><br>
+              {% endif %}
+              {{ _('settings.entra.configured.client', lang) }}:
+              <span style="color: var(--tw-primary);">{{ entra.client_id }}</span><br>
+              {{ _('settings.entra.configured.secret', lang) }}:
+              <span style="color: #065F46;">✓ {{ _('settings.entra.configured.stored', lang) }}</span>
+            </div>
           </div>
-          <div style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 3px;">
-            {{ _('settings.entra.autosetup.intro', lang) }}
-          </div>
+          <button type="button" id="btn-entra-autosetup" class="btn btn-secondary"
+                  data-noloader style="white-space: nowrap;"
+                  title="{{ _('settings.entra.configured.reconfigure_hint', lang) }}">
+            🔄 {{ _('settings.entra.configured.reconfigure', lang) }}
+          </button>
         </div>
-        <button type="button" id="btn-entra-autosetup" class="btn btn-primary"
-                data-noloader style="white-space: nowrap;">
-          🚀 {{ _('settings.entra.autosetup.start', lang) }}
-        </button>
-      </div>
+      {% else %}
+        <div style="display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-weight: 700; color: var(--tw-primary);">
+              ⚡ {{ _('settings.entra.autosetup.title', lang) }}
+            </div>
+            <div style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 3px;">
+              {{ _('settings.entra.autosetup.intro', lang) }}
+            </div>
+          </div>
+          <button type="button" id="btn-entra-autosetup" class="btn btn-primary"
+                  data-noloader style="white-space: nowrap;">
+            🚀 {{ _('settings.entra.autosetup.start', lang) }}
+          </button>
+        </div>
+      {% endif %}
       <div id="entra-autosetup-panel" style="display: none; margin-top: var(--sp-4);">
         <!-- populated by JS -->
       </div>
@@ -776,6 +808,10 @@
              'onclick="location.reload()">' +
              {{ _('common.reload', lang)|tojson }} +
           '</button></div>');
+        // v0.18.1: auto-reload after a moment so the page state
+        // reflects the new config (Auto-Setup box → Configured card)
+        // and the admin can't accidentally trigger the flow again.
+        setTimeout(function() { location.reload(); }, 2500);
         return;
       }
       if (j.status === 'pending') {
@@ -836,6 +872,7 @@
                      'admin_consent: ' + esc(j2.admin_consent) +
                   '</pre><button type="button" class="btn" data-noloader onclick="location.reload()">' +
                      {{ _('common.reload', lang)|tojson }} + '</button></div>');
+                setTimeout(function() { location.reload(); }, 2500);
               } else {
                 show('<div style="color:#991B1B;">✗ ' + esc(j2.error || 'error') + '</div>');
               }

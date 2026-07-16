@@ -480,6 +480,15 @@
         🏷 {{ _('toner.group_by.toggle', lang) }}
       </a>
     {% endif %}
+
+    {# v0.18.1: Anywhere-Printer filter (vendor="Printix"). Default ON —
+       Anywhere is Printix's virtual queue, no real toner data. #}
+    <a href="?hide_anywhere={{ '0' if hide_anywhere else '1' }}{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
+       class="chip {{ 'active' if hide_anywhere else '' }}"
+       style="margin-left: 4px;" data-noloader
+       title="{{ _('toner.hide_anywhere.hint', lang) }}">
+      {% if hide_anywhere %}☑{% else %}☐{% endif %} {{ _('toner.hide_anywhere.toggle', lang) }}
+    </a>
   </div>
 {% endif %}
 
