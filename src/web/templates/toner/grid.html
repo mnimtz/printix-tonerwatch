@@ -507,16 +507,17 @@
       </a>
     {% endif %}
 
-    {# v0.18.1: Anywhere-Printer filter (vendor="Printix"). Default ON —
-       Anywhere is Printix's virtual queue, no real toner data. #}
-    <a href="?hide_anywhere={{ '0' if hide_anywhere else '1' }}{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
-       class="chip {{ 'active' if hide_anywhere else '' }}"
+    {# v0.24.18: replaces the old name/vendor "Anywhere" heuristic —
+       hides any device the BI feed reports zero toner supplies for
+       (Anywhere queues included, but not name-dependent). Default ON. #}
+    <a href="?hide_no_toner={{ '0' if hide_no_toner else '1' }}{% if filter_severity %}&severity={{ filter_severity }}{% endif %}{% if filter_customer %}&customer={{ filter_customer }}{% endif %}{% if filter_group %}&group={{ filter_group }}{% endif %}{% if filter_search %}&q={{ filter_search }}{% endif %}"
+       class="chip {{ 'active' if hide_no_toner else '' }}"
        style="margin-left: 4px;" data-noloader
-       title="{{ _('toner.hide_anywhere.hint', lang) }}">
-      {% if hide_anywhere %}☑{% else %}☐{% endif %} {{ _('toner.hide_anywhere.toggle', lang) }}
-      {% if anywhere_count %}
+       title="{{ _('toner.hide_no_toner.hint', lang) }}">
+      {% if hide_no_toner %}☑{% else %}☐{% endif %} {{ _('toner.hide_no_toner.toggle', lang) }}
+      {% if no_toner_count %}
         <span style="opacity: 0.7; font-weight: 400; margin-left: 4px;">
-          ({{ anywhere_count }})
+          ({{ no_toner_count }})
         </span>
       {% endif %}
     </a>

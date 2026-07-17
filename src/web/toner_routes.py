@@ -178,21 +178,25 @@ async def toner_grid(request: Request):
             group_by = request.session.get("toner_group_by", "0") == "1"
         except AssertionError:
             group_by = False
-    # v0.18.1: Printix Anywhere Printers are virtual (vendor="Printix"),
-    # they have no toner and would clutter every list. Hide by default;
-    # persist the operator's choice in the session so a reload keeps it.
-    hide_anywhere_raw = q.get("hide_anywhere", "")
-    if hide_anywhere_raw in ("1", "0"):
-        hide_anywhere = (hide_anywhere_raw == "1")
+    # v0.24.18: replaces the old vendor/model/name "Anywhere" string
+    # matching (v0.18.1–v0.23.13 — never fully reliable across tenants)
+    # with a direct check: hide any device the BI feed reports zero
+    # toner supplies for. Printix Anywhere queues have no real toner
+    # and always land here, but so does anything else with no supply
+    # data — no heuristic to keep in sync with Printix's own markers.
+    # Hide by default; persist the operator's choice in the session.
+    hide_no_toner_raw = q.get("hide_no_toner", "")
+    if hide_no_toner_raw in ("1", "0"):
+        hide_no_toner = (hide_no_toner_raw == "1")
         try:
-            request.session["toner_hide_anywhere"] = "1" if hide_anywhere else "0"
+            request.session["toner_hide_no_toner"] = "1" if hide_no_toner else "0"
         except AssertionError:
             pass
     else:
         try:
-            hide_anywhere = request.session.get("toner_hide_anywhere", "1") == "1"
+            hide_no_toner = request.session.get("toner_hide_no_toner", "1") == "1"
         except AssertionError:
-            hide_anywhere = True
+            hide_no_toner = True
     # View mode — persist in session so page reloads / navigation keep it.
     view_mode = q.get("view", "").strip().lower()
     if view_mode in ("grid", "list"):
@@ -208,24 +212,14 @@ async def toner_grid(request: Request):
     if view_mode not in ("grid", "list"):
         view_mode = "grid"
 
-    # v0.23.5 — the v0.18.1 filter only matched vendor="Printix", but
-    # Anywhere printers can also carry the real vendor (HP, Kyocera,
-    # …) with the "Anywhere" marker in the model or printer_name. Do
-    # the union of all three signals so "hide anywhere" hides them
-    # regardless of which field Printix populated.
-    def _is_anywhere_printer(r: dict) -> bool:
-        vendor = (r.get("vendor") or "").strip().lower()
-        model  = (r.get("model") or "").strip().lower()
-        name   = (r.get("printer_name") or "").strip().lower()
-        return (vendor == "printix"
-                or "anywhere" in model
-                or "anywhere" in name)
+    def _has_no_toner(r: dict) -> bool:
+        return not r.get("supplies")
 
-    anywhere_count = sum(1 for r in rows if _is_anywhere_printer(r))
+    no_toner_count = sum(1 for r in rows if _has_no_toner(r))
 
     filtered = rows
-    if hide_anywhere:
-        filtered = [r for r in filtered if not _is_anywhere_printer(r)]
+    if hide_no_toner:
+        filtered = [r for r in filtered if not _has_no_toner(r)]
     if filter_customer.isdigit():
         cid = int(filter_customer)
         filtered = [r for r in filtered if r["customer_id"] == cid]
@@ -309,8 +303,8 @@ async def toner_grid(request: Request):
             "view_saved_flag": q.get("view_saved") == "1",
             "view_deleted_flag": q.get("view_deleted") == "1",
             "group_by":        group_by,
-            "hide_anywhere":   hide_anywhere,
-            "anywhere_count":  anywhere_count,
+            "hide_no_toner":   hide_no_toner,
+            "no_toner_count":  no_toner_count,
             # Buckets: [(group_name_or_None, [printer, printer, …]), …]
             # sorted by group name (ungrouped last). Only used when
             # group_by is True; grid.html / list.html each decide

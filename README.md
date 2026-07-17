@@ -26,7 +26,8 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   sortable list view for spreadsheet-style scanning. Toggle persists per
   user in session.
 - **Live client-side search + filters.** Chip filters for severity, hide
-  Anywhere printers (Printix's virtual queues) with a live count, group
+  devices with no toner data at all (Printix Anywhere queues and anything
+  else the BI feed never reported supplies for) with a live count, group
   chips per printer group. Client-side freetext search (name, location,
   model, serial, vendor, asset tag, notes, customer, group) narrows the
   visible cards/rows as you type — no server round-trip.
