@@ -326,9 +326,13 @@
         result.style.color = 'var(--status-critical)';
         return;
       }
-      // Auto-toggle C/M/Y based on the model's color capability.
+      // Auto-check C/M/Y when the AI detects a color device, but never
+      // uncheck a box the operator already ticked by hand — a wrong
+      // "this is mono" guess must not silently undo a manual
+      // "check all" and leave those rows without data to fill.
       COLORS.forEach(function(c) {
-        setEnabled(c, c === 'K' || j.is_color);
+        var alreadyChecked = document.getElementById('enable_' + c).checked;
+        setEnabled(c, c === 'K' || j.is_color || alreadyChecked);
       });
       var filled = [];
       Object.keys(j.slots || {}).forEach(function(c) {

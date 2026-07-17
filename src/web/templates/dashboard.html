@@ -83,6 +83,14 @@
     display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
     gap: var(--sp-3); margin-bottom: var(--sp-6);
   }
+  /* base.html's `.card + .card { margin-top }` rule is meant for
+     stacked cards in normal flow, but every tile here also carries
+     the shared `.card` class — inside a grid the sibling selector
+     still matches, adding top margin to every tile after the first
+     and shrinking it inside its stretched grid cell. Same specificity
+     as the base rule, declared later, so this wins without !important. */
+  .health-panel > .card,
+  .customer-grid > .card { margin-top: 0; }
   .ctile {
     text-decoration: none; color: inherit; display: block; position: relative;
     padding: var(--sp-4);

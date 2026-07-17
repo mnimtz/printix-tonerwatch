@@ -341,17 +341,20 @@ def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
         "You are a printer-supply lookup assistant. Given a printer "
         "model, first determine whether it is a MONOCHROME-only "
         "device (black toner only) or a COLOR device (CMYK — "
-        "black + cyan + magenta + yellow). Then return the OEM "
+        "black + cyan + magenta + yellow) — this is only a hint for "
+        "the UI, not a reason to omit data. Then return the OEM "
         "cartridge SKU, a one-line description, manufacturer, and "
-        "page yield for each toner slot it actually has. Never "
-        "invent numbers you're unsure about — return null for any "
-        "field you don't know. Reply with ONE JSON object only, no "
-        "prose, no code fences: "
-        "{\"is_color\": true|false, \"slots\": {"
+        "page yield for ALL FOUR toner slots K/C/M/Y, even for a "
+        "monochrome device (leave C/M/Y null in that case) — the "
+        "operator may still want them filled in for a shared toner "
+        "family or a variant of this model. Never invent numbers "
+        "you're unsure about — return null for any field you don't "
+        "know. Reply with ONE JSON object only, no prose, no code "
+        "fences: {\"is_color\": true|false, \"slots\": {"
         "\"K\": {\"sku\": \"…\", \"description\": \"…\", "
         "\"manufacturer\": \"…\", \"yield_pages\": 12345}, "
         "\"C\": {…}, \"M\": {…}, \"Y\": {…}}} "
-        "— omit the C/M/Y keys entirely when is_color is false."
+        "— always include all four slot keys."
     )
     user = (f"Printer model: {printer_model}\n"
             "Return the OEM cartridges (not compatible/generic) for "
@@ -384,9 +387,15 @@ def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
     if not isinstance(raw_slots, dict):
         raw_slots = {}
 
-    wanted_colors = ("K", "C", "M", "Y") if is_color else ("K",)
+    # v0.24.15 fix: always parse every color the LLM was asked for,
+    # regardless of its own is_color guess — that flag is only a UI
+    # hint for which checkboxes to default to, never a reason to
+    # discard C/M/Y data the model actually returned. Previously this
+    # was gated on `is_color`, so a printer the LLM misjudged as mono
+    # silently lost its C/M/Y slots even if the operator had checked
+    # every color box by hand.
     slots: dict[str, dict[str, Any]] = {}
-    for c in wanted_colors:
+    for c in ("K", "C", "M", "Y"):
         s = raw_slots.get(c)
         if not isinstance(s, dict):
             s = {}
