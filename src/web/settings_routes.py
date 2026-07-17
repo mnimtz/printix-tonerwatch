@@ -229,7 +229,8 @@ async def entra_autosetup_start(request: Request):
                 admin["id"], _short_hash(d["device_code"]), d.get("expires_in"))
     db.audit(admin["id"], "settings.entra_autosetup_started",
              target_type="settings", target_id="entra_sso",
-             meta_json=json.dumps({"user_code_len": len(d["user_code"])}))
+             meta_json=json.dumps({"user_code_len": len(d["user_code"]),
+                                    "device_code_hash": _short_hash(d["device_code"])}))
     return JSONResponse({
         "ok": True,
         "user_code":        d["user_code"],
@@ -396,6 +397,14 @@ async def entra_autosetup_poll(request: Request):
                         "consumed/replaced it, or the session cookie isn't "
                         "round-tripping between requests",
                         admin["id"], session_error)
+        # v0.24.22: mirror the warning into the audit log — Azure's Log
+        # Stream for custom containers has proven unreliable to actually
+        # show this (nothing appeared across several real attempts), but
+        # the DB write is unconditional and already surfaced on
+        # /settings/entra/diagnose without needing Kudu at all.
+        db.audit(admin["id"], "settings.entra_autosetup_poll_no_session",
+                 target_type="settings", target_id="entra_sso",
+                 meta_json=json.dumps({"session_error": session_error}))
         return JSONResponse({"ok": False,
                               "status": "error",
                               "error": "no_device_code_in_session"},
