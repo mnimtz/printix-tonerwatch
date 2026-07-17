@@ -744,6 +744,15 @@
               {% else %}
                 <span style="color: #B45309;">⚠ {{ _('settings.entra.configured.status.off', lang) }}</span>
               {% endif %}
+              {% if entra_secret_status.known %}
+                <br>{{ _('settings.entra.secret_expires', lang) }}:
+                {% if entra_secret_status.warn %}
+                  <span style="color: #B45309;">⚠ {{ entra_secret_status.expires_at.split('T')[0] }}
+                    ({{ entra_secret_status.days_left }} {{ _('settings.entra.days', lang) }})</span>
+                {% else %}
+                  <span style="color: var(--tw-primary);">{{ entra_secret_status.expires_at.split('T')[0] }}</span>
+                {% endif %}
+              {% endif %}
             </div>
           </div>
           <div style="display: flex; flex-direction: column; gap: 6px;
@@ -774,6 +783,20 @@
                       border-radius: var(--r); color: #92400E;
                       font-size: 0.85rem;">
             ⚠ {{ _('settings.entra.configured.disabled_hint', lang) }}
+          </div>
+        {% endif %}
+        {% if entra_secret_status.warn %}
+          <div style="margin-top: var(--sp-3); padding: var(--sp-3);
+                      background: #FEF2F2; border: 1px solid #FCA5A5;
+                      border-radius: var(--r); color: #991B1B;
+                      font-size: 0.85rem;">
+            ⚠ {% if entra_secret_status.days_left < 0 %}
+                {{ _('settings.entra.secret_expired', lang) }}
+              {% else %}
+                {{ _('settings.entra.secret_expiring', lang) }}
+                {{ entra_secret_status.days_left }} {{ _('settings.entra.days', lang) }}
+              {% endif %}
+            — {{ _('settings.entra.secret_expiring_hint', lang) }}
           </div>
         {% endif %}
         <div style="margin-top: var(--sp-3); font-size: 0.82rem;">

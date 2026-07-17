@@ -35,6 +35,7 @@ async def settings_page(request: Request):
             "mail":   mail_client.load_config(),
             "backup": backup.load_config(),
             "entra":  entra_sso.load_config(),
+            "entra_secret_status": entra_sso.secret_expiry_status(),
             "llm":    llm_client.load_config(),
             "graph":  graph_connector.load_config(),
             "runner": runner_config.load_config(),
@@ -248,9 +249,11 @@ async def entra_autosetup_rotate_secret(request: Request):
                  meta_json=json.dumps({"error": str(e)[:300]}))
         return JSONResponse({"ok": False, "status": "error",
                               "error": str(e)[:400]}, status_code=500)
-    # Merge into existing config: only replace client_secret.
+    # Merge into existing config: only replace client_secret (+ its
+    # expiry, so the settings page can warn before the NEW one dies too).
     cfg = entra_sso.load_config()
     cfg["client_secret"] = rot["client_secret"]
+    cfg["secret_expires_at"] = rot["secret_expires_at"]
     entra_sso.save_config(cfg)
     db.audit(admin["id"], "settings.entra_secret_rotated",
              target_type="settings", target_id="entra_sso",

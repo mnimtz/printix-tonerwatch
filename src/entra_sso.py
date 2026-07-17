@@ -133,6 +133,10 @@ def load_config() -> dict[str, Any]:
         "default_role":       raw.get("default_role", "technician"),
         # Present-flag for the UI so the secret field can show "stored"
         "client_secret_present": bool(raw.get("client_secret")),
+        # v0.24.8 — Graph's endDateTime for the current secret, so the
+        # settings page can warn before it expires instead of Marcus
+        # finding out via a broken login.
+        "secret_expires_at": raw.get("secret_expires_at", ""),
     }
 
 
@@ -152,10 +156,16 @@ def save_config(cfg: dict[str, Any]) -> None:
     secret = cfg.get("client_secret") or ""
     if secret:
         payload["client_secret_enc"] = crypto.encrypt(secret)
+        # A fresh secret value with no accompanying expiry means the
+        # caller doesn't know it (e.g. hand-typed in the form) —
+        # clear the stale one rather than keep showing an expiry that
+        # no longer matches the stored secret.
+        payload["secret_expires_at"] = cfg.get("secret_expires_at", "")
     else:
         existing = load_config()
         if existing.get("client_secret"):
             payload["client_secret_enc"] = crypto.encrypt(existing["client_secret"])
+            payload["secret_expires_at"] = existing.get("secret_expires_at", "")
 
     value_json = json.dumps(payload, ensure_ascii=False)
     with db.get_conn() as conn:
@@ -177,6 +187,26 @@ def is_configured() -> bool:
     cfg = load_config()
     return bool(cfg["enabled"] and cfg["tenant_id"]
                 and cfg["client_id"] and cfg["client_secret"])
+
+
+def secret_expiry_status(warn_within_days: int = 30) -> dict[str, Any]:
+    """v0.24.8 — how much runway is left on the stored client_secret,
+    for a warning banner on the settings page. ``known`` is False for
+    secrets minted before this field existed, or hand-entered ones —
+    there's nothing to warn about because there's nothing to compare."""
+    cfg = load_config()
+    raw = (cfg.get("secret_expires_at") or "").strip()
+    if not raw or not cfg.get("client_secret"):
+        return {"known": False, "expires_at": "", "days_left": None, "warn": False}
+    import datetime as _dt
+    try:
+        expires = _dt.datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=_dt.timezone.utc)
+    except ValueError:
+        return {"known": False, "expires_at": raw, "days_left": None, "warn": False}
+    days_left = (expires - _dt.datetime.now(_dt.timezone.utc)).days
+    return {"known": True, "expires_at": raw, "days_left": days_left,
+            "warn": days_left <= warn_within_days}
 
 
 # ---------------------------------------------------------------------------
@@ -548,6 +578,52 @@ def find_existing_apps(access_token: str, app_name: str) -> list[dict[str, Any]]
     return list(r.json().get("value", []))
 
 
+def _add_password_best_effort(h: dict, object_id: str,
+                               display_name: str) -> dict[str, Any]:
+    """v0.24.8 — mint a client secret with the longest lifetime the
+    tenant will allow, instead of leaving ``endDateTime`` unspecified.
+
+    An unspecified ``endDateTime`` gets whatever the tenant's default
+    is — some tenants apply a short (as low as 6 month) default via
+    "Application authentication methods" governance policy, which is
+    almost certainly why AADSTS7000215 ("invalid client secret") kept
+    recurring: the secret wasn't wrong, it had quietly expired.
+    Requesting 24 months explicitly gets the longest lifetime on
+    tenants without such a policy; on tenants that enforce a shorter
+    cap, Graph rejects the out-of-policy request outright (it does
+    NOT silently clamp), so this retries once at 6 months — the most
+    common enforced ceiling — and finally falls back to the
+    unspecified default so secret creation never fails outright just
+    because we asked for too long a lifetime."""
+    import datetime as _dt
+    import httpx as _httpx
+
+    def _mint(end_date_time: str | None) -> "_httpx.Response":
+        cred: dict[str, Any] = {"displayName": display_name}
+        if end_date_time:
+            cred["endDateTime"] = end_date_time
+        return _httpx.post(
+            f"{_GRAPH_URL}/applications/{object_id}/addPassword",
+            headers=h, json={"passwordCredential": cred}, timeout=15.0)
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    attempts = [
+        (now + _dt.timedelta(days=730)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # 24mo
+        (now + _dt.timedelta(days=183)).strftime("%Y-%m-%dT%H:%M:%SZ"),  # 6mo
+        None,  # tenant default — always succeeds if the app itself is valid
+    ]
+    last_error = ""
+    for end_date_time in attempts:
+        try:
+            r = _mint(end_date_time)
+        except _httpx.HTTPError as e:
+            raise EntraSSOError(f"Graph addPassword: {e}") from e
+        if r.status_code in (200, 201):
+            return r.json()
+        last_error = f"HTTP {r.status_code}: {r.text[:200]}"
+    raise EntraSSOError(f"Secret creation failed: {last_error}")
+
+
 def rotate_client_secret(access_token: str, object_id: str,
                           app_name: str = "TonerWatch (rotated)"
                           ) -> dict[str, Any]:
@@ -557,20 +633,11 @@ def rotate_client_secret(access_token: str, object_id: str,
     granted permissions carry over, only the secret changes. Used by
     the "🔑 Rotate secret only" button when Auto-Setup's
     existing_found panel fires."""
-    import httpx as _httpx
     h = _graph(access_token)
     try:
-        r = _httpx.post(
-            f"{_GRAPH_URL}/applications/{object_id}/addPassword",
-            headers=h,
-            json={"passwordCredential": {"displayName": app_name}},
-            timeout=15.0)
-    except _httpx.HTTPError as e:
-        raise EntraSSOError(f"Graph addPassword: {e}") from e
-    if r.status_code not in (200, 201):
-        raise EntraSSOError(
-            f"Secret rotation failed: HTTP {r.status_code}: {r.text[:200]}")
-    sec = r.json()
+        sec = _add_password_best_effort(h, object_id, app_name)
+    except EntraSSOError as e:
+        raise EntraSSOError(f"Secret rotation failed: {e}") from e
     return {
         "client_secret":     sec.get("secretText", ""),
         "secret_expires_at": sec.get("endDateTime", ""),
@@ -634,20 +701,10 @@ def auto_register_app(
     client_id = app["appId"]
     obj_id = app["id"]
 
-    # 3. Create client secret.
-    try:
-        r = _httpx.post(
-            f"{_GRAPH_URL}/applications/{obj_id}/addPassword",
-            headers=h,
-            json={"passwordCredential": {
-                "displayName": "TonerWatch auto-generated"}},
-            timeout=15.0)
-    except _httpx.HTTPError as e:
-        raise EntraSSOError(f"Graph addPassword: {e}") from e
-    if r.status_code not in (200, 201):
-        raise EntraSSOError(
-            f"Secret creation failed: HTTP {r.status_code}: {r.text[:200]}")
-    sec = r.json()
+    # 3. Create client secret — longest lifetime the tenant allows
+    # (see _add_password_best_effort), not whatever the platform
+    # default happens to be.
+    sec = _add_password_best_effort(h, obj_id, "TonerWatch auto-generated")
     client_secret = sec.get("secretText", "")
     secret_expires_at = sec.get("endDateTime", "")
 
@@ -738,6 +795,7 @@ def apply_auto_setup_result(result: dict[str, Any], *,
         "tenant_id":     result.get("tenant_id", ""),
         "client_id":     result.get("client_id", ""),
         "client_secret": result.get("client_secret", ""),
+        "secret_expires_at": result.get("secret_expires_at", ""),
         "redirect_uri":  redirect_uri,
         # Auto-setup doesn't imply auto-provisioning — the admin has
         # to explicitly opt in to that (creates local users on first
