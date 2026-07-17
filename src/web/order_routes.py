@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import auth, db, orders, supply_library
+from .. import auth, db, orders, suppliers, supply_library
 from ..db import customers as customers_tbl
 
 
@@ -164,12 +164,22 @@ async def orders_mail_suggestion(order_id: int, request: Request):
     customer_names = _customer_names([o["customer_id"]])
     supply = supply_library.resolve_supply(
         o["customer_id"], o["printer_id"], None, o["color"])
+    # v0.24.14: resolve the formal supplier record (if the SKU is
+    # linked to one) into an actual contact — target mailbox + this
+    # customer's account number — so both the AI draft and the
+    # modal's "To:" field can use it without the operator typing it.
+    contact = suppliers.resolve_supplier_contact(
+        o["customer_id"], (supply or {}).get("supplier_id"))
     mail = supply_library.ai_suggest_order_mail(
         o, supply, customer_names.get(o["customer_id"], ""),
-        lang=request.state.lang)
+        lang=request.state.lang, contact=contact)
     if mail is None:
         return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=400)
-    return JSONResponse({"ok": True, **mail})
+    return JSONResponse({
+        "ok": True, **mail,
+        "to_email": (contact or {}).get("order_email", ""),
+        "customer_number": (contact or {}).get("customer_number", ""),
+    })
 
 
 @router.post("/orders/new", include_in_schema=False)

@@ -23,6 +23,9 @@
     <a href="/customers/{{ customer.id }}/savings" class="btn btn-secondary">
       💡 {{ _('customer.savings.nav_label', lang) }}
     </a>
+    <a href="/customers/{{ customer.id }}/suppliers" class="btn btn-secondary">
+      🚚 {{ _('customer.suppliers.nav_label', lang) }}
+    </a>
     {% if user.role == 'admin' %}
       <a href="/customers/{{ customer.id }}/edit" class="btn btn-secondary">
         ✎ {{ _('common.edit', lang) }}

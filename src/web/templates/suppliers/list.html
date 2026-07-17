@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ _('suppliers.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('suppliers.title', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .suppliers-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--sp-4); margin-bottom: var(--sp-4); flex-wrap: wrap;
+  }
+  .suppliers-table-wrap {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-sm);
+  }
+  .suppliers-table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+  .suppliers-table th, .suppliers-table td {
+    padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid var(--tw-gray-200); vertical-align: middle;
+  }
+  .suppliers-table tbody tr:last-child td { border-bottom: none; }
+  .suppliers-table th {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+    background: var(--tw-gray-100);
+  }
+  .suppliers-table tr.inactive { opacity: 0.5; }
+  .suppliers-table .badge-inactive {
+    font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+    background: var(--tw-gray-200); color: var(--tw-muted-blue);
+    margin-left: 6px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .suppliers-table td.actions { text-align: right; white-space: nowrap; }
+  .suppliers-table td.actions form { display: inline; margin: 0; }
+  .suppliers-table td.actions .btn-link {
+    background: none; border: none; padding: 4px 8px; margin: 0;
+    color: var(--tw-muted-blue); cursor: pointer; font: inherit;
+  }
+  .suppliers-table td.actions .btn-link:hover { color: var(--tw-primary); }
+  .suppliers-table td.actions .btn-link.danger:hover { color: var(--status-critical); }
+  .empty-state {
+    text-align: center; padding: var(--sp-12) var(--sp-6);
+    color: var(--tw-muted-blue);
+    background: var(--tw-white); border: 1px dashed var(--tw-gray-300);
+    border-radius: var(--r-lg);
+  }
+  .empty-state p { font-size: 1.05rem; margin-bottom: var(--sp-4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="suppliers-header">
+  <div>
+    <h1>{{ _('suppliers.title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: 4px; font-size: 0.9rem;">
+      {{ _('suppliers.intro', lang) }}
+    </p>
+  </div>
+  <a href="/suppliers/new" class="btn">+ {{ _('suppliers.new', lang) }}</a>
+</div>
+
+{% if info == 'supplier_saved' %}
+  <div class="alert alert-info">{{ _('suppliers.saved', lang) }}</div>
+{% elif info == 'supplier_deleted' %}
+  <div class="alert alert-info">{{ _('suppliers.deactivated', lang) }}</div>
+{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+{% if suppliers %}
+<div class="suppliers-table-wrap">
+  <table class="suppliers-table">
+    <thead>
+      <tr>
+        <th>{{ _('suppliers.col.name', lang) }}</th>
+        <th>{{ _('suppliers.col.order_email', lang) }}</th>
+        <th>{{ _('suppliers.col.website', lang) }}</th>
+        <th style="width: 130px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in suppliers %}
+      <tr class="{{ 'inactive' if not s.active else '' }}">
+        <td>
+          {{ s.name }}
+          {% if not s.active %}<span class="badge-inactive">{{ _('suppliers.inactive', lang) }}</span>{% endif %}
+        </td>
+        <td>{{ s.order_email or '—' }}</td>
+        <td>
+          {% if s.website_url %}
+            <a href="{{ s.website_url }}" target="_blank" rel="noopener" data-noloader>↗ {{ s.website_url }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td class="actions">
+          <a href="/suppliers/{{ s.id }}/edit" class="btn-link">{{ _('common.edit', lang) }}</a>
+          {% if s.active %}
+          <form method="post" action="/suppliers/{{ s.id }}/delete"
+                onsubmit="return confirm('{{ _('suppliers.confirm_deactivate', lang) }}')"
+                data-noloader>
+            {% include "_csrf_input.html" %}
+            <button type="submit" class="btn-link danger">{{ _('common.deactivate', lang) }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <div class="empty-state">
+    <p>{{ _('suppliers.empty', lang) }}</p>
+    <a href="/suppliers/new" class="btn">+ {{ _('suppliers.new', lang) }}</a>
+  </div>
+{% endif %}
+{% endblock %}

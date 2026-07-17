@@ -376,6 +376,17 @@
       {{ _('orders.mailsuggest.loading', lang) }}
     </div>
     <div id="mailsuggest-result" style="display: none;">
+      <div id="mailsuggest-to-row" style="display: none; margin-bottom: var(--sp-3);">
+        <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">
+          {{ _('orders.mailsuggest.to', lang) }}
+        </label>
+        <input id="mailsuggest-to" readonly style="width: 100%; margin-top: 4px;
+               font-family: var(--font-mono); font-size: 0.85rem; padding: 8px;
+               border: 1px solid var(--tw-gray-300); border-radius: 6px;">
+        <div id="mailsuggest-customer-number" style="font-size: 0.78rem;
+             color: var(--tw-muted-blue); margin-top: 4px; display: none;"></div>
+      </div>
       <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
                     text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">
         {{ _('orders.mailsuggest.subject', lang) }}
@@ -441,6 +452,22 @@
         status.style.display = 'none';
         subjectBox.value = j.subject;
         bodyBox.value = j.body;
+        var toRow = document.getElementById('mailsuggest-to-row');
+        var toBox = document.getElementById('mailsuggest-to');
+        var custNumBox = document.getElementById('mailsuggest-customer-number');
+        if (j.to_email) {
+          toBox.value = j.to_email;
+          toRow.style.display = '';
+          if (j.customer_number) {
+            custNumBox.textContent = {{ _('orders.mailsuggest.customer_number', lang)|tojson }}
+              + ': ' + j.customer_number;
+            custNumBox.style.display = '';
+          } else {
+            custNumBox.style.display = 'none';
+          }
+        } else {
+          toRow.style.display = 'none';
+        }
         result.style.display = '';
       } catch (e) {
         status.textContent = '✗ ' + (e.message || e);
@@ -450,7 +477,11 @@
   });
 
   copyBtn.addEventListener('click', function () {
-    var text = subjectBox.value + '\n\n' + bodyBox.value;
+    var toBox = document.getElementById('mailsuggest-to');
+    var toPrefix = toBox.value
+      ? ({{ _('orders.mailsuggest.to', lang)|tojson }} + ': ' + toBox.value + '\n')
+      : '';
+    var text = toPrefix + subjectBox.value + '\n\n' + bodyBox.value;
     var ta = document.createElement('textarea');
     ta.value = text;
     document.body.appendChild(ta);

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if supplier %}{{ _('suppliers.edit_title', lang) }}{% else %}{{ _('suppliers.new', lang) }}{% endif %}
+  · {{ _('brand.product_name', lang) }}
+{% endblock %}
+{% block breadcrumb %}
+  <a href="/suppliers" data-noloader>{{ _('suppliers.title', lang) }}</a> /
+  {% if supplier %}{{ supplier.name }}{% else %}{{ _('suppliers.new', lang) }}{% endif %}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .supplier-form {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-5) var(--sp-6);
+    box-shadow: var(--shadow-sm); max-width: 640px;
+  }
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+  @media (max-width: 640px) { .row-2col { grid-template-columns: 1fr; } }
+  .form-hint { font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px; }
+  .form-actions {
+    display: flex; gap: var(--sp-2); margin-top: var(--sp-5);
+    padding-top: var(--sp-4); border-top: 1px solid var(--tw-gray-200);
+    justify-content: flex-end; align-items: center;
+  }
+  .form-actions .cancel { color: var(--tw-muted-blue); padding: 8px 14px; text-decoration: none; }
+  .active-toggle {
+    display: flex; align-items: center; gap: 8px; margin-right: auto;
+    font-size: 0.88rem; color: var(--tw-primary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-4);">
+  {% if supplier %}{{ _('suppliers.edit_title', lang) }}{% else %}{{ _('suppliers.new', lang) }}{% endif %}
+</h1>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<form method="post" action="{{ form_action }}" class="supplier-form">
+  {% include "_csrf_input.html" %}
+  <div class="form-group">
+    <label for="name">{{ _('suppliers.col.name', lang) }} *</label>
+    <input type="text" id="name" name="name" required
+           value="{{ supplier.name if supplier else '' }}"
+           placeholder="Group24 / Bechtle / …">
+  </div>
+
+  <div class="row-2col">
+    <div class="form-group">
+      <label for="order_email">{{ _('suppliers.col.order_email', lang) }}</label>
+      <input type="email" id="order_email" name="order_email"
+             value="{{ supplier.order_email if supplier else '' }}"
+             placeholder="bestellung@lieferant.de">
+      <div class="form-hint">{{ _('suppliers.hint.order_email', lang) }}</div>
+    </div>
+    <div class="form-group">
+      <label for="website_url">{{ _('suppliers.col.website', lang) }}</label>
+      <input type="url" id="website_url" name="website_url"
+             value="{{ supplier.website_url if supplier else '' }}"
+             placeholder="https://shop.example.com">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="notes">{{ _('suppliers.col.notes', lang) }}</label>
+    <textarea id="notes" name="notes" rows="3">{{ supplier.notes if supplier else '' }}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <label class="active-toggle">
+      <input type="checkbox" name="active" id="active"
+             {{ 'checked' if (not supplier) or supplier.active else '' }}>
+      {{ _('suppliers.col.active', lang) }}
+    </label>
+    <a href="/suppliers" class="cancel" data-noloader>{{ _('common.cancel', lang) }}</a>
+    <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+  </div>
+</form>
+{% endblock %}

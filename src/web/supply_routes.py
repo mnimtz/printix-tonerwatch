@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 from fastapi.responses import JSONResponse
 
-from .. import auth, bi_client, db, llm_client, supply_library
+from .. import auth, bi_client, db, llm_client, suppliers, supply_library
 from ..db import customers as customers_tbl
 
 
@@ -70,6 +70,7 @@ async def supplies_new_form(request: Request):
             "form_action": "/supplies/new",
             "error": request.query_params.get("error", ""),
             "prefill_model": request.query_params.get("model", ""),
+            "all_suppliers": suppliers.list_suppliers(),
         },
     )
 
@@ -113,6 +114,7 @@ async def supplies_new_set_form(request: Request):
             "user": user,
             "error": request.query_params.get("error", ""),
             "prefill_model": request.query_params.get("model", ""),
+            "all_suppliers": suppliers.list_suppliers(),
         },
     )
 
@@ -166,6 +168,7 @@ async def supplies_new_set_save(request: Request):
     shared = {
         "printer_model":     model,
         "supplier":          form.get("supplier") or "",
+        "supplier_id":       form.get("supplier_id") or "",
         "supplier_url":      form.get("supplier_url") or "",
         "default_quantity":  form.get("default_quantity") or "1",
     }
@@ -230,6 +233,7 @@ async def supplies_edit_form(tpl_id: int, request: Request):
             "template": tpl,
             "form_action": f"/supplies/{tpl_id}/edit",
             "error": request.query_params.get("error", ""),
+            "all_suppliers": suppliers.list_suppliers(),
         },
     )
 
@@ -477,6 +481,7 @@ async def printer_supply_form(customer_id: int, printer_id: str, request: Reques
             "printer": printer or {"id": printer_id, "name": printer_id,
                                     "model": "", "location": ""},
             "rows": rows,
+            "all_suppliers": suppliers.list_suppliers(),
             "info":  request.query_params.get("info", ""),
             "error": request.query_params.get("error", ""),
         },
@@ -503,6 +508,7 @@ async def printer_supply_save(customer_id: int, printer_id: str, request: Reques
             "description":      form.get(f"description_{color}") or "",
             "manufacturer":     form.get(f"manufacturer_{color}") or "",
             "supplier":         form.get(f"supplier_{color}") or "",
+            "supplier_id":      form.get(f"supplier_id_{color}") or "",
             "supplier_url":     form.get(f"supplier_url_{color}") or "",
             "default_quantity": form.get(f"default_quantity_{color}") or "1",
             "unit_price_cents": form.get(f"unit_price_cents_{color}") or "",

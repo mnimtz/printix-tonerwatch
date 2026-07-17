@@ -582,6 +582,18 @@
             {{ _('nav.supplies', lang) }}
           </a>
 
+          <a href="/suppliers"
+             class="{{ 'active' if request.url.path.startswith('/suppliers') else '' }}">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1.5" y="8" width="10" height="7" rx="1"/>
+              <path d="M11.5 10.5 h3.5 l3 3 V15 h-6.5"/>
+              <circle cx="5" cy="16.5" r="1.6"/>
+              <circle cx="14.5" cy="16.5" r="1.6"/>
+            </svg>
+            {{ _('nav.suppliers', lang) }}
+          </a>
+
           <a href="/users"
              class="{{ 'active' if request.url.path.startswith('/users') else '' }}">
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"

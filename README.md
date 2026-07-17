@@ -112,7 +112,10 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **AI supplier-mail draft.** A **✉️ Mail text** button on any draft/ordered
   card asks the LLM to write a ready-to-copy purchase-order email (subject
   + body) from the order's own SKU/quantity/printer — TonerWatch never
-  sends it, the operator copies it into their own mail client.
+  sends it, the operator copies it into their own mail client. When the
+  SKU is linked to a supplier (see below), the modal also shows a
+  pre-filled **To:** address and the customer's account number with that
+  supplier, resolved automatically.
 
 ### Supply library
 
@@ -130,6 +133,22 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **Seed set** — 13 common OEM entries (HP 26A, HP 415A CMYK,
   Brother TN-421 CMYK, Kyocera TK-5220 CMYK) so a fresh install has
   something to work with.
+
+### Suppliers
+
+- **Global vendor list** (`/suppliers`, admin-only) — name, default order
+  mailbox, website, notes. The same distributor usually serves multiple
+  customers, so suppliers are defined once and linked from templates and
+  overrides via a dropdown (kept in sync with the legacy free-text
+  `supplier` field for display/backward compatibility).
+- **Per-customer account details** (`/customers/{id}/suppliers`) — this
+  customer's account/customer number with each supplier, plus an optional
+  order-email override for the rare case they order through a different
+  address than the supplier's own default.
+- **Feeds the order-mail draft automatically.** Once a supply template or
+  override is linked to a supplier and the customer has an account number
+  on file, the **✉️ Mail text** feature resolves both without the operator
+  typing anything.
 
 ### Per-printer metadata overrides
 

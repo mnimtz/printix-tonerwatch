@@ -208,6 +208,7 @@ def upsert_override(
     is_empty = not any([
         fields.get("sku"), fields.get("supplier_url"),
         fields.get("description"), fields.get("notes"),
+        fields.get("supplier_id"),
     ])
     if is_empty:
         delete_override(customer_id, printer_id, color)
@@ -405,7 +406,8 @@ def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
 
 
 def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
-                          customer_name: str, lang: str = "de") -> dict[str, str] | None:
+                          customer_name: str, lang: str = "de",
+                          contact: dict[str, Any] | None = None) -> dict[str, str] | None:
     """v0.24.6 — draft a ready-to-send supplier order email for one
     order row. The LLM only writes the prose; every fact in it (SKU,
     quantity, printer, customer reference) is handed in already
@@ -413,6 +415,15 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
     given. TonerWatch never sends this itself: the operator copies it
     into their own mail client, so there's no new supplier-facing
     sending surface to secure or misconfigure.
+
+    ``contact`` — v0.24.14 — is the resolved supplier record from
+    ``suppliers.resolve_supplier_contact()``: the target order-mailbox
+    and this customer's account number with that supplier, when the
+    SKU is linked to a formal supplier record. When given, the
+    customer number is handed to the LLM as a fact to mention (most
+    distributors expect it in the mail body); the target address
+    itself is returned alongside the draft rather than put in the
+    prose, so the operator's own mail client addresses the message.
 
     Returns ``{"subject": .., "body": ..}`` or ``None`` if the LLM
     isn't configured or the call fails."""
@@ -423,7 +434,8 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
     sku         = (order.get("sku") or (supply or {}).get("sku") or "").strip()
     description = (supply or {}).get("description") or ""
     manufacturer = (supply or {}).get("manufacturer") or ""
-    supplier    = (supply or {}).get("supplier") or ""
+    supplier    = (contact or {}).get("supplier_name") or (supply or {}).get("supplier") or ""
+    customer_number = (contact or {}).get("customer_number") or ""
     quantity    = order.get("quantity") or 1
     printer     = order.get("printer_name") or order.get("printer_id") or ""
     color_word  = {"K": "black", "C": "cyan", "M": "magenta",
@@ -438,14 +450,17 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
         "details given below — never invent a SKU, quantity, price, or "
         "delivery date. If a field is missing (e.g. no SKU on file), "
         "ask the supplier to confirm the correct part for the stated "
-        "printer instead of guessing one. Keep it short: a subject "
-        "line and a brief body — greeting, the order itself, a polite "
-        "close. No markdown, no placeholders like [Your Name]. "
-        "Reply with ONE JSON object only, no prose, no code fences: "
+        "printer instead of guessing one. If a customer account number "
+        "is given, mention it so the supplier can bill/ship to the "
+        "right account. Keep it short: a subject line and a brief "
+        "body — greeting, the order itself, a polite close. No "
+        "markdown, no placeholders like [Your Name]. Reply with ONE "
+        "JSON object only, no prose, no code fences: "
         "{\"subject\": \"…\", \"body\": \"…\"}"
     )
     user = (
         f"Customer reference: {customer_name}\n"
+        f"Our account number with this supplier: {customer_number or 'n/a'}\n"
         f"Printer: {printer}\n"
         f"Toner colour: {color_word or 'n/a'}\n"
         f"SKU: {sku or '(not on file — ask supplier to confirm)'}\n"
@@ -514,6 +529,7 @@ def _sanitise_template_fields(f: dict[str, Any]) -> dict[str, Any]:
         "description":      _clean_str(f.get("description")),
         "manufacturer":     _clean_str(f.get("manufacturer")),
         "supplier":         _clean_str(f.get("supplier")),
+        "supplier_id":      _clean_int_or_none(f.get("supplier_id")),
         "supplier_url":     _clean_str(f.get("supplier_url")),
         "default_quantity": max(1, _clean_int_or_none(f.get("default_quantity")) or 1),
         "unit_price_cents": _clean_int_or_none(f.get("unit_price_cents")),
@@ -529,6 +545,7 @@ def _sanitise_override_fields(f: dict[str, Any]) -> dict[str, Any]:
         "description":      _clean_str(f.get("description")),
         "manufacturer":     _clean_str(f.get("manufacturer")),
         "supplier":         _clean_str(f.get("supplier")),
+        "supplier_id":      _clean_int_or_none(f.get("supplier_id")),
         "supplier_url":     _clean_str(f.get("supplier_url")),
         "default_quantity": max(1, _clean_int_or_none(f.get("default_quantity")) or 1),
         "unit_price_cents": _clean_int_or_none(f.get("unit_price_cents")),

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ _('customer.suppliers.title', lang) }} · {{ customer.name }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/customers" style="color: inherit;">{{ _('nav.customers', lang) }}</a> ›
+  <a href="/customers/{{ customer.id }}" style="color: inherit;">{{ customer.name }}</a> ›
+  {{ _('customer.suppliers.title', lang) }}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .supplier-links { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .supplier-link-card {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-sm);
+  }
+  .supplier-link-card h3 {
+    margin: 0 0 var(--sp-3) 0; font-size: 0.95rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .supplier-link-card .assigned-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--tw-gray-300); flex-shrink: 0;
+  }
+  .supplier-link-card.assigned .assigned-dot { background: var(--status-ok); }
+  .row-3col { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: var(--sp-4); }
+  @media (max-width: 720px) { .row-3col { grid-template-columns: 1fr; } }
+  .form-actions {
+    margin-top: var(--sp-5); display: flex; justify-content: flex-end;
+  }
+  .empty-state {
+    text-align: center; padding: var(--sp-12) var(--sp-6);
+    color: var(--tw-muted-blue);
+    background: var(--tw-white); border: 1px dashed var(--tw-gray-300);
+    border-radius: var(--r-lg);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-2);">{{ _('customer.suppliers.title', lang) }}</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-5); font-size: 0.9rem;">
+  {{ _('customer.suppliers.intro', lang) }}
+</p>
+
+{% if info == 'suppliers_saved' %}
+  <div class="alert alert-info">{{ _('customer.suppliers.saved', lang) }}</div>
+{% endif %}
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+{% if rows %}
+<form method="post" action="/customers/{{ customer.id }}/suppliers">
+  {% include "_csrf_input.html" %}
+  <div class="supplier-links">
+    {% for row in rows %}
+    <div class="supplier-link-card {{ 'assigned' if row.link else '' }}">
+      <h3><span class="assigned-dot"></span>{{ row.supplier.name }}
+        {% if row.supplier.order_email %}
+          <span style="font-weight: 400; color: var(--tw-muted-blue); font-size: 0.82rem;">
+            ({{ row.supplier.order_email }})
+          </span>
+        {% endif %}
+      </h3>
+      <div class="row-3col">
+        <div class="form-group">
+          <label for="customer_number_{{ row.supplier.id }}">
+            {{ _('customer.suppliers.col.customer_number', lang) }}
+          </label>
+          <input type="text" id="customer_number_{{ row.supplier.id }}"
+                 name="customer_number_{{ row.supplier.id }}"
+                 value="{{ row.link.customer_number if row.link else '' }}"
+                 placeholder="{{ _('customer.suppliers.col.customer_number.placeholder', lang) }}">
+        </div>
+        <div class="form-group">
+          <label for="order_email_override_{{ row.supplier.id }}">
+            {{ _('customer.suppliers.col.email_override', lang) }}
+          </label>
+          <input type="email" id="order_email_override_{{ row.supplier.id }}"
+                 name="order_email_override_{{ row.supplier.id }}"
+                 value="{{ row.link.order_email_override if row.link else '' }}"
+                 placeholder="{{ row.supplier.order_email or _('customer.suppliers.col.email_override.placeholder', lang) }}">
+        </div>
+        <div class="form-group">
+          <label for="notes_{{ row.supplier.id }}">{{ _('suppliers.col.notes', lang) }}</label>
+          <input type="text" id="notes_{{ row.supplier.id }}"
+                 name="notes_{{ row.supplier.id }}"
+                 value="{{ row.link.relationship_notes if row.link else '' }}">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+  </div>
+</form>
+{% else %}
+  <div class="empty-state">
+    <p>{{ _('customer.suppliers.empty', lang) }}</p>
+    {% if user.role == 'admin' %}
+      <a href="/suppliers/new" class="btn">+ {{ _('suppliers.new', lang) }}</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

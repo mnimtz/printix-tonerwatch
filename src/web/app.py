@@ -22,7 +22,7 @@ from .. import auth, db, toner_alerts
 from . import (access_routes, auth_routes, backup_routes, customer_routes,
                dashboard_routes, graph_routes, i18n, order_routes,
                printer_info_routes, saved_view_routes, settings_routes,
-               supply_routes, toner_routes, user_routes)
+               supplier_routes, supply_routes, toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -169,6 +169,7 @@ def create_app() -> FastAPI:
     app.include_router(toner_routes.router)       # P2: /toner grid + /toner/refresh
     app.include_router(settings_routes.router)    # P3: mail config + test-mail
     app.include_router(supply_routes.router)      # P4a: model templates + per-printer overrides
+    app.include_router(supplier_routes.router)    # v0.24.14: vendor list + per-customer account details
     app.include_router(order_routes.router)       # P4b: kanban + magic-link handlers
     app.include_router(printer_info_routes.router)  # v0.9: per-printer metadata overrides
     app.include_router(backup_routes.router)      # v0.10: backup download + Azure Blob upload

@@ -165,10 +165,18 @@
 
         <div class="row-2col">
           <div class="form-group">
-            <label for="supplier_{{ c }}">{{ _('supplies.col.supplier', lang) }}</label>
-            <input type="text" id="supplier_{{ c }}" name="supplier_{{ c }}"
-                   value="{{ ov.supplier if ov else '' }}"
-                   placeholder="{{ tpl.supplier if tpl else '' }}">
+            <label for="supplier_id_{{ c }}">{{ _('supplies.col.supplier', lang) }}</label>
+            <select id="supplier_id_{{ c }}" name="supplier_id_{{ c }}" class="supplier-select" data-color="{{ c }}">
+              <option value="">{{ _('supplies.supplier.none', lang) }}</option>
+              {% for s in all_suppliers %}
+              <option value="{{ s.id }}" data-name="{{ s.name }}"
+                      {{ 'selected' if ov and ov.supplier_id == s.id else '' }}>
+                {{ s.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <input type="hidden" id="supplier_{{ c }}" name="supplier_{{ c }}"
+                   value="{{ ov.supplier if ov else '' }}">
           </div>
           <div class="form-group">
             <label for="supplier_url_{{ c }}">{{ _('supplies.col.supplier_url', lang) }}</label>
@@ -215,4 +223,14 @@
     </div>
   </div>
 </form>
+
+<script>
+document.querySelectorAll('.supplier-select').forEach(function(sel) {
+  var hidden = document.getElementById('supplier_' + sel.getAttribute('data-color'));
+  sel.addEventListener('change', function() {
+    var opt = sel.options[sel.selectedIndex];
+    hidden.value = opt && opt.value ? (opt.getAttribute('data-name') || '') : '';
+  });
+});
+</script>
 {% endblock %}

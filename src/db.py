@@ -297,6 +297,45 @@ customer_access = Table(
 )
 Index("idx_customer_access_customer", customer_access.c.customer_id)
 
+# v0.24.14 — suppliers are a GLOBAL list (like supply_templates: one
+# MSP, one set of vendors, reused across customers), because the same
+# distributor usually serves several of Marcus's customers. What's
+# per-customer is the RELATIONSHIP — account/customer number, and
+# sometimes a different order mailbox than the supplier's default —
+# which lives in customer_suppliers below.
+suppliers = Table(
+    "suppliers", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("name", Text, nullable=False),
+    Column("order_email", Text, nullable=False, server_default=""),
+    Column("website_url", Text, nullable=False, server_default=""),
+    Column("notes", Text, nullable=False, server_default=""),
+    Column("active", Integer, nullable=False, server_default="1"),
+    Column("created_at", Text, nullable=False,
+           server_default=func.current_timestamp()),
+    Column("updated_by_user_id", Integer,
+           ForeignKey("users.id", ondelete="SET NULL")),
+    UniqueConstraint("name", name="uq_suppliers_name"),
+)
+
+customer_suppliers = Table(
+    "customer_suppliers", metadata,
+    Column("customer_id", Integer,
+           ForeignKey("customers.id", ondelete="CASCADE"), nullable=False),
+    Column("supplier_id", Integer,
+           ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False),
+    Column("customer_number", Text, nullable=False, server_default=""),
+    # Empty means "use the supplier's own order_email" — only set this
+    # when the customer genuinely orders through a different mailbox
+    # than the supplier's default (e.g. a dedicated account manager).
+    Column("order_email_override", Text, nullable=False, server_default=""),
+    Column("notes", Text, nullable=False, server_default=""),
+    Column("updated_at", Text, nullable=False,
+           server_default=func.current_timestamp()),
+    PrimaryKeyConstraint("customer_id", "supplier_id",
+                         name="pk_customer_suppliers"),
+)
+
 supply_templates = Table(
     "supply_templates", metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
@@ -305,7 +344,15 @@ supply_templates = Table(
     Column("sku", Text, nullable=False, server_default=""),
     Column("description", Text, nullable=False, server_default=""),
     Column("manufacturer", Text, nullable=False, server_default=""),
+    # Free-text label — kept for suppliers not yet formalized as a
+    # `suppliers` row. supplier_id (v0.24.14), when set, is the source
+    # of truth for order-flow resolution (email, customer number);
+    # this column stays in sync with the chosen supplier's name so
+    # every existing reader that displays `.supplier` as a plain
+    # string keeps working unchanged.
     Column("supplier", Text, nullable=False, server_default=""),
+    Column("supplier_id", Integer,
+           ForeignKey("suppliers.id", ondelete="SET NULL")),
     Column("supplier_url", Text, nullable=False, server_default=""),
     Column("default_quantity", Integer, nullable=False, server_default="1"),
     Column("unit_price_cents", Integer),
@@ -358,6 +405,8 @@ printer_supplies = Table(
     Column("description", Text, nullable=False, server_default=""),
     Column("manufacturer", Text, nullable=False, server_default=""),
     Column("supplier", Text, nullable=False, server_default=""),
+    Column("supplier_id", Integer,
+           ForeignKey("suppliers.id", ondelete="SET NULL")),
     Column("supplier_url", Text, nullable=False, server_default=""),
     Column("default_quantity", Integer, nullable=False, server_default="1"),
     Column("unit_price_cents", Integer),
