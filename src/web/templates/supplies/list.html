@@ -90,7 +90,8 @@
     </p>
   </div>
   <div class="actions">
-    <a href="/supplies/new" class="btn">+ {{ _('supplies.new', lang) }}</a>
+    <a href="/supplies/new" class="btn btn-secondary">+ {{ _('supplies.new', lang) }}</a>
+    <a href="/supplies/new-set" class="btn">🎨 {{ _('supplies.new_set', lang) }}</a>
   </div>
 </div>
 
@@ -99,8 +100,24 @@
 {% elif info == 'template_deleted' %}
   <div class="alert alert-info">{{ _('supplies.deleted', lang) }}</div>
 {% elif info and info.startswith('seeded_') %}
+  {# v0.24.0 fix: `len()` is not a Jinja global (built-in or
+     registered) — calling it raises UndefinedError. Use the
+     `|length` FILTER on the literal instead, which Jinja does
+     provide. This branch was latent-broken before this fix; nobody
+     had hit "insert sample library" recently enough to notice. #}
   <div class="alert alert-info">
-    {{ _('supplies.seeded', lang) }} ({{ info[len('seeded_'):] }})
+    {{ _('supplies.seeded', lang) }} ({{ info[('seeded_')|length:] }})
+  </div>
+{% elif info and info.startswith('set_saved_') %}
+  {# v0.24.0: "set_saved_<n>" or "set_saved_<n>_dup_K,C" — n templates
+     created, optional trailing list of colors skipped as duplicates. #}
+  {% set _rest = info[('set_saved_')|length:] %}
+  {% set _parts = _rest.split('_dup_') %}
+  <div class="alert alert-info">
+    {{ _('supplies.new_set.saved', lang) }} ({{ _parts[0] }})
+    {% if _parts|length > 1 %}
+      — {{ _('supplies.new_set.saved.duplicates', lang) }}: {{ _parts[1] }}
+    {% endif %}
   </div>
 {% endif %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
@@ -165,7 +182,8 @@
   <div class="empty-state">
     <p>{{ _('supplies.empty', lang) }}</p>
     <div class="btn-group">
-      <a href="/supplies/new" class="btn">+ {{ _('supplies.new', lang) }}</a>
+      <a href="/supplies/new" class="btn btn-secondary">+ {{ _('supplies.new', lang) }}</a>
+      <a href="/supplies/new-set" class="btn">🎨 {{ _('supplies.new_set', lang) }}</a>
       <form method="post" action="/supplies/seed" style="margin: 0;">
         {% include "_csrf_input.html" %}
         <button type="submit" class="btn btn-secondary"

@@ -313,6 +313,97 @@ def ai_suggest_supply(printer_model: str,
     }
 
 
+def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
+    """v0.24.0 — one LLM call that determines whether ``printer_model``
+    is monochrome or color (CMYK) and returns OEM SKU + description +
+    manufacturer + yield for every toner slot it actually has. Backs
+    the "Neues Toner-Set" flow: the operator picks a model once, the
+    UI auto-checks C/M/Y (or leaves them off for a mono device) and
+    fills every enabled row in one round-trip instead of four.
+
+    Returns::
+
+        {"is_color": bool,
+         "slots": {"K": {"sku":.., "description":.., "manufacturer":..,
+                          "yield_pages":..}, "C": {...}, "M": {...}, "Y": {...}},
+         "provider": "...", "model": "..."}
+
+    ``slots`` only contains C/M/Y when ``is_color`` is true. Returns
+    ``None`` if the LLM isn't configured or the response can't be
+    parsed — caller falls back to the per-color ai_suggest_supply()
+    flow or plain manual entry."""
+    from . import llm_client
+    if not llm_client.is_configured():
+        return None
+
+    system = (
+        "You are a printer-supply lookup assistant. Given a printer "
+        "model, first determine whether it is a MONOCHROME-only "
+        "device (black toner only) or a COLOR device (CMYK — "
+        "black + cyan + magenta + yellow). Then return the OEM "
+        "cartridge SKU, a one-line description, manufacturer, and "
+        "page yield for each toner slot it actually has. Never "
+        "invent numbers you're unsure about — return null for any "
+        "field you don't know. Reply with ONE JSON object only, no "
+        "prose, no code fences: "
+        "{\"is_color\": true|false, \"slots\": {"
+        "\"K\": {\"sku\": \"…\", \"description\": \"…\", "
+        "\"manufacturer\": \"…\", \"yield_pages\": 12345}, "
+        "\"C\": {…}, \"M\": {…}, \"Y\": {…}}} "
+        "— omit the C/M/Y keys entirely when is_color is false."
+    )
+    user = (f"Printer model: {printer_model}\n"
+            "Return the OEM cartridges (not compatible/generic) for "
+            "every toner slot this model actually has.")
+
+    try:
+        resp = llm_client.chat(system, user)
+    except llm_client.LLMError as e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[ai_suggest_supply_set] LLM error for %s: %s",
+            printer_model, e)
+        return None
+
+    import json as _json
+    raw = (resp.text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].lstrip("\n")
+    try:
+        data = _json.loads(raw)
+    except _json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    is_color = bool(data.get("is_color"))
+    raw_slots = data.get("slots") or {}
+    if not isinstance(raw_slots, dict):
+        raw_slots = {}
+
+    wanted_colors = ("K", "C", "M", "Y") if is_color else ("K",)
+    slots: dict[str, dict[str, Any]] = {}
+    for c in wanted_colors:
+        s = raw_slots.get(c)
+        if not isinstance(s, dict):
+            s = {}
+        slots[c] = {
+            "sku":          (s.get("sku") or "").strip() or None,
+            "description":  (s.get("description") or "").strip() or None,
+            "manufacturer": (s.get("manufacturer") or "").strip() or None,
+            "yield_pages":  _clean_int_or_none(s.get("yield_pages")),
+        }
+
+    return {
+        "is_color": is_color,
+        "slots":    slots,
+        "provider": resp.provider,
+        "model":    resp.model,
+    }
+
+
 def _normalize_color(c: str) -> str:
     c = (c or "").strip()
     return c if c in _ALLOWED_COLORS else ""

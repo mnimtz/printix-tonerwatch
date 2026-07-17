@@ -94,6 +94,125 @@ async def supplies_new_save(request: Request):
     return RedirectResponse("/supplies?info=template_saved", status_code=303)
 
 
+_SET_COLORS = ("K", "C", "M", "Y")
+
+
+@router.get("/supplies/new-set", response_class=HTMLResponse,
+            include_in_schema=False)
+async def supplies_new_set_form(request: Request):
+    """v0.24.0 — create every toner-color template for one printer
+    model in a single form instead of repeating '+ New template'
+    once per color. Defaults to all four (CMYK) checked; the AI
+    button can auto-toggle C/M/Y off for a mono device."""
+    user = auth.require_admin(request)
+    return request.app.state.templates.TemplateResponse(
+        "supplies/new_set.html",
+        {
+            "request": request,
+            "lang": request.state.lang,
+            "user": user,
+            "error": request.query_params.get("error", ""),
+            "prefill_model": request.query_params.get("model", ""),
+        },
+    )
+
+
+@router.post("/supplies/ai/suggest-set", include_in_schema=False)
+async def supplies_ai_suggest_set(request: Request):
+    """v0.24.0 — one LLM round-trip that both classifies the printer
+    (mono vs color) and fills SKU/description/manufacturer/yield for
+    every slot it has. Powers the "🤖 AI-Vorschlag" button on the
+    Toner-Set form."""
+    auth.require_admin(request)
+    if not llm_client.is_configured():
+        return JSONResponse(
+            {"ok": False, "error": "llm_not_configured"}, status_code=400)
+
+    form = await request.form()
+    model = (form.get("printer_model") or "").strip()
+    if not model:
+        return JSONResponse(
+            {"ok": False, "error": "printer_model_required"}, status_code=400)
+
+    result = supply_library.ai_suggest_supply_set(model)
+    if result is None:
+        return JSONResponse(
+            {"ok": False, "error": "llm_response_not_json_or_unavailable"},
+            status_code=500)
+
+    return JSONResponse({
+        "ok": True,
+        "provider": result["provider"],
+        "model": result["model"],
+        "is_color": result["is_color"],
+        "slots": result["slots"],
+    })
+
+
+@router.post("/supplies/new-set", include_in_schema=False)
+async def supplies_new_set_save(request: Request):
+    """v0.24.0 — batch-create up to 4 (model, color) templates from
+    one submit. Every checked color is its own upsert_template() call
+    so a duplicate on one color (e.g. K already exists) doesn't block
+    the others — the redirect summarises created vs skipped."""
+    admin = auth.require_admin(request)
+    form = await request.form()
+    model = (form.get("printer_model") or "").strip()
+    if not model:
+        return RedirectResponse(
+            "/supplies/new-set?error=printer_model_required",
+            status_code=303)
+
+    shared = {
+        "printer_model":     model,
+        "supplier":          form.get("supplier") or "",
+        "supplier_url":      form.get("supplier_url") or "",
+        "default_quantity":  form.get("default_quantity") or "1",
+    }
+
+    created: list[str] = []
+    skipped_duplicate: list[str] = []
+    skipped_unchecked = 0
+    for color in _SET_COLORS:
+        if not form.get(f"enable_{color}"):
+            skipped_unchecked += 1
+            continue
+        fields = {
+            **shared,
+            "color":            color,
+            "sku":              form.get(f"sku_{color}") or "",
+            "description":      form.get(f"description_{color}") or "",
+            "manufacturer":     form.get(f"manufacturer_{color}") or "",
+            "yield_pages":      form.get(f"yield_{color}") or "",
+            "unit_price_cents": form.get(f"price_{color}") or "",
+        }
+        try:
+            _, err = supply_library.upsert_template(
+                None, fields, updated_by_user_id=admin["id"])
+        except ValueError as e:
+            return RedirectResponse(
+                f"/supplies/new-set?error={str(e)[:120]}&model={model}",
+                status_code=303)
+        if err == "duplicate_model_color":
+            skipped_duplicate.append(color)
+        else:
+            created.append(color)
+            db.audit(admin["id"], "supply.template_created",
+                     target_type="supply_template",
+                     target_id=f"{model}:{color}",
+                     meta_json=json.dumps({"via": "set"}))
+
+    if not created and not skipped_duplicate:
+        return RedirectResponse(
+            "/supplies/new-set?error=select_at_least_one_color",
+            status_code=303)
+
+    info = f"set_saved_{len(created)}"
+    if skipped_duplicate:
+        info += f"_dup_{','.join(skipped_duplicate)}"
+    return RedirectResponse(f"/supplies?info={info}", status_code=303)
+
+
 @router.get("/supplies/{tpl_id}/edit", response_class=HTMLResponse,
             include_in_schema=False)
 async def supplies_edit_form(tpl_id: int, request: Request):

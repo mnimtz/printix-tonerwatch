@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}{{ _('supplies.new_set', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/supplies" data-noloader>{{ _('supplies.title', lang) }}</a> /
+  {{ _('supplies.new_set', lang) }}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .set-form {
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-5) var(--sp-6);
+    box-shadow: var(--shadow-sm); max-width: 920px;
+  }
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+  .row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-4); }
+  @media (max-width: 720px) {
+    .row-2col, .row-3col { grid-template-columns: 1fr; }
+  }
+  .form-hint { font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px; }
+
+  .set-toolbar {
+    display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+    margin: var(--sp-4) 0; padding: var(--sp-3) var(--sp-4);
+    background: linear-gradient(90deg, rgba(0,235,134,0.06), rgba(0,160,251,0.06));
+    border: 1px solid rgba(0,40,84,0.15); border-radius: var(--r-lg);
+  }
+  .set-toolbar .presets { display: flex; gap: 6px; margin-left: auto; }
+
+  .set-table {
+    width: 100%; border-collapse: collapse; font-size: 0.87rem;
+    margin-top: var(--sp-3);
+  }
+  .set-table th, .set-table td {
+    padding: 8px 10px; text-align: left; vertical-align: middle;
+    border-bottom: 1px solid var(--tw-gray-200);
+  }
+  .set-table th {
+    font-size: 0.72rem; color: var(--tw-muted-blue);
+    letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700;
+    background: var(--tw-gray-100);
+  }
+  .set-table input[type="text"], .set-table input[type="number"] {
+    width: 100%; padding: 6px 8px; font-size: 0.85rem;
+  }
+  .set-table .color-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 10px 2px 6px; border-radius: 12px;
+    font-family: var(--font-mono); font-weight: 700;
+    font-size: 0.82rem; background: var(--tw-gray-100);
+    color: var(--tw-primary); white-space: nowrap;
+  }
+  .set-table .color-chip::before {
+    content: ''; display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--tw-muted-blue);
+  }
+  .set-table .color-chip.K::before { background: #231F20; }
+  .set-table .color-chip.C::before { background: #00A0FB; }
+  .set-table .color-chip.M::before { background: #D030E8; }
+  .set-table .color-chip.Y::before { background: #FFC600; }
+  .set-table tr.disabled-row { opacity: 0.45; }
+
+  .form-actions {
+    display: flex; gap: var(--sp-2); margin-top: var(--sp-5);
+    padding-top: var(--sp-4); border-top: 1px solid var(--tw-gray-200);
+    justify-content: flex-end;
+  }
+  .form-actions .cancel { color: var(--tw-muted-blue); padding: 8px 14px; text-decoration: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-2);">🎨 {{ _('supplies.new_set', lang) }}</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-4); max-width: 720px;">
+  {{ _('supplies.new_set.intro', lang) }}
+</p>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<form method="post" action="/supplies/new-set" class="set-form">
+  {% include "_csrf_input.html" %}
+
+  <div class="form-group">
+    <label for="printer_model">{{ _('supplies.col.printer_model', lang) }} *</label>
+    <input type="text" id="printer_model" name="printer_model" required
+           value="{{ prefill_model or '' }}"
+           placeholder="HP Color LaserJet Pro M479"
+           list="known-models" autocomplete="off">
+    <datalist id="known-models"></datalist>
+    <div class="form-hint">{{ _('supplies.hint.printer_model', lang) }}</div>
+  </div>
+
+  <div class="row-3col">
+    <div class="form-group">
+      <label for="supplier">{{ _('supplies.col.supplier', lang) }}</label>
+      <input type="text" id="supplier" name="supplier" placeholder="Group24 / Bechtle / …">
+    </div>
+    <div class="form-group">
+      <label for="supplier_url">{{ _('supplies.col.supplier_url', lang) }}</label>
+      <input type="url" id="supplier_url" name="supplier_url"
+             placeholder="https://shop.example.com/…">
+    </div>
+    <div class="form-group">
+      <label for="default_quantity">{{ _('supplies.col.default_quantity', lang) }}</label>
+      <input type="number" id="default_quantity" name="default_quantity" min="1" value="1">
+    </div>
+  </div>
+
+  <div class="set-toolbar">
+    <button type="button" id="btn-ai-suggest-set" class="btn" data-noloader>
+      🤖 {{ _('supplies.new_set.ai_button', lang) }}
+    </button>
+    <span class="presets">
+      <button type="button" id="btn-preset-mono" class="btn btn-secondary" data-noloader>
+        {{ _('supplies.new_set.preset_mono', lang) }}
+      </button>
+      <button type="button" id="btn-preset-cmyk" class="btn btn-secondary" data-noloader>
+        {{ _('supplies.new_set.preset_cmyk', lang) }}
+      </button>
+    </span>
+  </div>
+  <div id="ai-suggest-result" style="font-size: 0.85rem; margin-bottom: var(--sp-3);"></div>
+
+  <table class="set-table">
+    <thead>
+      <tr>
+        <th style="width: 90px;"></th>
+        <th style="width: 140px;">{{ _('supplies.col.sku', lang) }}</th>
+        <th>{{ _('supplies.col.description', lang) }}</th>
+        <th style="width: 130px;">{{ _('supplies.col.manufacturer', lang) }}</th>
+        <th style="width: 100px;">{{ _('supplies.col.yield', lang) }}</th>
+        <th style="width: 110px;">{{ _('supplies.col.price_cents', lang) }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in ['K', 'C', 'M', 'Y'] %}
+      <tr id="row_{{ c }}" class="{{ 'disabled-row' if c != 'K' else '' }}">
+        <td>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="enable_{{ c }}" name="enable_{{ c }}" value="1"
+                   {% if c == 'K' %}checked{% endif %}>
+            <span class="color-chip {{ c }}">{{ c }}</span>
+          </label>
+        </td>
+        <td><input type="text" id="sku_{{ c }}" name="sku_{{ c }}" placeholder="W2030A"></td>
+        <td><input type="text" id="description_{{ c }}" name="description_{{ c }}"
+                    placeholder="HP 415A Original LaserJet Toner"></td>
+        <td><input type="text" id="manufacturer_{{ c }}" name="manufacturer_{{ c }}" placeholder="HP"></td>
+        <td><input type="number" id="yield_{{ c }}" name="yield_{{ c }}" min="0" placeholder="2400"></td>
+        <td><input type="number" id="price_{{ c }}" name="price_{{ c }}" min="0" placeholder="11500"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="form-actions">
+    <a href="/supplies" class="cancel" data-noloader>{{ _('common.cancel', lang) }}</a>
+    <button type="submit" class="btn">💾 {{ _('supplies.new_set.save_button', lang) }}</button>
+  </div>
+</form>
+
+<script>
+(function() {
+  fetch('/supplies/models', {credentials: 'same-origin'})
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(j) {
+      if (!j || !j.models) return;
+      var dl = document.getElementById('known-models');
+      if (!dl) return;
+      var frag = document.createDocumentFragment();
+      j.models.forEach(function(m) {
+        var opt = document.createElement('option');
+        opt.value = m;
+        frag.appendChild(opt);
+      });
+      dl.appendChild(frag);
+    })
+    .catch(function() { /* silent — free text still works */ });
+})();
+
+(function() {
+  var COLORS = ['K', 'C', 'M', 'Y'];
+
+  function setEnabled(color, on) {
+    var box = document.getElementById('enable_' + color);
+    var row = document.getElementById('row_' + color);
+    box.checked = on;
+    row.classList.toggle('disabled-row', !on);
+  }
+
+  COLORS.forEach(function(c) {
+    document.getElementById('enable_' + c).addEventListener('change', function(e) {
+      document.getElementById('row_' + c).classList.toggle('disabled-row', !e.target.checked);
+    });
+  });
+
+  document.getElementById('btn-preset-mono').addEventListener('click', function() {
+    setEnabled('K', true);
+    setEnabled('C', false); setEnabled('M', false); setEnabled('Y', false);
+  });
+  document.getElementById('btn-preset-cmyk').addEventListener('click', function() {
+    COLORS.forEach(function(c) { setEnabled(c, true); });
+  });
+
+  var aiBtn = document.getElementById('btn-ai-suggest-set');
+  var result = document.getElementById('ai-suggest-result');
+  var modelInput = document.getElementById('printer_model');
+
+  aiBtn.addEventListener('click', async function() {
+    var model = modelInput.value.trim();
+    if (!model) {
+      result.textContent = '{{ _('supplies.ai.need_model', lang)|e }}';
+      result.style.color = 'var(--status-critical)';
+      return;
+    }
+    aiBtn.disabled = true;
+    result.textContent = '{{ _('supplies.ai.thinking', lang)|e }}';
+    result.style.color = 'var(--tw-muted-blue)';
+    var fd = new FormData();
+    fd.append('printer_model', model);
+    fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+    try {
+      var r = await fetch('/supplies/ai/suggest-set', {method: 'POST', body: fd,
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+      var j = await r.json();
+      if (!j.ok) {
+        var msg = j.error === 'llm_not_configured'
+          ? '{{ _('supplies.ai.not_configured', lang)|e }}'
+          : (j.error || 'error');
+        result.innerHTML = '❌ ' + msg;
+        result.style.color = 'var(--status-critical)';
+        return;
+      }
+      // Auto-toggle C/M/Y based on the model's color capability.
+      COLORS.forEach(function(c) {
+        setEnabled(c, c === 'K' || j.is_color);
+      });
+      var filled = [];
+      Object.keys(j.slots || {}).forEach(function(c) {
+        var s = j.slots[c] || {};
+        var fill = function(id, v) {
+          if (!v) return;
+          var el = document.getElementById(id);
+          if (el && !el.value) el.value = v;
+        };
+        fill('sku_' + c, s.sku);
+        fill('description_' + c, s.description);
+        fill('manufacturer_' + c, s.manufacturer);
+        fill('yield_' + c, s.yield_pages);
+        filled.push(c);
+      });
+      var detected = j.is_color
+        ? '{{ _('supplies.new_set.ai.color_detected', lang)|e }}'
+        : '{{ _('supplies.new_set.ai.mono_detected', lang)|e }}';
+      result.innerHTML = '✓ ' + detected + ' · ' + filled.join('/') +
+        ' <code>' + (j.provider || 'llm') + ' · ' + (j.model || '') + '</code>';
+      result.style.color = 'var(--status-ok)';
+    } catch (e) {
+      result.innerHTML = '❌ ' + e.message;
+      result.style.color = 'var(--status-critical)';
+    } finally {
+      aiBtn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}
