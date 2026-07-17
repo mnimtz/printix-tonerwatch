@@ -1274,6 +1274,15 @@
                 var firstApp = existingApps[0] || {};
                 var fd = new FormData();
                 fd.append('object_id', firstApp.id || '');
+                // v0.24.25: must travel with object_id — the rotated
+                // secret only works paired with the SAME app's
+                // client_id. Without this the backend kept whatever
+                // client_id happened to already be stored, which can
+                // be a DIFFERENT one of the (possibly several)
+                // existing "Printix TonerWatch" registrations —
+                // secret and client_id then belong to different apps
+                // and every token request fails with AADSTS7000215.
+                fd.append('client_id', firstApp.appId || '');
                 fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
                 var r2 = await fetch('/settings/entra/autosetup/rotate_secret', {
                   method:'POST', credentials:'same-origin', body: fd,

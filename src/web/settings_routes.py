@@ -288,9 +288,7 @@ async def entra_autosetup_rotate_secret(request: Request):
     /replace does). Uses the access_token from the device-code poll
     that put us on the "existing_found" panel, and the object_id
     from the form (populated by the JS from the existing[0] result).
-    Only the client_secret in the entra_sso settings row changes —
-    tenant_id, client_id, redirect_uri, provisioning flags are
-    preserved."""
+    tenant_id, redirect_uri, provisioning flags are preserved."""
     admin = auth.require_admin(request)
     # v0.24.9: not popped here — so the same device-code token can also
     # back the "Grant Mail.Send" button below without forcing a second
@@ -302,6 +300,7 @@ async def entra_autosetup_rotate_secret(request: Request):
                              status_code=400)
     form = await request.form()
     object_id = (form.get("object_id") or "").strip()
+    client_id = (form.get("client_id") or "").strip()
     if not object_id:
         return JSONResponse({"ok": False, "status": "error",
                               "error": "object_id required"},
@@ -314,15 +313,25 @@ async def entra_autosetup_rotate_secret(request: Request):
                  meta_json=json.dumps({"error": str(e)[:300]}))
         return JSONResponse({"ok": False, "status": "error",
                               "error": str(e)[:400]}, status_code=500)
-    # Merge into existing config: only replace client_secret (+ its
-    # expiry, so the settings page can warn before the NEW one dies too).
+    # Merge into existing config: replace client_secret (+ its expiry)
+    # and — v0.24.25 — client_id. A secret only works paired with the
+    # SAME app it was minted on; when several "Printix TonerWatch"
+    # registrations exist in the tenant (find_existing_apps returned
+    # more than one), the object_id the secret was rotated on isn't
+    # guaranteed to be the one the currently-stored client_id refers
+    # to. Keeping the old client_id here silently paired a fresh,
+    # valid secret with the WRONG app — every token request then fails
+    # with AADSTS7000215 even though nothing looks broken in the UI.
     cfg = entra_sso.load_config()
     cfg["client_secret"] = rot["client_secret"]
     cfg["secret_expires_at"] = rot["secret_expires_at"]
+    if client_id:
+        cfg["client_id"] = client_id
     entra_sso.save_config(cfg)
     db.audit(admin["id"], "settings.entra_secret_rotated",
              target_type="settings", target_id="entra_sso",
              meta_json=json.dumps({"object_id": object_id,
+                                    "client_id": client_id,
                                     "expires_at": rot["secret_expires_at"]}))
     return JSONResponse({"ok": True, "status": "done",
                           "secret_expires_at": rot["secret_expires_at"]})
