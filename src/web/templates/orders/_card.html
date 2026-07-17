@@ -1,6 +1,10 @@
 {# One kanban card. Consumes: `o` (order dict). Uses the enclosing
-   template's `lang` + `status`. Actions depend on the current status. #}
-<div class="order-card" data-order-id="{{ o.id }}">
+   template's `lang` + `status`. Actions depend on the current status.
+   v0.24.1: `highlight_id` (from the parent's context, auto-inherited
+   by include) marks the card the "🛒 Bestellen" button on /toner
+   just created or reused. #}
+<div class="order-card{% if highlight_id and (o.id|string) == highlight_id %} highlighted{% endif %}"
+     data-order-id="{{ o.id }}">
   <div class="printer-name" title="{{ o.printer_id }}">
     {{ o.printer_name or o.printer_id }}
   </div>

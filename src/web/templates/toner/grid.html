@@ -245,15 +245,31 @@
     font-size: 0.85rem;
   }
   .toner-bar-row .order-link {
-    text-align: center; color: var(--tw-muted-blue);
+    /* v0.24.1: now a <button> (was an <a>/<span>) so it always
+       renders — reset the button chrome to keep the same compact
+       icon look, then add severity-driven color so a critical row
+       visibly demands attention instead of blending in. */
+    display: block; width: 100%; text-align: center;
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; cursor: pointer;
+    color: var(--tw-muted-blue);
     text-decoration: none; font-size: 1rem; line-height: 1;
-    opacity: 0.55; transition: opacity var(--t-fast), color var(--t-fast);
+    opacity: 0.5; transition: opacity var(--t-fast), color var(--t-fast), transform var(--t-fast);
   }
   .toner-bar-row .order-link:hover {
-    opacity: 1; color: var(--tw-accent);
+    opacity: 1; color: var(--tw-accent); transform: scale(1.15);
   }
-  .toner-bar-row.critical .order-link,
-  .toner-bar-row.warn     .order-link { opacity: 0.85; }
+  .toner-bar-row.warn .order-link {
+    opacity: 1; color: #B45309;
+  }
+  .toner-bar-row.critical .order-link {
+    opacity: 1; color: var(--status-critical);
+    animation: order-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes order-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+  }
   .toner-bar-row .lbl {
     font-weight: 700; color: var(--tw-primary); text-align: center;
   }

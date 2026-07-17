@@ -63,14 +63,23 @@
             {% endif %}
           </div>
           <div>
-          {% if s.supply and s.supply.supplier_url %}
-            <a href="{{ s.supply.supplier_url }}" target="_blank" rel="noopener"
-               class="order-link" data-noloader
-               title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">🛒</a>
-          {% elif s.supply and s.supply.sku %}
-            <span class="order-link" style="cursor: help;"
-                  title="{{ s.supply.sku }}{% if s.supply.description %} · {{ s.supply.description }}{% endif %}">📦</span>
-          {% endif %}
+          {# v0.24.1: persistent "Bestellen" button — always present,
+             regardless of whether a supply template exists yet. One
+             click creates/reuses the draft order and lands the
+             operator directly in the kanban. Replaces the old
+             icon-that-only-appeared-if-a-supplier_url-was-set; the
+             supplier quick-link now lives on the resulting kanban
+             card instead (orders/_card.html already has it). #}
+          <form method="post"
+                action="/toner/{{ p.customer_id }}/{{ p.id }}/order"
+                data-noloader style="display: contents;">
+            {% include "_csrf_input.html" %}
+            <input type="hidden" name="color" value="{{ s.color }}">
+            <input type="hidden" name="printer_name" value="{{ p.printer_name }}">
+            <input type="hidden" name="model" value="{{ p.model }}">
+            <button type="submit" class="order-link" data-noloader
+                    title="{{ _('toner.order_now', lang) }}{% if s.supply and s.supply.sku %} · {{ s.supply.sku }}{% endif %}">🛒</button>
+          </form>
           </div>
         </div>
       {% endfor %}

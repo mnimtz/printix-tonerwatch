@@ -115,6 +115,11 @@
         // operator still has to enter the tenant-scoped credentials.
         // If the exact server host differs for your tenant, override
         // in the field after applying the preset.
+        //
+        // v0.24.1: corrected to Printix's actual current BI hosting —
+        // the old 'bi-database.printix.net' / 'printix' pair was
+        // wrong (predates Printix's move to a dedicated Azure SQL
+        // instance). Confirmed live values from Marcus.
         (function() {
           var btn = document.getElementById('btn-printix-preset');
           if (!btn) return;
@@ -123,9 +128,9 @@
             var db  = document.getElementById('sql_database');
             var pt  = document.getElementById('sql_port');
             if (srv && (!srv.value || confirm('{{ _('customer.printix_preset_confirm', lang)|e }}'))) {
-              srv.value = 'bi-database.printix.net';
+              srv.value = 'printix-bi-data-2.database.windows.net';
             }
-            if (db  && !db.value)  db.value  = 'printix';
+            if (db  && !db.value)  db.value  = 'printix_bi_data_2_1';
             if (pt  && (!pt.value || pt.value === '1433')) pt.value = 1433;
             var un = document.getElementById('sql_username');
             if (un) un.focus();

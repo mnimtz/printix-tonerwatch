@@ -95,6 +95,13 @@ async def orders_board(request: Request):
             "customer_choices":  customer_choices,
             "info":  request.query_params.get("info", ""),
             "error": request.query_params.get("error", ""),
+            # v0.24.1: the "🛒 Bestellen" button on /toner redirects here
+            # with the order id it just created (or reused) so the
+            # kanban can highlight + scroll to it — the operator lands
+            # directly on the card they need to review, instead of
+            # hunting for it in three columns.
+            "highlight_id":  q.get("highlight", ""),
+            "highlight_new": q.get("highlight_new", "") == "1",
         },
     )
 
@@ -170,6 +177,58 @@ async def orders_new(request: Request):
         return RedirectResponse(
             f"/orders?error={str(e)[:120].replace('&','')}", status_code=303)
     return RedirectResponse("/orders?info=order_created", status_code=303)
+
+
+@router.post("/toner/{customer_id}/{printer_id}/order", include_in_schema=False)
+async def toner_order_now(customer_id: int, printer_id: str, request: Request):
+    """v0.24.1 — the "🛒 Bestellen" button on the toner grid/list.
+    This is the missing bridge Marcus asked about: seeing a
+    critical/warn toner color on /toner and having ONE persistent
+    button that actually starts an order, instead of only reacting
+    to the alert e-mail whenever the runner happens to fire.
+
+    One click either creates a fresh draft — pre-filled with the
+    resolved supply template's SKU + default quantity, if a
+    template exists for this (model, color) — or reuses the
+    existing active order for this exact (customer, printer, color)
+    slot. Same idempotent create_draft_if_none() path the alert
+    runner already uses, so clicking twice (or the runner firing a
+    moment later) can never spawn a duplicate active order.
+
+    Redirects straight into the kanban with that order highlighted
+    + customer filter cleared, so it's always visible: the operator
+    lands exactly where they can check the SKU, send it (mark
+    ordered), edit quantity via the printer's supply override, or
+    delete the draft if it was a mistake."""
+    user = auth.require_user(request)
+    if not auth.user_can_see_customer(user, customer_id):
+        return RedirectResponse("/toner?error=forbidden", status_code=303)
+
+    form = await request.form()
+    color = (form.get("color") or "K").strip().upper()
+    printer_name = (form.get("printer_name") or "").strip()
+    model = (form.get("model") or "").strip()
+
+    supply = supply_library.resolve_supply(customer_id, printer_id, model, color)
+    sku = (supply or {}).get("sku") or ""
+    try:
+        qty = int((supply or {}).get("default_quantity") or 1)
+    except (TypeError, ValueError):
+        qty = 1
+
+    order_id, created = orders.create_draft_if_none(
+        customer_id, printer_id, printer_name, color, sku=sku, quantity=qty)
+
+    if created:
+        db.audit(user["id"], "order.created",
+                 target_type="order", target_id=str(order_id),
+                 meta_json=json.dumps({"printer_id": printer_id, "color": color,
+                                        "sku": sku, "via": "toner_grid"}))
+
+    return RedirectResponse(
+        f"/orders?customer=all&highlight={order_id}"
+        f"&highlight_new={'1' if created else '0'}",
+        status_code=303)
 
 
 @router.post("/orders/{order_id}/delete", include_in_schema=False)

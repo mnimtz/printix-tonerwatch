@@ -71,6 +71,13 @@
     box-shadow: var(--shadow);
     transform: translateY(-1px);
   }
+  /* v0.24.1: card the operator was just redirected to from the
+     "🛒 Bestellen" button on /toner. */
+  .order-card.highlighted {
+    outline: 3px solid var(--tw-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(0, 235, 134, 0.15), var(--shadow);
+  }
   .order-card .printer-name {
     font-weight: 700; color: var(--tw-primary);
     font-size: 0.92rem;
@@ -256,6 +263,16 @@
   </div>
 {% endif %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if highlight_id %}
+  {# v0.24.1: landed here via the toner-grid "🛒 Bestellen" button. #}
+  <div class="alert alert-info" id="highlight-banner">
+    {% if highlight_new %}
+      ✓ {{ _('orders.info.highlight_created', lang) }}
+    {% else %}
+      ℹ {{ _('orders.info.highlight_existing', lang) }}
+    {% endif %}
+  </div>
+{% endif %}
 
 <div class="kanban">
   {% for status, orders in [('draft', grouped.draft),
@@ -316,4 +333,16 @@
     </div>
   {% endif %}
 </details>
+
+{% if highlight_id %}
+<script>
+  // v0.24.1: draw the eye to the card the "🛒 Bestellen" button on
+  // /toner just created (or reused) — it can be in any of the 3
+  // columns, and a long draft column may push it off-screen.
+  (function () {
+    var card = document.querySelector('.order-card.highlighted');
+    if (card) card.scrollIntoView({behavior: 'smooth', block: 'center'});
+  })();
+</script>
+{% endif %}
 {% endblock %}

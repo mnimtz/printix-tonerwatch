@@ -203,6 +203,18 @@
   }
   .toner-table .toner-mini.critical .pct { color: var(--status-critical); }
   .toner-table .toner-mini.warn     .pct { color: #B45309; }
+  /* v0.24.1: persistent per-color order button, same idea as the
+     grid card's icon — always present, color escalates with
+     severity so a critical row visibly demands a click. */
+  .toner-table .mini-order-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; font-size: 0.85rem; line-height: 1; cursor: pointer;
+    color: var(--tw-muted-blue); opacity: 0.5;
+    transition: opacity var(--t-fast), color var(--t-fast), transform var(--t-fast);
+  }
+  .toner-table .mini-order-btn:hover { opacity: 1; color: var(--tw-accent); transform: scale(1.15); }
+  .toner-table .toner-mini.warn     .mini-order-btn { opacity: 1; color: #B45309; }
+  .toner-table .toner-mini.critical .mini-order-btn { opacity: 1; color: var(--status-critical); }
   .toner-table .actions {
     text-align: right; white-space: nowrap;
   }
@@ -422,6 +434,18 @@
                   <div class="fill" style="width: {{ s.level }}%;"></div>
                 </div>
                 <span class="pct">{{ s.level }}%</span>
+                {# v0.24.1: same persistent order button as the grid
+                   card — always present, color-coded by severity. #}
+                <form method="post"
+                      action="/toner/{{ p.customer_id }}/{{ p.id }}/order"
+                      data-noloader style="display: contents;">
+                  {% include "_csrf_input.html" %}
+                  <input type="hidden" name="color" value="{{ s.color }}">
+                  <input type="hidden" name="printer_name" value="{{ p.printer_name }}">
+                  <input type="hidden" name="model" value="{{ p.model }}">
+                  <button type="submit" class="mini-order-btn" data-noloader
+                          title="{{ _('toner.order_now', lang) }}{% if s.supply and s.supply.sku %} · {{ s.supply.sku }}{% endif %}">🛒</button>
+                </form>
               </div>
             {% endfor %}
             </div>
