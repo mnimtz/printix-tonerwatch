@@ -48,6 +48,12 @@
     <li><a href="#entra"   data-tab="entra"   role="tab">🔐 {{ _('settings.entra.section', lang) }}</a></li>
     <li><a href="#graph"   data-tab="graph"   role="tab">☁ {{ _('settings.graph.section', lang) }}</a></li>
     <li><a href="#backup"  data-tab="backup"  role="tab">💾 {{ _('settings.backup.section', lang) }}</a></li>
+    {# v0.24.11 — /settings/database is its own page, not an in-page
+       tab-panel, so this link has no data-tab attribute: the tab-switch
+       JS below only touches a[data-tab], so this just navigates.
+       Previously only reachable via a small cross-link buried inside
+       the unrelated Backup tab — nobody found it there. #}
+    <li><a href="/settings/database" data-noloader>🗄 {{ _('settings.database.title', lang) }}</a></li>
   </ul>
 
   {% if info == 'mail_saved' %}
@@ -1179,171 +1185,170 @@
       }
       if (j.status === 'existing_found') {
         // v0.17.2: warn the admin before creating an nth orphan
+        // v0.24.11: rotate-secret and grant-mail are independent
+        // actions on the SAME app, not alternatives — renderPanel()
+        // redraws the whole thing (table + all three buttons) every
+        // time, with a running list of status banners on top, so
+        // doing one doesn't make the other disappear.
         stop();
-        var rows = (j.existing || []).map(function(app) {
-          var uris = (app.redirectUris || []).map(esc).join('<br>');
-          return '<tr>' +
-                 '<td style="padding:6px 10px;font-family:var(--font-mono);font-size:0.78rem;">' + esc(app.appId) + '</td>' +
-                 '<td style="padding:6px 10px;font-size:0.78rem;">' + esc(app.createdDateTime || '') + '</td>' +
-                 '<td style="padding:6px 10px;font-size:0.78rem;color:var(--tw-muted-blue);">' + (uris || '—') + '</td>' +
-                 '</tr>';
-        }).join('');
-        show(
-          '<div style="padding: var(--sp-3); background: #FFFBEB; ' +
-                'border: 1px solid #FCD34D; border-radius: var(--r); color: #92400E;">' +
-          '<strong>⚠ ' + {{ _('settings.entra.autosetup.existing_title', lang)|tojson }} + '</strong><br>' +
-             {{ _('settings.entra.autosetup.existing_hint', lang)|tojson }} +
-          '<table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:0.82rem;background:var(--tw-white);border-radius:4px;overflow:hidden;">' +
-          '<thead><tr style="background:var(--tw-gray-100);color:var(--tw-primary);">' +
-          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Client ID</th>' +
-          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Created</th>' +
-          '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Redirect URIs</th>' +
-          '</tr></thead><tbody>' + rows + '</tbody></table>' +
-          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
-          // v0.23.4: recommended path is to rotate the secret on the
-          // existing app — avoids orphan app registrations and the
-          // "Reconfigure loop" that Marcus hit repeatedly.
-          '<button type="button" class="btn btn-primary" id="btn-entra-rotate-secret" data-noloader>🔑 ' +
-             {{ _('settings.entra.autosetup.rotate_secret', lang)|tojson }} + '</button>' +
-          // v0.24.9: the automated version of the manual 3-step
-          // Mail.Send instructions further down this page.
-          '<button type="button" class="btn btn-secondary" id="btn-entra-grant-mail" data-noloader>📧 ' +
-             {{ _('settings.entra.autosetup.grant_mail', lang)|tojson }} + '</button>' +
-          '<button type="button" class="btn btn-secondary" id="btn-entra-create-anyway" data-noloader>➕ ' +
-             {{ _('settings.entra.autosetup.create_anyway', lang)|tojson }} + '</button>' +
-          '<button type="button" class="btn btn-secondary" onclick="location.reload()" data-noloader>' +
-             {{ _('common.cancel', lang)|tojson }} + '</button>' +
-          '</div>' +
-          '<div style="margin-top:8px;font-size:0.78rem;opacity:0.8;">' +
-             {{ _('settings.entra.autosetup.rotate_secret.hint', lang)|tojson }} +
-          '</div></div>');
-        // v0.23.4: wire the "🔑 Rotate secret only" button — the safe
-        // path that keeps the app + its permissions, only mints a
-        // fresh client_secret on it.
-        var btnRot = document.getElementById('btn-entra-rotate-secret');
-        if (btnRot) {
-          btnRot.addEventListener('click', async function() {
-            btnRot.disabled = true;
-            show('<div style="color: var(--tw-muted-blue);">' +
-                 {{ _('settings.entra.autosetup.rotating', lang)|tojson }} + '</div>');
-            try {
-              var firstApp = (j.existing || [])[0] || {};
-              var fd = new FormData();
-              fd.append('object_id', firstApp.id || '');
-              fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
-              var r2 = await fetch('/settings/entra/autosetup/rotate_secret', {
-                method:'POST', credentials:'same-origin', body: fd,
-                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
-              var j2 = await r2.json();
-              if (j2.status === 'done') {
-                show(
-                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
-                        'border-radius: var(--r); color: #065F46;">' +
-                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
-                     {{ _('settings.entra.autosetup.secret_rotated', lang)|tojson }} +
-                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
-                        'border-radius: 4px; font-size: 0.78rem;">' +
-                     'secret_expires_at: ' + esc(j2.secret_expires_at) +
-                  '</pre></div>');
-                setTimeout(function() { location.reload(); }, 2500);
-              } else {
-                show('<div style="color:#991B1B;">✗ ' + esc(j2.error || 'error') + '</div>');
-              }
-            } catch (e) {
-              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
-            }
-          });
+        var existingApps = j.existing || [];
+        var statusBanners = [];
+
+        function renderPanel() {
+          var rows = existingApps.map(function(app) {
+            var uris = (app.redirectUris || []).map(esc).join('<br>');
+            return '<tr>' +
+                   '<td style="padding:6px 10px;font-family:var(--font-mono);font-size:0.78rem;">' + esc(app.appId) + '</td>' +
+                   '<td style="padding:6px 10px;font-size:0.78rem;">' + esc(app.createdDateTime || '') + '</td>' +
+                   '<td style="padding:6px 10px;font-size:0.78rem;color:var(--tw-muted-blue);">' + (uris || '—') + '</td>' +
+                   '</tr>';
+          }).join('');
+          show(
+            statusBanners.join('') +
+            '<div style="padding: var(--sp-3); background: #FFFBEB; ' +
+                  'border: 1px solid #FCD34D; border-radius: var(--r); color: #92400E;">' +
+            '<strong>⚠ ' + {{ _('settings.entra.autosetup.existing_title', lang)|tojson }} + '</strong><br>' +
+               {{ _('settings.entra.autosetup.existing_hint', lang)|tojson }} +
+            '<table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:0.82rem;background:var(--tw-white);border-radius:4px;overflow:hidden;">' +
+            '<thead><tr style="background:var(--tw-gray-100);color:var(--tw-primary);">' +
+            '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Client ID</th>' +
+            '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Created</th>' +
+            '<th style="text-align:left;padding:6px 10px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;">Redirect URIs</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+            // v0.23.4: recommended path is to rotate the secret on the
+            // existing app — avoids orphan app registrations and the
+            // "Reconfigure loop" that Marcus hit repeatedly.
+            '<button type="button" class="btn btn-primary" id="btn-entra-rotate-secret" data-noloader>🔑 ' +
+               {{ _('settings.entra.autosetup.rotate_secret', lang)|tojson }} + '</button>' +
+            // v0.24.9: the automated version of the manual 3-step
+            // Mail.Send instructions further down this page.
+            '<button type="button" class="btn btn-secondary" id="btn-entra-grant-mail" data-noloader>📧 ' +
+               {{ _('settings.entra.autosetup.grant_mail', lang)|tojson }} + '</button>' +
+            '<button type="button" class="btn btn-secondary" id="btn-entra-create-anyway" data-noloader>➕ ' +
+               {{ _('settings.entra.autosetup.create_anyway', lang)|tojson }} + '</button>' +
+            '<button type="button" class="btn btn-secondary" onclick="location.reload()" data-noloader>' +
+               {{ _('common.done_reload', lang)|tojson }} + '</button>' +
+            '</div>' +
+            '<div style="margin-top:8px;font-size:0.78rem;opacity:0.8;">' +
+               {{ _('settings.entra.autosetup.rotate_secret.hint', lang)|tojson }} +
+            '</div></div>');
+          wireButtons();
         }
-        // v0.24.9: "📧 Grant Mail.Send" — adds Mail.Send + User.Read.All
-        // as Application permissions on the EXISTING app and admin-
-        // consents them, replacing the 3-step manual Azure Portal flow
-        // for admins who hold Global Administrator in the tenant. A
-        // 403-style failure here is expected (not a bug) for an admin
-        // who registered the app but isn't a tenant-level admin — the
-        // manual instructions further down the page still work.
-        var btnMail = document.getElementById('btn-entra-grant-mail');
-        if (btnMail) {
-          btnMail.addEventListener('click', async function() {
-            btnMail.disabled = true;
-            show('<div style="color: var(--tw-muted-blue);">' +
-                 {{ _('settings.entra.autosetup.granting_mail', lang)|tojson }} + '</div>');
-            try {
-              var firstApp = (j.existing || [])[0] || {};
-              var fd = new FormData();
-              fd.append('object_id', firstApp.id || '');
-              fd.append('client_id', firstApp.appId || '');
-              fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
-              var r2 = await fetch('/settings/entra/autosetup/grant_mail_permissions', {
-                method:'POST', credentials:'same-origin', body: fd,
-                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
-              var j2 = await r2.json();
-              if (j2.status === 'done') {
-                var lines = [];
-                if ((j2.granted || []).length) lines.push('granted: ' + j2.granted.join(', '));
-                if ((j2.already_granted || []).length) lines.push('already granted: ' + j2.already_granted.join(', '));
-                if ((j2.failed || []).length) lines.push('failed: ' + j2.failed.join('; '));
-                show(
-                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
-                        'border-radius: var(--r); color: #065F46;">' +
-                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
-                     {{ _('settings.entra.autosetup.mail_granted', lang)|tojson }} +
-                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
-                        'border-radius: 4px; font-size: 0.78rem; white-space: pre-wrap;">' +
-                     esc(lines.join('\n')) +
-                  '</pre><button type="button" class="btn" data-noloader onclick="location.reload()">' +
-                     {{ _('common.reload', lang)|tojson }} + '</button></div>');
-              } else {
-                show('<div style="padding: var(--sp-3); background: #FEF2F2; ' +
-                      'border-radius: var(--r); color: #991B1B;">✗ ' + esc(j2.error || 'error') +
-                      '<div style="margin-top:6px;font-size:0.82rem;opacity:0.85;">' +
-                         {{ _('settings.entra.autosetup.granting_mail_failed_hint', lang)|tojson }} +
-                      '</div></div>');
-              }
-            } catch (e) {
-              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
-            } finally {
-              btnMail.disabled = false;
-            }
-          });
+
+        function addBanner(ok, html) {
+          statusBanners.push(
+            '<div style="padding: 10px 12px; margin-bottom: 8px; border-radius: var(--r); ' +
+                 'background: ' + (ok ? '#ECFDF5' : '#FEF2F2') + '; ' +
+                 'color: ' + (ok ? '#065F46' : '#991B1B') + '; font-size: 0.88rem;">' +
+            html + '</div>');
         }
-        var btn2 = document.getElementById('btn-entra-create-anyway');
-        if (btn2) {
-          btn2.addEventListener('click', async function() {
-            btn2.disabled = true;
-            show('<div style="color: var(--tw-muted-blue);">' +
-                 {{ _('settings.entra.autosetup.creating', lang)|tojson }} + '</div>');
-            try {
-              var r2 = await fetch('/settings/entra/autosetup/replace', {
-                method:'POST', credentials:'same-origin',
-                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
-              var j2 = await r2.json();
-              if (j2.status === 'done') {
-                show(
-                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
-                        'border-radius: var(--r); color: #065F46;">' +
-                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
-                     {{ _('settings.entra.autosetup.done', lang)|tojson }} +
-                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
-                        'border-radius: 4px; font-size: 0.78rem;">' +
-                     'tenant_id: ' + esc(j2.tenant_id) + '\n' +
-                     'client_id: ' + esc(j2.client_id) + '\n' +
-                     'admin_consent: ' + esc(j2.admin_consent) +
-                  '</pre><button type="button" class="btn" data-noloader onclick="location.reload()">' +
-                     {{ _('common.reload', lang)|tojson }} + '</button></div>');
-                setTimeout(function() { location.reload(); }, 2500);
-              } else {
-                show('<div style="color:#991B1B;">✗ ' + esc(j2.error || 'error') + '</div>');
+
+        function wireButtons() {
+          // v0.23.4: "🔑 Rotate secret only" — the safe path that
+          // keeps the app + its permissions, only mints a fresh
+          // client_secret on it.
+          var btnRot = document.getElementById('btn-entra-rotate-secret');
+          if (btnRot) {
+            btnRot.addEventListener('click', async function() {
+              btnRot.disabled = true;
+              btnRot.textContent = {{ _('settings.entra.autosetup.rotating', lang)|tojson }};
+              try {
+                var firstApp = existingApps[0] || {};
+                var fd = new FormData();
+                fd.append('object_id', firstApp.id || '');
+                fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+                var r2 = await fetch('/settings/entra/autosetup/rotate_secret', {
+                  method:'POST', credentials:'same-origin', body: fd,
+                  headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+                var j2 = await r2.json();
+                if (j2.status === 'done') {
+                  addBanner(true, '✅ ' + {{ _('settings.entra.autosetup.secret_rotated', lang)|tojson }} +
+                    (j2.secret_expires_at ? ' <code style="font-size:0.82em;">secret_expires_at: ' +
+                     esc(j2.secret_expires_at) + '</code>' : ''));
+                } else {
+                  addBanner(false, '✗ ' + esc(j2.error || 'error'));
+                }
+              } catch (e) {
+                addBanner(false, esc(e.message || e));
               }
-            } catch (e) {
-              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
-            }
-          });
+              renderPanel();
+            });
+          }
+          // v0.24.9: "📧 Grant Mail.Send" — adds Mail.Send +
+          // User.Read.All as Application permissions on the EXISTING
+          // app and admin-consents them, replacing the 3-step manual
+          // Azure Portal flow for admins who hold Global Administrator
+          // in the tenant. A 403-style failure here is expected (not a
+          // bug) for an admin who registered the app but isn't a
+          // tenant-level admin — the manual instructions further down
+          // the page still work.
+          var btnMail = document.getElementById('btn-entra-grant-mail');
+          if (btnMail) {
+            btnMail.addEventListener('click', async function() {
+              btnMail.disabled = true;
+              btnMail.textContent = {{ _('settings.entra.autosetup.granting_mail', lang)|tojson }};
+              try {
+                var firstApp = existingApps[0] || {};
+                var fd = new FormData();
+                fd.append('object_id', firstApp.id || '');
+                fd.append('client_id', firstApp.appId || '');
+                fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+                var r2 = await fetch('/settings/entra/autosetup/grant_mail_permissions', {
+                  method:'POST', credentials:'same-origin', body: fd,
+                  headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+                var j2 = await r2.json();
+                if (j2.status === 'done') {
+                  var lines = [];
+                  if ((j2.granted || []).length) lines.push('granted: ' + j2.granted.join(', '));
+                  if ((j2.already_granted || []).length) lines.push('already granted: ' + j2.already_granted.join(', '));
+                  if ((j2.failed || []).length) lines.push('failed: ' + j2.failed.join('; '));
+                  addBanner(true, '✅ ' + {{ _('settings.entra.autosetup.mail_granted', lang)|tojson }} +
+                    (lines.length ? ' <code style="font-size:0.82em;">' + esc(lines.join(' · ')) + '</code>' : ''));
+                } else {
+                  addBanner(false, '✗ ' + esc(j2.error || 'error') + '<br><span style="font-size:0.85em;opacity:0.85;">' +
+                    {{ _('settings.entra.autosetup.granting_mail_failed_hint', lang)|tojson }} + '</span>');
+                }
+              } catch (e) {
+                addBanner(false, esc(e.message || e));
+              }
+              renderPanel();
+            });
+          }
+          var btn2 = document.getElementById('btn-entra-create-anyway');
+          if (btn2) {
+            btn2.addEventListener('click', async function() {
+              btn2.disabled = true;
+              btn2.textContent = {{ _('settings.entra.autosetup.creating', lang)|tojson }};
+              try {
+                var r2 = await fetch('/settings/entra/autosetup/replace', {
+                  method:'POST', credentials:'same-origin',
+                  headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+                var j2 = await r2.json();
+                if (j2.status === 'done') {
+                  addBanner(true, '✅ ' + {{ _('settings.entra.autosetup.done', lang)|tojson }} +
+                    ' <code style="font-size:0.82em;">client_id: ' + esc(j2.client_id) + '</code> — ' +
+                    {{ _('settings.entra.autosetup.reload_to_see', lang)|tojson }});
+                  stop();
+                  show(statusBanners.join(''));
+                  return;
+                } else {
+                  addBanner(false, '✗ ' + esc(j2.error || 'error'));
+                }
+              } catch (e) {
+                addBanner(false, esc(e.message || e));
+              }
+              renderPanel();
+            });
+          }
         }
+
+        renderPanel();
         return;
       }
       if (j.status === 'expired') {
         stop();
-        show(
+        showRestartable(
           '<div style="padding: var(--sp-3); background: #FFFBEB; ' +
                 'border-radius: var(--r); color: #92400E;">' +
           '<strong>' + {{ _('settings.entra.autosetup.expired', lang)|tojson }} + '</strong><br>' +
@@ -1351,9 +1356,13 @@
           '</div>');
         return;
       }
-      // status === "error"
+      // status === "error" — includes session hiccups like
+      // no_device_code_in_session (e.g. this browser tab's polling
+      // outlived another tab/attempt that already consumed the code,
+      // or the session simply timed out). v0.24.11: offer a one-click
+      // restart instead of leaving a dead end with a raw error string.
       stop();
-      show(
+      showRestartable(
         '<div style="padding: var(--sp-3); background: #FEE2E2; ' +
               'border-radius: var(--r); color: #991B1B;">' +
         '<strong>✗ ' + {{ _('settings.entra.autosetup.error', lang)|tojson }} + '</strong><br>' +
@@ -1361,7 +1370,25 @@
            esc(j.error || 'unknown') + '</span></div>');
     } catch (e) {
       stop();
-      show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+      showRestartable('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+    }
+  }
+
+  // v0.24.11 — shared dead-end handler: shows the given message plus
+  // a restart button that re-runs the whole device-code flow from
+  // scratch, instead of leaving the admin staring at a raw error with
+  // no next step.
+  function showRestartable(messageHtml) {
+    show(messageHtml +
+      '<button type="button" id="btn-entra-restart" class="btn btn-secondary" ' +
+         'data-noloader style="margin-top: 10px;">🔄 ' +
+         {{ _('settings.entra.autosetup.restart', lang)|tojson }} + '</button>');
+    var btnRestart = document.getElementById('btn-entra-restart');
+    if (btnRestart) {
+      btnRestart.addEventListener('click', function() {
+        btn.disabled = false;
+        btn.click();
+      });
     }
   }
 
