@@ -4,8 +4,18 @@
 # ============================================================================
 # Multi-stage build:
 #   1. builder  — compile Python wheels (pyodbc, pymssql need dev headers)
-#   2. runtime  — slim Debian-based image with the FreeTDS runtime for
-#                 Microsoft SQL Server connectivity (Printix BI database)
+#   2. runtime  — slim Debian-based image with two SEPARATE SQL Server
+#                 drivers, for two separate features:
+#                   * FreeTDS, used by pymssql (bi_client.py) to read a
+#                     tenant's own Printix BI database — pymssql talks
+#                     TDS directly, no unixODBC driver registration
+#                     needed.
+#                   * Microsoft's ODBC Driver 18, used by pyodbc
+#                     (db.py's build_azure_sql_url) when TonerWatch's
+#                     OWN backend storage is switched to Azure SQL —
+#                     genuinely needs a registered unixODBC driver
+#                     named "ODBC Driver 18 for SQL Server", which
+#                     FreeTDS does not provide.
 #
 # Target platforms: linux/amd64, linux/arm64 (built via buildx in CI)
 # ============================================================================
@@ -48,8 +58,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tini \
         ca-certificates \
         curl \
+        gnupg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 app
+
+# Microsoft's ODBC Driver 18 for SQL Server — separate apt repo, not in
+# Debian's own. db.py's build_azure_sql_url() has always assumed this
+# was present ("available in the container image"), but it never
+# actually was: FreeTDS above covers pymssql (bi_client.py), not
+# pyodbc. Left unnoticed until the Azure-SQL-as-TonerWatch's-own-
+# backend feature (v0.23.0) got its first real test.
+RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
+        | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && curl -sSL https://packages.microsoft.com/config/debian/12/prod.list \
+        | sed 's|deb |deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] |' \
+        > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
+    && apt-get purge -y gnupg \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 USER app
 WORKDIR /app
