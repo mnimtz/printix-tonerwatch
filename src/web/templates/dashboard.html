@@ -149,7 +149,13 @@
   <div>
     <h1>{{ _('dashboard.greeting.hello', lang) }}, {{ user.name or user.email }} 👋</h1>
     <div class="summary">
-      {% if has_fleet_data %}
+      {% if ai_greeting %}
+        {# v0.24.13 — AI-phrased, built from the same facts as the
+           static sentence below plus recent anomalies; falls back to
+           the static sentence whenever the LLM isn't configured,
+           errors, or is slow (ai_greeting is None in all of those). #}
+        {{ ai_greeting }}
+      {% elif has_fleet_data %}
         <strong>{{ counts.printers }} {{ _('dashboard.stat.printers', lang) }}</strong>
         · <strong>{{ counts.customers }} {{ _('dashboard.stat.customers', lang) }}</strong>.
         {% if counts.critical or counts.warn %}

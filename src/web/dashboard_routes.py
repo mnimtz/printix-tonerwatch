@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import desc, func, select
 
-from .. import auth, bi_client, db
+from .. import auth, bi_client, dashboard_greeting, db, toner_alerts
 from ..db import audit_log
 from . import toner_routes
 
@@ -75,6 +75,20 @@ async def dashboard(request: Request):
     # Names of the (up to 2) worst-off customers, for the one-line
     # greeting summary — "Acme GmbH and Beta AG need a look first".
     urgent_names = [c["name"] for c in per_customer_stats if c["critical"]][:2]
+
+    # v0.24.13 — AI-phrased greeting, built from the exact same facts
+    # as the static sentence below plus recent cross-customer
+    # anomalies, so it can name a specific situation instead of just
+    # totals. Cached ~hourly inside generate_greeting(); returns None
+    # (falls back to the static sentence in the template) whenever the
+    # LLM isn't configured, errors, or is slow.
+    recent_anomalies = toner_alerts.list_recent_anomalies_multi(
+        [c["id"] for c in customers], limit=5)
+    ai_greeting = dashboard_greeting.generate_greeting(
+        user["id"], user.get("name") or user.get("email") or "",
+        {"customers": len(customers), "printers": total_printers,
+         "critical": critical_count, "warn": warn_count},
+        urgent_names, recent_anomalies, lang=request.state.lang)
 
     # v0.24.10 — cache freshness for the greeting line. toner_state is
     # the only place a "last seen" timestamp exists; MAX across every
@@ -168,6 +182,7 @@ async def dashboard(request: Request):
             },
             "per_customer": per_customer_stats,
             "urgent_names": urgent_names,
+            "ai_greeting": ai_greeting,
             "last_seen_at": last_seen_at or "",
             "recent_events": recent_events,
         },

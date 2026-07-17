@@ -137,6 +137,34 @@ def list_recent_anomalies(customer_id: int, limit: int = 5) -> list[dict]:
     return out
 
 
+def list_recent_anomalies_multi(customer_ids: list[int], limit: int = 5) -> list[dict]:
+    """v0.24.13 — most recent ``toner.anomaly`` events across several
+    customers in one query, newest first, with the customer name
+    resolved in — backs the AI dashboard greeting, which needs to say
+    *which* customer without an extra lookup per row."""
+    if not customer_ids:
+        return []
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            select(db.toner_events, db.customers.c.name.label("customer_name"))
+            .select_from(db.toner_events.join(
+                db.customers, db.customers.c.id == db.toner_events.c.customer_id))
+            .where(db.toner_events.c.customer_id.in_(customer_ids))
+            .where(db.toner_events.c.kind == "toner.anomaly")
+            .order_by(db.toner_events.c.created_at.desc())
+            .limit(limit)
+        ).all()
+    out = []
+    for r in rows:
+        d = db._row_to_dict(r)
+        try:
+            d["meta"] = json.loads(d.get("meta_json") or "{}")
+        except json.JSONDecodeError:
+            d["meta"] = {}
+        out.append(d)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Time helpers
 # ---------------------------------------------------------------------------
