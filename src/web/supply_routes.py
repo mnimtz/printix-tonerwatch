@@ -60,6 +60,7 @@ async def supplies_list(request: Request):
 @router.get("/supplies/new", response_class=HTMLResponse, include_in_schema=False)
 async def supplies_new_form(request: Request):
     user = auth.require_admin(request)
+    all_suppliers = suppliers.list_suppliers()
     return request.app.state.templates.TemplateResponse(
         "supplies/edit.html",
         {
@@ -70,7 +71,10 @@ async def supplies_new_form(request: Request):
             "form_action": "/supplies/new",
             "error": request.query_params.get("error", ""),
             "prefill_model": request.query_params.get("model", ""),
-            "all_suppliers": suppliers.list_suppliers(),
+            "all_suppliers": all_suppliers,
+            # v0.24.16: exactly one supplier on file — no point making
+            # the operator pick it every time a new template is added.
+            "default_supplier": all_suppliers[0] if len(all_suppliers) == 1 else None,
         },
     )
 
@@ -106,6 +110,7 @@ async def supplies_new_set_form(request: Request):
     once per color. Defaults to all four (CMYK) checked; the AI
     button can auto-toggle C/M/Y off for a mono device."""
     user = auth.require_admin(request)
+    all_suppliers = suppliers.list_suppliers()
     return request.app.state.templates.TemplateResponse(
         "supplies/new_set.html",
         {
@@ -114,7 +119,8 @@ async def supplies_new_set_form(request: Request):
             "user": user,
             "error": request.query_params.get("error", ""),
             "prefill_model": request.query_params.get("model", ""),
-            "all_suppliers": suppliers.list_suppliers(),
+            "all_suppliers": all_suppliers,
+            "default_supplier": all_suppliers[0] if len(all_suppliers) == 1 else None,
         },
     )
 

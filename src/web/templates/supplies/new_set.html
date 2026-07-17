@@ -115,10 +115,14 @@
       <select id="supplier_id" name="supplier_id">
         <option value="">{{ _('supplies.supplier.none', lang) }}</option>
         {% for s in all_suppliers %}
-        <option value="{{ s.id }}" data-name="{{ s.name }}">{{ s.name }}</option>
+        <option value="{{ s.id }}" data-name="{{ s.name }}"
+                {{ 'selected' if default_supplier and default_supplier.id == s.id else '' }}>
+          {{ s.name }}
+        </option>
         {% endfor %}
       </select>
-      <input type="hidden" id="supplier" name="supplier">
+      <input type="hidden" id="supplier" name="supplier"
+             value="{{ default_supplier.name if default_supplier else '' }}">
     </div>
     <div class="form-group">
       <label for="supplier_url">{{ _('supplies.col.supplier_url', lang) }}</label>

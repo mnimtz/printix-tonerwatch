@@ -98,13 +98,15 @@
         <option value="">{{ _('supplies.supplier.none', lang) }}</option>
         {% for s in all_suppliers %}
         <option value="{{ s.id }}" data-name="{{ s.name }}"
-                {{ 'selected' if template and template.supplier_id == s.id else '' }}>
+                {{ 'selected' if (template and template.supplier_id == s.id)
+                   or (not template and default_supplier and default_supplier.id == s.id)
+                   else '' }}>
           {{ s.name }}
         </option>
         {% endfor %}
       </select>
       <input type="hidden" id="supplier" name="supplier"
-             value="{{ template.supplier if template else '' }}">
+             value="{{ template.supplier if template else (default_supplier.name if default_supplier else '') }}">
       <div class="form-hint">
         {{ _('supplies.hint.supplier', lang) }}
         <a href="/suppliers/new" target="_blank" data-noloader>{{ _('supplies.supplier.manage_link', lang) }}</a>
