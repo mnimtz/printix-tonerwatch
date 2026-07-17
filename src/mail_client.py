@@ -371,6 +371,27 @@ def _send_graph(recipients: list[str], subject: str,
                     "been admin-consented. Add + consent it in Azure "
                     "Portal → Microsoft Entra ID → App registrations "
                     "→ your app → API permissions.")
+        elif r.status_code == 403 and "ErrorSendAsDenied" in raw:
+            # v0.24.26 — distinct from ErrorAccessDenied above: the app
+            # DOES have Mail.Send, but Exchange Online's own
+            # ApplicationAccessPolicy feature further restricts WHICH
+            # mailboxes an app with Mail.Send may act as, independent
+            # of the Graph/Entra permission grant. A tenant that has
+            # ever scoped one down will block every mailbox not in
+            # that policy's allowed group, even though everything
+            # looks correctly consented in Entra ID.
+            hint = (f" — Exchange Online has an Application Access "
+                    f"Policy that restricts which mailboxes this app "
+                    f"may send as, and {mailbox_upn!r} isn't in the "
+                    "allowed scope. Check via Exchange Online "
+                    "PowerShell (Connect-ExchangeOnline): "
+                    "Get-ApplicationAccessPolicy — then either add "
+                    "this mailbox to the policy's allowed group, or "
+                    "run Remove-ApplicationAccessPolicy if the policy "
+                    "wasn't intentional. If no policy is listed at "
+                    "all, the Mail.Send admin consent likely didn't "
+                    "fully propagate — try 'Grant Mail.Send' again on "
+                    "Settings → Entra ID.")
         elif r.status_code == 404 and "MailboxNotEnabledForRESTAPI" in raw:
             hint = (f" — the mailbox {mailbox_upn!r} isn't licensed "
                     "for Exchange Online or is on a plan without "
