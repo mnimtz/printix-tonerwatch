@@ -228,7 +228,11 @@ async def entra_autosetup_rotate_secret(request: Request):
     preserved."""
     admin = auth.require_admin(request)
     try:
-        access_token = request.session.pop("entra_setup_access_token", "")
+        # v0.24.9: was .pop() — now .get() so the same device-code
+        # token can also back the "Grant Mail.Send" button below
+        # without forcing a second device-code login just because the
+        # admin clicked rotate first.
+        access_token = request.session.get("entra_setup_access_token", "")
     except AssertionError:
         access_token = ""
     if not access_token:
@@ -261,6 +265,46 @@ async def entra_autosetup_rotate_secret(request: Request):
                                     "expires_at": rot["secret_expires_at"]}))
     return JSONResponse({"ok": True, "status": "done",
                           "secret_expires_at": rot["secret_expires_at"]})
+
+
+@router.post("/settings/entra/autosetup/grant_mail_permissions",
+             include_in_schema=False)
+async def entra_autosetup_grant_mail_permissions(request: Request):
+    """v0.24.9 — the automated version of the manual "3 Schritte"
+    Mail.Send instructions, for an app that was registered before this
+    existed (or where the very first auto-grant attempt failed).
+    Same access_token + object_id pattern as rotate_secret. A 403-style
+    EntraSSOError here means the signed-in admin isn't a tenant Global
+    Administrator — caller falls back to the manual Azure Portal steps,
+    which this doesn't disable."""
+    admin = auth.require_admin(request)
+    try:
+        access_token = request.session.get("entra_setup_access_token", "")
+    except AssertionError:
+        access_token = ""
+    if not access_token:
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": "no_access_token_in_session"},
+                             status_code=400)
+    form = await request.form()
+    object_id = (form.get("object_id") or "").strip()
+    client_id = (form.get("client_id") or "").strip() or entra_sso.load_config().get("client_id", "")
+    if not object_id or not client_id:
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": "object_id and client_id required"},
+                             status_code=400)
+    try:
+        result = entra_sso.grant_mail_send_permissions(access_token, object_id, client_id)
+    except entra_sso.EntraSSOError as e:
+        db.audit(admin["id"], "settings.entra_mail_permissions_grant_failed",
+                 target_type="settings", target_id="entra_sso",
+                 meta_json=json.dumps({"error": str(e)[:300]}))
+        return JSONResponse({"ok": False, "status": "error",
+                              "error": str(e)[:400]}, status_code=500)
+    db.audit(admin["id"], "settings.entra_mail_permissions_granted",
+             target_type="settings", target_id="entra_sso",
+             meta_json=json.dumps(result))
+    return JSONResponse({"ok": True, "status": "done", **result})
 
 
 @router.post("/settings/entra/autosetup/replace", include_in_schema=False)

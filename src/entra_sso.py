@@ -82,10 +82,19 @@ _MSGRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"
 # auto-registration. All Application.ReadWrite.All is enough for
 # create/update apps + secrets. DelegatedPermissionGrant.ReadWrite.All
 # lets us grant tenant-wide consent so end-users skip the consent
-# screen on first sign-in.
+# screen on first sign-in. AppRoleAssignment.ReadWrite.All (v0.24.9)
+# additionally lets us admin-consent Mail.Send + User.Read.All
+# Application permissions on the app's own service principal — the
+# step that used to require three manual Azure Portal clicks. Every
+# scope here is high-privilege by nature (that's what makes the
+# automation possible); the signed-in admin sees the real consent
+# screen and still needs Global Administrator (or Privileged Role
+# Administrator) in the tenant for the appRoleAssignment call itself
+# to succeed — Application.ReadWrite.All alone isn't enough for that.
 _AUTOSETUP_SCOPES = (
     "https://graph.microsoft.com/Application.ReadWrite.All "
     "https://graph.microsoft.com/DelegatedPermissionGrant.ReadWrite.All "
+    "https://graph.microsoft.com/AppRoleAssignment.ReadWrite.All "
     "offline_access openid profile"
 )
 
@@ -95,6 +104,11 @@ _GRAPH_SCOPE_OPENID   = "37f7f235-527c-4136-accd-4a02d197296e"
 _GRAPH_SCOPE_PROFILE  = "14dad69e-099b-42c9-810b-d002981feec1"
 _GRAPH_SCOPE_EMAIL    = "64a6cdd6-aab1-4aaf-94b8-3cc8405e90d0"
 _GRAPH_SCOPE_USERREAD = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+
+# Application (app-role) permission IDs on Microsoft Graph — used for
+# the Mail.Send automation, not the sign-in flow above. Same docs.
+_GRAPH_ROLE_MAILSEND    = "b633e1c5-b582-4048-a93e-9f11b44c7e96"
+_GRAPH_ROLE_USERREADALL = "df021288-bdef-4463-88db-98f22de89214"
 
 # Session key for the state token (guards against CSRF on the
 # callback) and the redirect-target after successful login.
@@ -711,10 +725,25 @@ def auto_register_app(
     # 4. Tenant-wide consent → users don't see the consent screen.
     consent_status = _grant_tenant_consent(h, client_id)
 
+    # 5. Mail.Send + User.Read.All Application permissions — best
+    # effort. This is what used to be a manual 3-step Azure Portal
+    # detour; on tenants where the signed-in admin has the rights for
+    # it, new setups now come out fully configured for both sign-in
+    # AND mail sending in one pass. Never fails the whole setup — an
+    # admin without Global Admin rights still gets a working SSO app
+    # and falls back to the manual instructions for Mail.Send only.
+    try:
+        mail_perms = grant_mail_send_permissions(access_token, obj_id, client_id)
+    except EntraSSOError as e:
+        logger.info("Mail.Send auto-grant skipped for %s: %s", app_name, e)
+        mail_perms = {"ok": False, "granted": [], "already_granted": [],
+                     "failed": [str(e)[:200]]}
+
     logger.info(
         "Entra SSO app auto-registered: %s (client_id=%s, tenant=%s, "
-        "secret_expires=%s, admin_consent=%s)",
-        app_name, client_id, tenant_id, secret_expires_at, consent_status)
+        "secret_expires=%s, admin_consent=%s, mail_send_granted=%s)",
+        app_name, client_id, tenant_id, secret_expires_at, consent_status,
+        mail_perms.get("ok"))
 
     return {
         "tenant_id":         tenant_id,
@@ -723,6 +752,7 @@ def auto_register_app(
         "secret_expires_at": secret_expires_at,
         "object_id":         obj_id,
         "admin_consent":     consent_status,
+        "mail_send_granted": mail_perms.get("ok", False),
     }
 
 
@@ -782,6 +812,110 @@ def _grant_tenant_consent(headers: dict[str, str], client_id: str,
                        r.status_code, r.text[:200])
         return "grant_failed"
     return "granted"
+
+
+def _ensure_service_principal(headers: dict[str, str], client_id: str) -> str:
+    """v0.24.9 — return the app's service-principal id, creating one
+    if it doesn't exist yet. Apps created via Graph (rather than the
+    Portal UI) don't automatically get a service principal, but
+    ``POST`` 409s if one already exists from a previous run — look it
+    up instead of treating that as failure."""
+    import httpx as _httpx
+    r = _httpx.post(f"{_GRAPH_URL}/servicePrincipals",
+                    headers=headers, json={"appId": client_id}, timeout=15.0)
+    if r.status_code in (200, 201):
+        return r.json().get("id", "")
+    r = _httpx.get(
+        f"{_GRAPH_URL}/servicePrincipals(appId='{client_id}')",
+        headers=headers, timeout=10.0)
+    if r.status_code == 200:
+        return r.json().get("id", "")
+    raise EntraSSOError(
+        f"Could not create or find service principal: HTTP {r.status_code}: {r.text[:200]}")
+
+
+def grant_mail_send_permissions(access_token: str, object_id: str,
+                                 client_id: str) -> dict[str, Any]:
+    """v0.24.9 — the automated version of the manual "3 Schritte"
+    instructions: add Mail.Send + User.Read.All as APPLICATION
+    permissions (not delegated — those cover sign-in, not sending as
+    an arbitrary mailbox) to the app's manifest, then admin-consent
+    both on its service principal. Requires the signed-in device-code
+    admin to hold Global Administrator or Privileged Role
+    Administrator in the tenant — Application.ReadWrite.All alone
+    isn't enough to consent application permissions, so this can
+    legitimately 403 for an admin who registered the app but isn't a
+    tenant-level admin. Callers should fall back to the manual
+    instructions on failure, not treat it as a bug."""
+    import httpx as _httpx
+    h = _graph(access_token)
+
+    # 1. Merge Mail.Send + User.Read.All (type "Role" = Application
+    # permission) into the existing Graph resourceAccess entry so the
+    # Portal's "API permissions" blade shows them, same as the manual
+    # flow would leave behind.
+    r = _httpx.get(
+        f"{_GRAPH_URL}/applications/{object_id}?$select=requiredResourceAccess",
+        headers=h, timeout=10.0)
+    if r.status_code != 200:
+        raise EntraSSOError(
+            f"Could not read app manifest: HTTP {r.status_code}: {r.text[:200]}")
+    existing = r.json().get("requiredResourceAccess", [])
+    graph_entry = next(
+        (e for e in existing if e.get("resourceAppId") == _MSGRAPH_APP_ID), None)
+    if graph_entry is None:
+        graph_entry = {"resourceAppId": _MSGRAPH_APP_ID, "resourceAccess": []}
+        existing.append(graph_entry)
+    have_ids = {a["id"] for a in graph_entry["resourceAccess"]}
+    for role_id in (_GRAPH_ROLE_MAILSEND, _GRAPH_ROLE_USERREADALL):
+        if role_id not in have_ids:
+            graph_entry["resourceAccess"].append({"id": role_id, "type": "Role"})
+
+    r = _httpx.patch(
+        f"{_GRAPH_URL}/applications/{object_id}",
+        headers=h, json={"requiredResourceAccess": existing}, timeout=15.0)
+    if r.status_code not in (200, 204):
+        raise EntraSSOError(
+            f"Could not update app manifest: HTTP {r.status_code}: {r.text[:200]}")
+
+    # 2. Admin-consent both roles on the app's own service principal.
+    our_sp_id = _ensure_service_principal(h, client_id)
+    r = _httpx.get(
+        f"{_GRAPH_URL}/servicePrincipals(appId='{_MSGRAPH_APP_ID}')",
+        headers=h, timeout=10.0)
+    if r.status_code != 200:
+        raise EntraSSOError(
+            f"Could not find Microsoft Graph service principal: "
+            f"HTTP {r.status_code}: {r.text[:200]}")
+    msgraph_sp_id = r.json().get("id", "")
+
+    granted, already, failed = [], [], []
+    for role_id, name in ((_GRAPH_ROLE_MAILSEND, "Mail.Send"),
+                          (_GRAPH_ROLE_USERREADALL, "User.Read.All")):
+        try:
+            r = _httpx.post(
+                f"{_GRAPH_URL}/servicePrincipals/{our_sp_id}/appRoleAssignments",
+                headers=h,
+                json={"principalId": our_sp_id, "resourceId": msgraph_sp_id,
+                      "appRoleId": role_id},
+                timeout=15.0)
+        except _httpx.HTTPError as e:
+            failed.append(f"{name}: {e}")
+            continue
+        if r.status_code in (200, 201):
+            granted.append(name)
+        elif r.status_code == 400 and "already" in r.text.lower():
+            already.append(name)
+        else:
+            failed.append(f"{name}: HTTP {r.status_code}: {r.text[:150]}")
+
+    if failed and not granted and not already:
+        raise EntraSSOError(
+            "Admin consent failed for all permissions — this account "
+            "likely isn't a Global Administrator in the tenant: "
+            + "; ".join(failed))
+    return {"ok": not failed, "granted": granted, "already_granted": already,
+            "failed": failed}
 
 
 def apply_auto_setup_result(result: dict[str, Any], *,

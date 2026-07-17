@@ -53,6 +53,14 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   and **Microsoft Graph** (`/users/{upn}/sendMail`, reuses the Entra SSO
   app registration). Graph provider auto-lists tenant mailboxes for the
   sender picker + inline auth-probe button that pinpoints AADSTS misconfigs.
+- **One-click Mail.Send permission grant.** The Graph provider needs
+  Mail.Send + User.Read.All as *Application* permissions (not the
+  delegated ones sign-in uses) with admin consent — Settings → Entra ID →
+  Reconfigure → **📧 Enable Mail.Send** does this automatically for tenant
+  Global Administrators, updating the app manifest and admin-consenting
+  both roles via Graph. Falls back to a 3-step manual Azure Portal guide
+  (with one-click deep links) for admins who registered the app without
+  Global Admin rights.
 - **Rich HTML mail with one-click ordering.** Every critical/warn row
   carries the SKU + description + a green **🛒 Order now** button + a blue
   **✓ Mark as ordered** magic link (14-day-signed, single action, POST

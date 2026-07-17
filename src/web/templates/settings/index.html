@@ -190,6 +190,10 @@
             ⚡ {{ _('settings.mail.graph_setup.title', lang) }}
           </div>
           <div style="line-height: 1.55;">
+            <div style="padding: 6px 10px; background: #FEF3C7; border-radius: 4px;
+                        margin-bottom: 8px;">
+              💡 {{ _('settings.mail.graph_setup.shortcut_hint', lang) }}
+            </div>
             {{ _('settings.mail.graph_setup.intro', lang) }}
             <ol style="margin: 8px 0 8px 20px; padding: 0;">
               <li>
@@ -1201,6 +1205,10 @@
           // "Reconfigure loop" that Marcus hit repeatedly.
           '<button type="button" class="btn btn-primary" id="btn-entra-rotate-secret" data-noloader>🔑 ' +
              {{ _('settings.entra.autosetup.rotate_secret', lang)|tojson }} + '</button>' +
+          // v0.24.9: the automated version of the manual 3-step
+          // Mail.Send instructions further down this page.
+          '<button type="button" class="btn btn-secondary" id="btn-entra-grant-mail" data-noloader>📧 ' +
+             {{ _('settings.entra.autosetup.grant_mail', lang)|tojson }} + '</button>' +
           '<button type="button" class="btn btn-secondary" id="btn-entra-create-anyway" data-noloader>➕ ' +
              {{ _('settings.entra.autosetup.create_anyway', lang)|tojson }} + '</button>' +
           '<button type="button" class="btn btn-secondary" onclick="location.reload()" data-noloader>' +
@@ -1243,6 +1251,58 @@
               }
             } catch (e) {
               show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+            }
+          });
+        }
+        // v0.24.9: "📧 Grant Mail.Send" — adds Mail.Send + User.Read.All
+        // as Application permissions on the EXISTING app and admin-
+        // consents them, replacing the 3-step manual Azure Portal flow
+        // for admins who hold Global Administrator in the tenant. A
+        // 403-style failure here is expected (not a bug) for an admin
+        // who registered the app but isn't a tenant-level admin — the
+        // manual instructions further down the page still work.
+        var btnMail = document.getElementById('btn-entra-grant-mail');
+        if (btnMail) {
+          btnMail.addEventListener('click', async function() {
+            btnMail.disabled = true;
+            show('<div style="color: var(--tw-muted-blue);">' +
+                 {{ _('settings.entra.autosetup.granting_mail', lang)|tojson }} + '</div>');
+            try {
+              var firstApp = (j.existing || [])[0] || {};
+              var fd = new FormData();
+              fd.append('object_id', firstApp.id || '');
+              fd.append('client_id', firstApp.appId || '');
+              fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+              var r2 = await fetch('/settings/entra/autosetup/grant_mail_permissions', {
+                method:'POST', credentials:'same-origin', body: fd,
+                headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+              var j2 = await r2.json();
+              if (j2.status === 'done') {
+                var lines = [];
+                if ((j2.granted || []).length) lines.push('granted: ' + j2.granted.join(', '));
+                if ((j2.already_granted || []).length) lines.push('already granted: ' + j2.already_granted.join(', '));
+                if ((j2.failed || []).length) lines.push('failed: ' + j2.failed.join('; '));
+                show(
+                  '<div style="padding: var(--sp-3); background: #ECFDF5; ' +
+                        'border-radius: var(--r); color: #065F46;">' +
+                  '<div style="font-weight: 700; font-size: 1.05rem;">✅ ' +
+                     {{ _('settings.entra.autosetup.mail_granted', lang)|tojson }} +
+                  '</div><pre style="margin-top: 8px; padding: 8px; background: #fff; ' +
+                        'border-radius: 4px; font-size: 0.78rem; white-space: pre-wrap;">' +
+                     esc(lines.join('\n')) +
+                  '</pre><button type="button" class="btn" data-noloader onclick="location.reload()">' +
+                     {{ _('common.reload', lang)|tojson }} + '</button></div>');
+              } else {
+                show('<div style="padding: var(--sp-3); background: #FEF2F2; ' +
+                      'border-radius: var(--r); color: #991B1B;">✗ ' + esc(j2.error || 'error') +
+                      '<div style="margin-top:6px;font-size:0.82rem;opacity:0.85;">' +
+                         {{ _('settings.entra.autosetup.granting_mail_failed_hint', lang)|tojson }} +
+                      '</div></div>');
+              }
+            } catch (e) {
+              show('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
+            } finally {
+              btnMail.disabled = false;
             }
           });
         }
