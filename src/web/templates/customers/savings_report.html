@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ _('customer.savings.title', lang) }} · {{ customer.name }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/customers" style="color: inherit;">{{ _('nav.customers', lang) }}</a> ›
+  <a href="/customers/{{ customer.id }}" style="color: inherit;">{{ customer.name }}</a> ›
+  {{ _('customer.savings.title', lang) }}
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-2);">
+  💡 {{ _('customer.savings.title', lang) }}
+</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-5);">
+  {{ customer.name }} — {{ _('customer.savings.intro', lang) }}
+</p>
+
+{% if narrative %}
+  <section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-5);
+            border-left: 4px solid var(--tw-primary);">
+    <p style="margin: 0; font-size: 1rem; line-height: 1.6;">{{ narrative }}</p>
+  </section>
+{% else %}
+  <div class="alert alert-info" style="margin-bottom: var(--sp-5);">
+    {{ _('customer.savings.no_narrative', lang) }}
+  </div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4);
+            margin-bottom: var(--sp-5);">
+  <div class="card" style="padding: var(--sp-4);">
+    <div style="font-size: 0.78rem; color: var(--tw-muted-blue); text-transform: uppercase;
+                letter-spacing: 0.06em; margin-bottom: 6px;">
+      {{ _('customer.savings.spend_label', lang) }}
+    </div>
+    <div style="font-size: 1.6rem; font-weight: 700;">
+      {{ '%.2f'|format(facts.total_spend_cents / 100) }} €
+    </div>
+    <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+      {{ _('customer.savings.spend_hint', lang) }}
+      {{ facts.priced_orders }}/{{ facts.total_orders }}
+    </div>
+  </div>
+  <div class="card" style="padding: var(--sp-4);">
+    <div style="font-size: 0.78rem; color: var(--tw-muted-blue); text-transform: uppercase;
+                letter-spacing: 0.06em; margin-bottom: 6px;">
+      {{ _('customer.savings.coverage_label', lang) }}
+    </div>
+    <div style="font-size: 1.6rem; font-weight: 700;">
+      {{ facts.priced_supplies }}/{{ facts.supplies_on_file }}
+    </div>
+    {% if facts.unpriced_supplies_pct > 0 %}
+      <div style="font-size: 0.78rem; color: var(--status-warn, #b8860b); margin-top: 4px;">
+        {{ facts.unpriced_supplies_pct }}% {{ _('customer.savings.coverage_hint', lang) }}
+      </div>
+    {% else %}
+      <div style="font-size: 0.78rem; color: var(--status-ok); margin-top: 4px;">
+        {{ _('customer.savings.coverage_complete', lang) }}
+      </div>
+    {% endif %}
+  </div>
+  <div class="card" style="padding: var(--sp-4);">
+    <div style="font-size: 0.78rem; color: var(--tw-muted-blue); text-transform: uppercase;
+                letter-spacing: 0.06em; margin-bottom: 6px;">
+      {{ _('customer.savings.findings_label', lang) }}
+    </div>
+    <div style="font-size: 1.6rem; font-weight: 700;">
+      {{ facts.sku_price_variance|length + facts.override_above_template|length }}
+    </div>
+    <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+      {{ _('customer.savings.findings_hint', lang) }}
+    </div>
+  </div>
+</div>
+
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-5);">
+  <h2 style="margin: 0 0 var(--sp-3);">
+    {{ _('customer.savings.variance_title', lang) }}
+  </h2>
+  <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-3);">
+    {{ _('customer.savings.variance_intro', lang) }}
+  </p>
+  {% if facts.sku_price_variance %}
+    <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left; color: var(--tw-muted-blue); font-size: 0.75rem;
+                   text-transform: uppercase; letter-spacing: 0.05em;">
+          <th style="padding: 6px 12px 6px 0;">SKU</th>
+          <th style="padding: 6px 12px;">{{ _('customer.savings.col_min', lang) }}</th>
+          <th style="padding: 6px 12px;">{{ _('customer.savings.col_max', lang) }}</th>
+          <th style="padding: 6px 0;">{{ _('customer.savings.col_spread', lang) }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in facts.sku_price_variance %}
+          <tr style="border-top: 1px solid var(--tw-gray-200);">
+            <td style="padding: 6px 12px 6px 0; font-family: var(--font-mono);">{{ v.sku }}</td>
+            <td style="padding: 6px 12px;">{{ '%.2f'|format(v.min_price_cents / 100) }} €</td>
+            <td style="padding: 6px 12px;">{{ '%.2f'|format(v.max_price_cents / 100) }} €</td>
+            <td style="padding: 6px 0; color: var(--status-warn, #b8860b); font-weight: 600;">
+              {{ '%.2f'|format(v.spread_cents / 100) }} €
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem;">
+      {{ _('customer.savings.variance_empty', lang) }}
+    </p>
+  {% endif %}
+</section>
+
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-5);">
+  <h2 style="margin: 0 0 var(--sp-3);">
+    {{ _('customer.savings.override_title', lang) }}
+  </h2>
+  <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-3);">
+    {{ _('customer.savings.override_intro', lang) }}
+  </p>
+  {% if facts.override_above_template %}
+    <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left; color: var(--tw-muted-blue); font-size: 0.75rem;
+                   text-transform: uppercase; letter-spacing: 0.05em;">
+          <th style="padding: 6px 12px 6px 0;">{{ _('customer.savings.col_printer', lang) }}</th>
+          <th style="padding: 6px 12px;">SKU</th>
+          <th style="padding: 6px 12px;">{{ _('customer.savings.col_customer_price', lang) }}</th>
+          <th style="padding: 6px 12px;">{{ _('customer.savings.col_library_price', lang) }}</th>
+          <th style="padding: 6px 0;">{{ _('customer.savings.col_diff', lang) }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in facts.override_above_template %}
+          <tr style="border-top: 1px solid var(--tw-gray-200);">
+            <td style="padding: 6px 12px 6px 0; font-family: var(--font-mono);">
+              {{ o.printer_id }} · {{ o.color }}
+            </td>
+            <td style="padding: 6px 12px; font-family: var(--font-mono);">{{ o.sku }}</td>
+            <td style="padding: 6px 12px;">{{ '%.2f'|format(o.override_price_cents / 100) }} €</td>
+            <td style="padding: 6px 12px;">{{ '%.2f'|format(o.template_price_cents / 100) }} €</td>
+            <td style="padding: 6px 0; color: var(--status-warn, #b8860b); font-weight: 600;">
+              +{{ '%.2f'|format(o.diff_cents / 100) }} €
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem;">
+      {{ _('customer.savings.override_empty', lang) }}
+    </p>
+  {% endif %}
+</section>
+{% endblock %}

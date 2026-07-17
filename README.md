@@ -187,6 +187,13 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   provider on success. Every provider failure lands as a readable error
   message on the settings page (no more raw 500s from a wrong model
   name).
+- **Savings potential report** (`/customers/{id}/savings`). Every number
+  — total spend, price coverage, same-SKU price variance across a
+  customer's printers, customer overrides priced above the shared supply
+  library — is computed straight from order history and stored pricing,
+  never from the LLM. The LLM only phrases those exact numbers into a
+  short paragraph for a sales conversation; if it's not configured the
+  page still shows the full numbers, just without the narrative.
 
 ### Microsoft 365 Copilot Connector
 

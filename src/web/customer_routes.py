@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import delete, func, insert, select, update
 
-from .. import auth, bi_client, crypto, db
+from .. import auth, bi_client, crypto, db, savings_report
 from ..db import audit_log, customer_access, customers, users
 from . import i18n
 
@@ -310,6 +310,40 @@ async def customer_detail(customer_id: int, request: Request):
             "customer": _customer_form_from_row(row),
             "access": [dict(r._mapping) for r in access_rows],
             "recent_events": [dict(r._mapping) for r in recent_events],
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Savings report
+# ---------------------------------------------------------------------------
+
+@router.get("/customers/{customer_id}/savings", response_class=HTMLResponse,
+            include_in_schema=False)
+async def customer_savings_report(customer_id: int, request: Request):
+    """v0.24.4 — Sparpotential-Report: real numbers from order history +
+    stored supply pricing (never estimated), plus an optional AI
+    narrative that phrases those exact numbers for a sales conversation.
+    Same access model as the customer detail page."""
+    user = auth.require_customer_access(request, customer_id)
+    row = _customer_row(customer_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+
+    facts = savings_report.compute_savings_facts(customer_id)
+    narrative = savings_report.generate_savings_narrative(
+        row["name"], facts, lang=request.state.lang)
+
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "customers/savings_report.html",
+        {
+            "request": request,
+            "lang": request.state.lang,
+            "user": user,
+            "customer": _customer_form_from_row(row),
+            "facts": facts,
+            "narrative": narrative,
         },
     )
 

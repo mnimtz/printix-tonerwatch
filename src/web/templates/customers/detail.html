@@ -19,11 +19,16 @@
       </p>
     {% endif %}
   </div>
-  {% if user.role == 'admin' %}
-    <a href="/customers/{{ customer.id }}/edit" class="btn btn-secondary">
-      ✎ {{ _('common.edit', lang) }}
+  <div style="display: flex; gap: var(--sp-2);">
+    <a href="/customers/{{ customer.id }}/savings" class="btn btn-secondary">
+      💡 {{ _('customer.savings.nav_label', lang) }}
     </a>
-  {% endif %}
+    {% if user.role == 'admin' %}
+      <a href="/customers/{{ customer.id }}/edit" class="btn btn-secondary">
+        ✎ {{ _('common.edit', lang) }}
+      </a>
+    {% endif %}
+  </div>
 </div>
 
 {% if not customer.active %}
