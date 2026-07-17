@@ -34,7 +34,8 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **Human-readable activity feed on the dashboard.** Replaces the old raw
   audit log with `👤 Marcus signed in · 3 min ago` and 30+ localized
   action templates. Icons per family (⚙ settings, 👤 user, 🏢 customer,
-  🖨 toner, 📦 order, 🛒 supply).
+  🖨 toner, 📦 order, 🛒 supply). Height-capped with its own scrollbar so
+  a full page of recent events doesn't push everything else down.
 - **Priority-first dashboard.** A personalized one-line status summary
   ("3 critical, 7 warning — Acme GmbH and Beta AG need a look first"),
   a fleet-health donut, and customer cards sorted worst-first (critical →
@@ -138,11 +139,11 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 ### Suppliers
 
 - **Global vendor list** (`/suppliers`, admin-only) — name, default order
-  mailbox, contact person, phone, website, notes. The same distributor
-  usually serves multiple customers, so suppliers are defined once and
-  linked from templates and overrides via a dropdown (kept in sync with
-  the legacy free-text `supplier` field for display/backward
-  compatibility).
+  mailbox, contact person, phone, postal address, website, notes. The
+  same distributor usually serves multiple customers, so suppliers are
+  defined once and linked from templates and overrides via a dropdown
+  (kept in sync with the legacy free-text `supplier` field for
+  display/backward compatibility).
 - **Per-customer account details** (`/customers/{id}/suppliers`) — this
   customer's account/customer number with each supplier, plus optional
   overrides for the order-email, contact person, and phone — for the
@@ -216,17 +217,20 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   Azure SQL config (server + database + credentials → `SELECT 1` in a
   throwaway engine, never touches the running one) and copy a
   ready-to-paste `DATABASE_URL` for Azure App Service → Application
-  Settings.
+  Settings. The container image bundles Microsoft's ODBC Driver 18 for
+  SQL Server, so `mssql+pyodbc://` connection strings work out of the box.
 - **One-click automated cutover.** On Azure App Service, the site carries a
   System-Assigned Managed Identity (Bicep `identity: SystemAssigned` +
   a self-scoped "Website Contributor" role assignment) and can switch its
   own `DATABASE_URL` and restart itself via the ARM REST API — no manual
-  Portal copy-paste. It authenticates to Azure via the Instance Metadata
-  Service, so no credential is ever stored. The switch always fetches the
-  *full* current app-settings collection and merges in the new
-  `DATABASE_URL` before writing back — never a blind overwrite — so
-  `FERNET_KEY` and every other secret survive untouched. Deployments that
-  predate this feature need a one-time `az cli` bootstrap (shown inline on
+  Portal copy-paste. It authenticates to Azure via App Service's own
+  local Managed Identity token endpoint (`IDENTITY_ENDPOINT` /
+  `IDENTITY_HEADER`, not the VM-only Instance Metadata Service), so no
+  credential is ever stored. The switch always fetches the *full*
+  current app-settings collection and merges in the new `DATABASE_URL`
+  before writing back — never a blind overwrite — so `FERNET_KEY` and
+  every other secret survive untouched. Deployments that predate this
+  feature need a one-time `az cli` bootstrap (shown inline on
   `/settings/database` — assigns the identity + role once).
 
 ### AI / LLM integration
