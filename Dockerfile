@@ -68,15 +68,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # actually was: FreeTDS above covers pymssql (bi_client.py), not
 # pyodbc. Left unnoticed until the Azure-SQL-as-TonerWatch's-own-
 # backend feature (v0.23.0) got its first real test.
+#
+# Microsoft's prod.list for Debian 12 already hardcodes
+# "signed-by=/usr/share/keyrings/microsoft-prod.gpg" — verified by
+# fetching it directly — so it's used unmodified, and the keyring
+# just needs to actually exist at that exact path (dearmored, gpg
+# needed for that one step). An earlier version of this tried to
+# inject its own signed-by via sed, which produced two adjacent
+# bracket option groups and broke apt's parser ("Malformed entry").
 RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
         | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && curl -sSL https://packages.microsoft.com/config/debian/12/prod.list \
-        | sed 's|deb |deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] |' \
-        > /etc/apt/sources.list.d/mssql-release.list \
+        -o /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
-    && apt-get purge -y gnupg \
-    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 USER app
