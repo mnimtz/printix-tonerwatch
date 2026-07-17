@@ -245,6 +245,14 @@ async def entra_autosetup_start(request: Request):
     # the admin's browser session owns this until they finish or it
     # expires (15 min default).
     try:
+        # v0.24.23: one-time cleanup — older sessions (pre-v0.24.23)
+        # may still carry a leftover entra_setup_access_token that used
+        # to live in the cookie itself (see _stash_setup_token above).
+        # That's what bloated the cookie past the ~4KB browser limit
+        # and caused the very bug this endpoint exists to recover
+        # from — drop it unconditionally so a stale cookie doesn't
+        # keep re-triggering the same failure on every new attempt.
+        request.session.pop("entra_setup_access_token", None)
         request.session["entra_setup_device_code"] = d["device_code"]
         request.session["entra_setup_tenant"] = tenant
     except AssertionError:
