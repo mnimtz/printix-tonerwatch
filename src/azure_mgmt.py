@@ -3,12 +3,16 @@
 Lets a running App Service switch its own ``DATABASE_URL`` to an Azure
 SQL Database and restart itself, with no Azure credential ever stored
 anywhere in the app. The site authenticates as *itself* via a
-System-Assigned Managed Identity: Azure's Instance Metadata Service
-(IMDS, reachable only from inside the running compute resource) mints
-short-lived ARM tokens on demand.
+System-Assigned Managed Identity, using App Service's own local
+identity token endpoint (NOT the VM-style Instance Metadata Service at
+169.254.169.254 — that address is IaaS-only and unreachable from
+inside an App Service container's network namespace; App Service
+publishes its own endpoint via the IDENTITY_ENDPOINT / IDENTITY_HEADER
+env vars once a Managed Identity is assigned).
 
 Everything here is a no-op / clean failure outside Azure App Service
-(local dev, tests, CI) — IMDS simply isn't reachable there.
+(local dev, tests, CI) — the identity endpoint simply isn't reachable
+there.
 
 Safety: ``PUT .../config/appsettings`` REPLACES the entire app-settings
 collection. :func:`switch_database_url` always fetches the full current
@@ -24,10 +28,14 @@ import os
 
 import httpx
 
-_IMDS_TOKEN_URL = "http://169.254.169.254/metadata/identity/oauth2/token"
 _ARM_BASE = "https://management.azure.com"
 _ARM_API_VERSION = "2023-12-01"
 _ARM_RESOURCE = "https://management.azure.com/"
+
+
+class _NoManagedIdentity(RuntimeError):
+    """IDENTITY_ENDPOINT/IDENTITY_HEADER not set — App Service has no
+    Managed Identity assigned yet (or this isn't App Service at all)."""
 
 
 def _site_identity() -> tuple[str, str, str] | None:
@@ -44,16 +52,26 @@ def _site_identity() -> tuple[str, str, str] | None:
 
 
 def _get_msi_token(timeout: float = 5.0) -> str:
+    """Mint an ARM-scoped token via App Service's Managed Identity
+    endpoint (https://learn.microsoft.com/azure/app-service/overview-managed-identity
+    — "Connect to Azure services in app code" — App Service local
+    endpoint, not the VM IMDS protocol)."""
+    endpoint = os.environ.get("IDENTITY_ENDPOINT", "").strip()
+    header = os.environ.get("IDENTITY_HEADER", "").strip()
+    if not (endpoint and header):
+        raise _NoManagedIdentity(
+            "IDENTITY_ENDPOINT/IDENTITY_HEADER not set — no Managed "
+            "Identity assigned to this App Service yet.")
     r = httpx.get(
-        _IMDS_TOKEN_URL,
+        endpoint,
         params={"api-version": "2019-08-01", "resource": _ARM_RESOURCE},
-        headers={"Metadata": "true"},
+        headers={"X-IDENTITY-HEADER": header},
         timeout=timeout,
     )
     r.raise_for_status()
     token = r.json().get("access_token", "")
     if not token:
-        raise RuntimeError("IMDS returned no access_token")
+        raise RuntimeError("Identity endpoint returned no access_token")
     return token
 
 
@@ -76,14 +94,21 @@ def probe() -> dict:
                           "one-time az CLI setup below.")}
     try:
         _get_msi_token(timeout=4.0)
+    except _NoManagedIdentity:
+        return {"ok": False, "stage": "identity", "hint": "one_time_setup_needed",
+                "error": "No System-Assigned Managed Identity assigned to "
+                         "this App Service yet (IDENTITY_ENDPOINT/"
+                         "IDENTITY_HEADER not set). Run the one-time az "
+                         "CLI setup below."}
     except httpx.HTTPStatusError as e:
         return {"ok": False, "stage": "identity", "hint": "one_time_setup_needed",
-                "error": f"IMDS rejected the token request ({e.response.status_code}) "
-                         "— this App Service has no System-Assigned Managed "
-                         f"Identity yet: {e.response.text[:300]}"}
-    except Exception as e:  # noqa: BLE001 — IMDS unreachable (not on Azure at all)
+                "error": f"Identity endpoint rejected the token request "
+                         f"({e.response.status_code}) — if you just ran the "
+                         "role assignment, it can take a minute to "
+                         f"propagate; try again shortly: {e.response.text[:300]}"}
+    except Exception as e:  # noqa: BLE001 — genuinely not on Azure App Service
         return {"ok": False, "stage": "unreachable", "hint": None,
-                "error": f"Instance Metadata Service unreachable ({type(e).__name__}: {e}) "
+                "error": f"Identity endpoint unreachable ({type(e).__name__}: {e}) "
                          "— this process isn't running on Azure App Service."}
     sub, rg, site = ids
     return {"ok": True, "subscription_id": sub, "resource_group": rg, "site_name": site}
