@@ -1136,6 +1136,23 @@
     });
   }
 
+  // v0.24.19: no_device_code_in_session is a real, legitimate outcome
+  // (the poll loop from a stale tab/attempt outlived the device code —
+  // e.g. it already got consumed by a newer attempt, or the browser
+  // session simply timed out) but showing the raw snake_case string
+  // left the admin with no idea what to do about it. Translate the
+  // known codes; unrecognised ones still fall back to the raw string
+  // so nothing goes silently unexplained.
+  function explainAutosetupError(code) {
+    var known = {
+      'no_device_code_in_session':
+        {{ _('settings.entra.autosetup.error.no_device_code', lang)|tojson }},
+      'no_access_token_in_session':
+        {{ _('settings.entra.autosetup.error.no_access_token', lang)|tojson }},
+    };
+    return known[code] || code;
+  }
+
   function show(html) {
     panel.innerHTML = html;
     panel.style.display = 'block';
@@ -1366,8 +1383,8 @@
         '<div style="padding: var(--sp-3); background: #FEE2E2; ' +
               'border-radius: var(--r); color: #991B1B;">' +
         '<strong>✗ ' + {{ _('settings.entra.autosetup.error', lang)|tojson }} + '</strong><br>' +
-        '<span style="font-family: var(--font-mono); font-size: 0.82rem;">' +
-           esc(j.error || 'unknown') + '</span></div>');
+        '<span style="font-size: 0.85rem;">' +
+           esc(explainAutosetupError(j.error || 'unknown')) + '</span></div>');
     } catch (e) {
       stop();
       showRestartable('<div style="color:#991B1B;">' + esc(e.message || e) + '</div>');
@@ -1393,6 +1410,10 @@
   }
 
   btn.addEventListener('click', async function() {
+    // Defensive: a fresh /start always supersedes whatever came before,
+    // so make sure no leftover timer from an earlier cycle in THIS tab
+    // can still fire and poll a device code /start is about to replace.
+    stop();
     btn.disabled = true;
     show('<div style="color: var(--tw-muted-blue);">' +
          {{ _('settings.entra.autosetup.starting', lang)|tojson }} + '</div>');
