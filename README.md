@@ -20,8 +20,10 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 ### Fleet visibility
 
 - **One instance, many tenants.** Each Printix customer is registered once
-  with its BI-database credentials; the shared runtime queries them all on
-  a schedule and rolls the data up into cross-customer views.
+  with its BI-database credentials, billing address and internal customer
+  number; the shared runtime queries them all on a schedule and rolls the
+  data up into cross-customer views. Customers, orders, and the supply
+  library all have their own live freetext search box.
 - **Two views on the same data.** Card-based grid for quick triage or a
   sortable list view for spreadsheet-style scanning. Toggle persists per
   user in session.
@@ -106,8 +108,8 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   10) protects against runaway alerts turning into P.O. spam; excess
   drafts stay as drafts.
 - **Three-column kanban** on `/orders` — Draft / Ordered / Delivered plus a
-  collapsible "recently closed" section, customer filter dropdown, and a
-  green **🛒 Order now** button per card.
+  collapsible "recently closed" section, customer filter dropdown, a live
+  freetext search box, and a green **🛒 Order now** button per card.
 - **Magic-link handlers.** `/orders/action/{token}` lets an email
   recipient act on an order without logging in — landing page requires a
   POST confirm so mail-preview crawlers can't accidentally change state.
@@ -116,8 +118,14 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   + body) from the order's own SKU/quantity/printer — TonerWatch never
   sends it, the operator copies it into their own mail client. When the
   SKU is linked to a supplier (see below), the modal also shows a
-  pre-filled **To:** address and the customer's account number with that
-  supplier, resolved automatically.
+  pre-filled **To:** address, the customer's account number with that
+  supplier, and the resolved delivery address (the specific printer's
+  own override, else the customer's own address on file) — all
+  resolved automatically, none of it typed by hand.
+- **Who created it, who last moved it.** Every card shows who created
+  the draft and — if different — who most recently transitioned it
+  (marked ordered, delivered, installed, …), so "who ordered this" and
+  "who confirmed delivery" are both a glance away.
 
 ### Supply library
 
@@ -161,8 +169,9 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 
 - **Enrich BI with your own info.** `/toner/{customer}/{printer}/info`
   form for location override, serial-number override, asset tag, group
-  name (for filter/grouping), contact e-mail, purchase date, warranty
-  date, freeform notes.
+  name (for filter/grouping), delivery address (falls back to the
+  customer's own address — only needed when a device ships elsewhere),
+  contact name + e-mail, purchase date, warranty date, freeform notes.
 - **Group filter + search.** Case-insensitive substring match on printer
   name / location / model / serial / asset tag / notes. Group picker
   with autocomplete from existing groups.
