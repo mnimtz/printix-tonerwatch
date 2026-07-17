@@ -404,6 +404,83 @@ def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
     }
 
 
+def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
+                          customer_name: str, lang: str = "de") -> dict[str, str] | None:
+    """v0.24.6 — draft a ready-to-send supplier order email for one
+    order row. The LLM only writes the prose; every fact in it (SKU,
+    quantity, printer, customer reference) is handed in already
+    resolved — it's told explicitly not to invent anything it isn't
+    given. TonerWatch never sends this itself: the operator copies it
+    into their own mail client, so there's no new supplier-facing
+    sending surface to secure or misconfigure.
+
+    Returns ``{"subject": .., "body": ..}`` or ``None`` if the LLM
+    isn't configured or the call fails."""
+    from . import llm_client
+    if not llm_client.is_configured():
+        return None
+
+    sku         = (order.get("sku") or (supply or {}).get("sku") or "").strip()
+    description = (supply or {}).get("description") or ""
+    manufacturer = (supply or {}).get("manufacturer") or ""
+    supplier    = (supply or {}).get("supplier") or ""
+    quantity    = order.get("quantity") or 1
+    printer     = order.get("printer_name") or order.get("printer_id") or ""
+    color_word  = {"K": "black", "C": "cyan", "M": "magenta",
+                   "Y": "yellow"}.get((order.get("color") or "").upper(), "")
+
+    lang_name = {"de": "German", "en": "English", "fr": "French",
+                 "it": "Italian", "es": "Spanish"}.get(lang, "English")
+    system = (
+        "You draft short, professional B2B purchase-order emails to a "
+        "print-supply distributor, sent by an MSP on behalf of one of "
+        f"its customers. Write in {lang_name}. Use ONLY the order "
+        "details given below — never invent a SKU, quantity, price, or "
+        "delivery date. If a field is missing (e.g. no SKU on file), "
+        "ask the supplier to confirm the correct part for the stated "
+        "printer instead of guessing one. Keep it short: a subject "
+        "line and a brief body — greeting, the order itself, a polite "
+        "close. No markdown, no placeholders like [Your Name]. "
+        "Reply with ONE JSON object only, no prose, no code fences: "
+        "{\"subject\": \"…\", \"body\": \"…\"}"
+    )
+    user = (
+        f"Customer reference: {customer_name}\n"
+        f"Printer: {printer}\n"
+        f"Toner colour: {color_word or 'n/a'}\n"
+        f"SKU: {sku or '(not on file — ask supplier to confirm)'}\n"
+        f"Description: {description or 'n/a'}\n"
+        f"Manufacturer: {manufacturer or 'n/a'}\n"
+        f"Supplier: {supplier or 'n/a'}\n"
+        f"Quantity: {quantity}\n"
+    )
+    try:
+        resp = llm_client.chat(system, user)
+    except llm_client.LLMError as e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "[ai_suggest_order_mail] LLM error for order: %s", e)
+        return None
+
+    import json as _json
+    raw = (resp.text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].lstrip("\n")
+    try:
+        data = _json.loads(raw)
+    except _json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    subject = (data.get("subject") or "").strip()
+    body = (data.get("body") or "").strip()
+    if not subject or not body:
+        return None
+    return {"subject": subject, "body": body}
+
+
 def _normalize_color(c: str) -> str:
     c = (c or "").strip()
     return c if c in _ALLOWED_COLORS else ""

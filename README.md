@@ -88,6 +88,10 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 - **Magic-link handlers.** `/orders/action/{token}` lets an email
   recipient act on an order without logging in — landing page requires a
   POST confirm so mail-preview crawlers can't accidentally change state.
+- **AI supplier-mail draft.** A **✉️ Mail text** button on any draft/ordered
+  card asks the LLM to write a ready-to-copy purchase-order email (subject
+  + body) from the order's own SKU/quantity/printer — TonerWatch never
+  sends it, the operator copies it into their own mail client.
 
 ### Supply library
 

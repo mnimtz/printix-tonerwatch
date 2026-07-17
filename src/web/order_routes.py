@@ -18,7 +18,7 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .. import auth, db, orders, supply_library
 from ..db import customers as customers_tbl
@@ -141,6 +141,30 @@ async def orders_transition(order_id: int, request: Request):
             f"/orders?error={str(e)[:120].replace('&','')}", status_code=303)
     return RedirectResponse(f"/orders?info=order_{new_status}",
                             status_code=303)
+
+
+@router.get("/orders/{order_id}/mail_suggestion", include_in_schema=False)
+async def orders_mail_suggestion(order_id: int, request: Request):
+    """v0.24.6 — draft a ready-to-copy supplier order email for one
+    order. Never sends anything; the operator copies the text into
+    their own mail client. Same tenant fence as every other order
+    action."""
+    user = auth.require_user(request)
+    o = orders.get_order(order_id)
+    if o is None:
+        return JSONResponse({"ok": False, "error": "order_not_found"}, status_code=404)
+    if not auth.user_can_see_customer(user, o["customer_id"]):
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
+    customer_names = _customer_names([o["customer_id"]])
+    supply = supply_library.resolve_supply(
+        o["customer_id"], o["printer_id"], None, o["color"])
+    mail = supply_library.ai_suggest_order_mail(
+        o, supply, customer_names.get(o["customer_id"], ""),
+        lang=request.state.lang)
+    if mail is None:
+        return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=400)
+    return JSONResponse({"ok": True, **mail})
 
 
 @router.post("/orders/new", include_in_schema=False)

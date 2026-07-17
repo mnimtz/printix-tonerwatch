@@ -345,4 +345,114 @@
   })();
 </script>
 {% endif %}
+
+{# v0.24.6 — one shared modal for every card's "✉️ Mail-Text" button,
+   instead of one per card. Never sends anything — copy-to-clipboard
+   only, same pattern as the DB automation bootstrap snippet. #}
+<div id="mailsuggest-overlay" style="display: none; position: fixed; inset: 0;
+     background: rgba(0,0,0,0.4); z-index: 1000; align-items: center;
+     justify-content: center;">
+  <div class="card" style="max-width: 560px; width: 92%; padding: var(--sp-4);
+       max-height: 85vh; overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: var(--sp-3);">
+      <h3 style="margin: 0;">✉️ {{ _('orders.mailsuggest.title', lang) }}</h3>
+      <button type="button" id="mailsuggest-close" data-noloader
+              style="background: none; border: none; font-size: 1.3rem;
+                     cursor: pointer; color: var(--tw-muted-blue); line-height: 1;">
+        ×
+      </button>
+    </div>
+    <div id="mailsuggest-status" style="font-size: 0.9rem; margin-bottom: var(--sp-3);">
+      {{ _('orders.mailsuggest.loading', lang) }}
+    </div>
+    <div id="mailsuggest-result" style="display: none;">
+      <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">
+        {{ _('orders.mailsuggest.subject', lang) }}
+      </label>
+      <input id="mailsuggest-subject" readonly style="width: 100%; margin-top: 4px;
+             margin-bottom: var(--sp-3); font-family: var(--font-mono);
+             font-size: 0.85rem; padding: 8px; border: 1px solid var(--tw-gray-300);
+             border-radius: 6px;">
+      <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
+                    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">
+        {{ _('orders.mailsuggest.body', lang) }}
+      </label>
+      <textarea id="mailsuggest-body" readonly style="width: 100%; height: 200px;
+                margin-top: 4px; font-family: var(--font-mono); font-size: 0.85rem;
+                padding: 8px; border: 1px solid var(--tw-gray-300);
+                border-radius: 6px;"></textarea>
+      <button type="button" id="mailsuggest-copy" class="btn btn-secondary"
+              data-noloader style="margin-top: var(--sp-3);">
+        📋 {{ _('orders.mailsuggest.copy', lang) }}
+      </button>
+      <p style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 8px;">
+        {{ _('orders.mailsuggest.hint', lang) }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var overlay = document.getElementById('mailsuggest-overlay');
+  var status = document.getElementById('mailsuggest-status');
+  var result = document.getElementById('mailsuggest-result');
+  var subjectBox = document.getElementById('mailsuggest-subject');
+  var bodyBox = document.getElementById('mailsuggest-body');
+  var copyBtn = document.getElementById('mailsuggest-copy');
+  var closeBtn = document.getElementById('mailsuggest-close');
+
+  function closeModal() { overlay.style.display = 'none'; }
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', function (ev) {
+    if (ev.target === overlay) closeModal();
+  });
+
+  document.querySelectorAll('.mail-suggest').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      var orderId = btn.getAttribute('data-order-id');
+      overlay.style.display = 'flex';
+      result.style.display = 'none';
+      status.style.display = '';
+      status.textContent = {{ _('orders.mailsuggest.loading', lang)|tojson }};
+      status.style.color = 'var(--tw-muted-blue)';
+      try {
+        var r = await fetch('/orders/' + orderId + '/mail_suggestion',
+          {credentials: 'same-origin'});
+        var j = await r.json();
+        if (!j.ok) {
+          status.textContent = j.error === 'llm_unavailable'
+            ? {{ _('orders.mailsuggest.llm_unavailable', lang)|tojson }}
+            : ('✗ ' + (j.error || 'error'));
+          status.style.color = 'var(--status-critical)';
+          return;
+        }
+        status.style.display = 'none';
+        subjectBox.value = j.subject;
+        bodyBox.value = j.body;
+        result.style.display = '';
+      } catch (e) {
+        status.textContent = '✗ ' + (e.message || e);
+        status.style.color = 'var(--status-critical)';
+      }
+    });
+  });
+
+  copyBtn.addEventListener('click', function () {
+    var text = subjectBox.value + '\n\n' + bodyBox.value;
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    copyBtn.textContent = '✓ {{ _('orders.mailsuggest.copied', lang)|e }}';
+    setTimeout(function () {
+      copyBtn.textContent = '📋 {{ _('orders.mailsuggest.copy', lang)|e }}';
+    }, 1500);
+  });
+})();
+</script>
 {% endblock %}

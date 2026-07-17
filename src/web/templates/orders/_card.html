@@ -37,6 +37,14 @@
          title="{{ _('orders.action.buy', lang) }}">🛒 {{ _('orders.action.buy', lang) }}</a>
     {% endif %}
 
+    {% if status in ('draft', 'ordered') %}
+      <button type="button" class="mail-suggest" data-noloader
+              data-order-id="{{ o.id }}"
+              title="{{ _('orders.action.mail_suggest', lang) }}">
+        ✉️ {{ _('orders.action.mail_suggest', lang) }}
+      </button>
+    {% endif %}
+
     {% if status == 'draft' %}
       <form method="post" action="/orders/{{ o.id }}/status">
         {% include "_csrf_input.html" %}
