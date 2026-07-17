@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from fastapi import APIRouter, Form, Request
@@ -26,6 +27,38 @@ def _short_hash(value: str) -> str:
     without ever writing the actual device_code / access_token to
     logs — short-lived credentials, but no reason to log them in full."""
     return hashlib.sha256(value.encode()).hexdigest()[:8]
+
+
+# v0.24.23: the device-code exchange's access_token is a full Entra JWT
+# (often 2-3 KB) — stashing it in the signed session cookie pushed the
+# cookie's total size over the ~4096-byte limit browsers enforce per
+# cookie whenever the rest of the session (CSRF token, language,
+# user_id) was already a few KB, causing the browser to silently drop
+# the Set-Cookie response and lose the device_code stashed moments
+# earlier (confirmed via DevTools: Chrome flagged the Set-Cookie as
+# "Malformed" and kept sending the stale cookie). Kept server-side
+# instead, keyed by admin id, with a short TTL — it's only ever read
+# by the SAME admin's own follow-up click (existing_found →
+# replace/rotate/grant) within the same setup session.
+_ENTRA_SETUP_TOKEN_TTL = 15 * 60  # matches the device-code flow's own expiry
+_entra_setup_tokens: dict[int, tuple[str, float]] = {}
+
+
+def _stash_setup_token(admin_id: int, access_token: str) -> None:
+    _entra_setup_tokens[admin_id] = (access_token, time.monotonic())
+
+
+def _take_setup_token(admin_id: int, *, pop: bool) -> str:
+    entry = _entra_setup_tokens.get(admin_id)
+    if not entry:
+        return ""
+    token, stored_at = entry
+    if time.monotonic() - stored_at > _ENTRA_SETUP_TOKEN_TTL:
+        _entra_setup_tokens.pop(admin_id, None)
+        return ""
+    if pop:
+        _entra_setup_tokens.pop(admin_id, None)
+    return token
 
 
 # ---------------------------------------------------------------------------
@@ -251,14 +284,10 @@ async def entra_autosetup_rotate_secret(request: Request):
     tenant_id, client_id, redirect_uri, provisioning flags are
     preserved."""
     admin = auth.require_admin(request)
-    try:
-        # v0.24.9: was .pop() — now .get() so the same device-code
-        # token can also back the "Grant Mail.Send" button below
-        # without forcing a second device-code login just because the
-        # admin clicked rotate first.
-        access_token = request.session.get("entra_setup_access_token", "")
-    except AssertionError:
-        access_token = ""
+    # v0.24.9: not popped here — so the same device-code token can also
+    # back the "Grant Mail.Send" button below without forcing a second
+    # device-code login just because the admin clicked rotate first.
+    access_token = _take_setup_token(admin["id"], pop=False)
     if not access_token:
         return JSONResponse({"ok": False, "status": "error",
                               "error": "no_access_token_in_session"},
@@ -302,10 +331,7 @@ async def entra_autosetup_grant_mail_permissions(request: Request):
     Administrator — caller falls back to the manual Azure Portal steps,
     which this doesn't disable."""
     admin = auth.require_admin(request)
-    try:
-        access_token = request.session.get("entra_setup_access_token", "")
-    except AssertionError:
-        access_token = ""
+    access_token = _take_setup_token(admin["id"], pop=False)
     if not access_token:
         return JSONResponse({"ok": False, "status": "error",
                               "error": "no_access_token_in_session"},
@@ -337,10 +363,7 @@ async def entra_autosetup_replace(request: Request):
     branch and clicked "create new anyway". Reuses the access-token
     from the session so no second device-code login is needed."""
     admin = auth.require_admin(request)
-    try:
-        access_token = request.session.pop("entra_setup_access_token", "")
-    except AssertionError:
-        access_token = ""
+    access_token = _take_setup_token(admin["id"], pop=True)
     if not access_token:
         return JSONResponse({"ok": False, "status": "error",
                               "error": "no_access_token_in_session"},
@@ -446,11 +469,9 @@ async def entra_autosetup_poll(request: Request):
         if existing:
             # Stash the access_token so the admin's next action
             # (replace / reuse / cancel) doesn't need to redo the
-            # device-code flow.
-            try:
-                request.session["entra_setup_access_token"] = access_token
-            except AssertionError:
-                pass
+            # device-code flow. Server-side (see _stash_setup_token) —
+            # not the session cookie, which is how it got lost before.
+            _stash_setup_token(admin["id"], access_token)
             db.audit(admin["id"], "settings.entra_autosetup_existing_found",
                      target_type="settings", target_id="entra_sso",
                      meta_json=json.dumps({"count": len(existing)}))
