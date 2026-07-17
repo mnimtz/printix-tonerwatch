@@ -263,8 +263,13 @@ def transition(
         if new_status in ("installed", "cancelled"):
             values["closed_at"] = func.current_timestamp()
             values["closed_reason"] = reason or ""
+        # v0.24.31: used to overwrite ordered_by_user_id here on every
+        # transition, losing who actually created the draft the moment
+        # anyone else moved it along. ordered_by_user_id is set once,
+        # at creation (create_draft); this is who touched it last.
         if user_id is not None:
-            values["ordered_by_user_id"] = user_id
+            values["updated_by_user_id"] = user_id
+            values["updated_at"] = func.current_timestamp()
 
         conn.execute(update(db.toner_orders)
                      .where(db.toner_orders.c.id == order_id)

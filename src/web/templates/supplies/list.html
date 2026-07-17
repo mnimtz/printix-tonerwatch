@@ -123,8 +123,14 @@
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
 {% if grouped %}
+  <div style="margin-bottom: var(--sp-3);">
+    <input type="search" id="supplies-live-search" class="search"
+           placeholder="{{ _('supplies.filter.search_placeholder', lang) }}"
+           style="width: 100%; max-width: 360px;"
+           autocomplete="off" spellcheck="false">
+  </div>
   {% for model, rows in grouped.items() %}
-    <div class="model-group">
+    <div class="model-group" data-model-group>
       <h3>
         <span>{{ model }}</span>
         <span class="count">{{ rows|length }} {{ _('supplies.colors_short', lang) }}</span>
@@ -143,7 +149,8 @@
         </thead>
         <tbody>
           {% for t in rows %}
-          <tr>
+          <tr class="supply-row"
+              data-search="{{ (model ~ ' ' ~ t.color ~ ' ' ~ (t.sku or '') ~ ' ' ~ (t.description or '') ~ ' ' ~ (t.manufacturer or ''))|lower }}">
             <td><span class="color-chip {{ t.color }}">{{ t.color }}</span></td>
             <td class="sku">{{ t.sku or '—' }}</td>
             <td>
@@ -178,6 +185,34 @@
       </table>
     </div>
   {% endfor %}
+  <script>
+  (function () {
+    var input = document.getElementById('supplies-live-search');
+    if (!input) return;
+    var groups = document.querySelectorAll('[data-model-group]');
+    var timer = null;
+    function apply() {
+      var q = (input.value || '').toLowerCase().trim();
+      var parts = q ? q.split(/\s+/).filter(Boolean) : [];
+      groups.forEach(function (g) {
+        var rows = g.querySelectorAll('.supply-row[data-search]');
+        var anyVisible = false;
+        rows.forEach(function (r) {
+          var match = !parts.length || parts.every(function (p) {
+            return (r.getAttribute('data-search') || '').indexOf(p) !== -1;
+          });
+          r.style.display = match ? '' : 'none';
+          if (match) anyVisible = true;
+        });
+        g.style.display = anyVisible ? '' : 'none';
+      });
+    }
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(apply, 60);
+    });
+  })();
+  </script>
 {% else %}
   <div class="empty-state">
     <p>{{ _('supplies.empty', lang) }}</p>

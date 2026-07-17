@@ -18,6 +18,15 @@
   {% endif %}
 </div>
 
+{% if customers %}
+  <div style="margin-bottom: var(--sp-3);">
+    <input type="search" id="customer-live-search" class="search"
+           placeholder="{{ _('customer.filter.search_placeholder', lang) }}"
+           style="width: 100%; max-width: 360px;"
+           autocomplete="off" spellcheck="false">
+  </div>
+{% endif %}
+
 <div class="card" style="padding: 0; overflow: hidden;">
   {% if customers %}
     <table style="width: 100%; border-collapse: collapse;">
@@ -43,7 +52,9 @@
       </thead>
       <tbody>
       {% for c in customers %}
-        <tr style="border-top: 1px solid var(--tw-gray-300);">
+        <tr class="customer-row"
+            data-search="{{ ((c.name or '') ~ ' ' ~ (c.tenant_url or '') ~ ' ' ~ (c.customer_number or '') ~ ' ' ~ (c.address or '') ~ ' ' ~ (c.notes or ''))|lower }}"
+            style="border-top: 1px solid var(--tw-gray-300);">
           <td style="padding: var(--sp-3) var(--sp-4); font-weight: 500;">
             <a href="/customers/{{ c.id }}"
                style="color: var(--tw-primary); font-weight: 700;">
@@ -106,4 +117,27 @@
     </div>
   {% endif %}
 </div>
+
+<script>
+(function () {
+  var input = document.getElementById('customer-live-search');
+  if (!input) return;
+  var rows = document.querySelectorAll('.customer-row[data-search]');
+  var timer = null;
+  function apply() {
+    var q = (input.value || '').toLowerCase().trim();
+    var parts = q ? q.split(/\s+/).filter(Boolean) : [];
+    rows.forEach(function (r) {
+      if (!parts.length) { r.style.display = ''; return; }
+      var hay = r.getAttribute('data-search') || '';
+      var match = parts.every(function (p) { return hay.indexOf(p) !== -1; });
+      r.style.display = match ? '' : 'none';
+    });
+  }
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 60);
+  });
+})();
+</script>
 {% endblock %}

@@ -4,7 +4,8 @@
    by include) marks the card the "🛒 Bestellen" button on /toner
    just created or reused. #}
 <div class="order-card{% if highlight_id and (o.id|string) == highlight_id %} highlighted{% endif %}"
-     data-order-id="{{ o.id }}">
+     data-order-id="{{ o.id }}"
+     data-search="{{ ((o.printer_name or '') ~ ' ' ~ o.printer_id ~ ' ' ~ (o.customer_name or '') ~ ' ' ~ o.color ~ ' ' ~ (o.sku or '') ~ ' ' ~ (o.ordered_by_name or ''))|lower }}">
   <div class="printer-name" title="{{ o.printer_id }}">
     {{ o.printer_name or o.printer_id }}
   </div>
@@ -27,7 +28,13 @@
       {% else %}
         {{ o.ordered_at.split('.')[0] if '.' in o.ordered_at else o.ordered_at }}
       {% endif %}
+      {% if o.ordered_by_name %} · {{ _('orders.stamp.by', lang) }} {{ o.ordered_by_name }}{% endif %}
     </span>
+    {% if o.updated_by_name and o.updated_by_name != o.ordered_by_name %}
+      <span class="stamp" style="display:block; margin-top:2px;">
+        {{ _('orders.stamp.updated_by', lang) }} {{ o.updated_by_name }}
+      </span>
+    {% endif %}
   </div>
 
   <div class="actions">

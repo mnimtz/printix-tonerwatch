@@ -243,6 +243,13 @@ customers = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("name", Text, nullable=False),
     Column("tenant_url", Text, nullable=False, server_default=""),
+    # v0.24.31: the customer's own billing/shipping address and our
+    # internal account reference for them — distinct from
+    # customer_suppliers.customer_number, which is THIS customer's
+    # account number AT a given supplier. This one is ours, for
+    # invoices/order paperwork that need "who is the customer" facts.
+    Column("address", Text, nullable=False, server_default=""),
+    Column("customer_number", Text, nullable=False, server_default=""),
     Column("notes", Text, nullable=False, server_default=""),
 
     # Printix BI database (Azure SQL) — password Fernet-encrypted at rest
@@ -394,6 +401,14 @@ printer_info = Table(
     Column("serial_override",   Text, nullable=False, server_default=""),
     Column("asset_tag",         Text, nullable=False, server_default=""),
     Column("group_name",        Text, nullable=False, server_default=""),
+    # v0.24.31: where the cartridge should physically be shipped/handed
+    # off for THIS device — empty falls back to the customer's own
+    # address, only needed when a printer sits at a different site than
+    # the customer's main address on file. contact_name complements the
+    # existing contact_email with an actual name for the delivery/
+    # order paperwork ("who do we ask for on-site").
+    Column("delivery_address",  Text, nullable=False, server_default=""),
+    Column("contact_name",      Text, nullable=False, server_default=""),
     Column("contact_email",     Text, nullable=False, server_default=""),
     Column("purchased_at",      Text, nullable=False, server_default=""),
     Column("warranty_until",    Text, nullable=False, server_default=""),
@@ -484,6 +499,14 @@ toner_orders = Table(
     Column("closed_reason", Text, nullable=False, server_default=""),
     Column("ordered_by_user_id", Integer,
            ForeignKey("users.id", ondelete="SET NULL")),
+    # v0.24.31: who created the draft (ordered_by_user_id, unchanged by
+    # later transitions now — it used to get silently overwritten on
+    # every status change) vs. who last moved it (updated_by_user_id).
+    # Surfaced on the kanban card so "who ordered this" and "who marked
+    # it delivered" are two different, both-visible facts.
+    Column("updated_by_user_id", Integer,
+           ForeignKey("users.id", ondelete="SET NULL")),
+    Column("updated_at", Text, nullable=False, server_default=""),
     Column("notes", Text, nullable=False, server_default=""),
     CheckConstraint(
         "status IN ('draft','ordered','delivered','installed','cancelled')",

@@ -44,7 +44,8 @@ def _customer_form_from_row(row: dict | None) -> dict:
     """Return a dict the edit template can render — masked password."""
     if row is None:
         return {
-            "id": None, "name": "", "tenant_url": "", "notes": "",
+            "id": None, "name": "", "tenant_url": "",
+            "customer_number": "", "address": "", "notes": "",
             "sql_server": "", "sql_database": "", "sql_port": 1433,
             "sql_username": "",
             "sql_password_present": False,
@@ -230,6 +231,8 @@ def _values_from_form(form, *, is_new: bool, existing: dict | None = None) -> di
     """
     values: dict = {
         "tenant_url":          (form.get("tenant_url") or "").strip(),
+        "customer_number":     (form.get("customer_number") or "").strip(),
+        "address":             (form.get("address") or "").strip(),
         "notes":               (form.get("notes") or "").strip(),
         "sql_server":          (form.get("sql_server") or "").strip(),
         "sql_database":        (form.get("sql_database") or "").strip(),

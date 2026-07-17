@@ -39,6 +39,19 @@
                placeholder="https://acme.printix.net"
                value="{{ form.tenant_url or '' }}">
       </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);">
+        <div class="form-group">
+          <label for="customer_number">{{ _('customer.field.customer_number', lang) }}</label>
+          <input id="customer_number" name="customer_number" type="text"
+                 value="{{ form.customer_number or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="address">{{ _('customer.field.address', lang) }}</label>
+          <input id="address" name="address" type="text"
+                 placeholder="Musterstraße 1, 12345 Musterstadt"
+                 value="{{ form.address or '' }}">
+        </div>
+      </div>
       <div class="form-group">
         <label for="notes">{{ _('customer.field.notes', lang) }}</label>
         <textarea id="notes" name="notes" rows="2">{{ form.notes or '' }}</textarea>

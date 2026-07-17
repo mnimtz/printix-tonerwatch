@@ -132,7 +132,8 @@ _MERGED_FIELDS = {
     "serial_number": "serial_override",
 }
 
-_INFO_PASSTHROUGH = ("asset_tag", "group_name", "contact_email",
+_INFO_PASSTHROUGH = ("asset_tag", "group_name", "contact_name",
+                     "contact_email", "delivery_address",
                      "purchased_at", "warranty_until", "notes")
 
 
@@ -168,7 +169,8 @@ def enrich(bi_row: dict[str, Any], info: dict[str, Any] | None) -> dict[str, Any
 
 _FIELDS = (
     "location_override", "serial_override", "asset_tag", "group_name",
-    "contact_email", "purchased_at", "warranty_until", "notes",
+    "contact_name", "contact_email", "delivery_address",
+    "purchased_at", "warranty_until", "notes",
 )
 
 

@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import auth, db, orders, suppliers, supply_library
+from .. import auth, db, orders, printer_info, suppliers, supply_library
 from ..db import customers as customers_tbl
 
 
@@ -68,6 +68,11 @@ async def orders_board(request: Request):
     # supply record so the template can render a "reorder" link even
     # for closed orders.
     customer_names = _customer_names(visible)
+    user_ids = {o["ordered_by_user_id"] for lst in (active_orders, recent_closed)
+                for o in lst if o.get("ordered_by_user_id")}
+    user_ids |= {o["updated_by_user_id"] for lst in (active_orders, recent_closed)
+                 for o in lst if o.get("updated_by_user_id")}
+    user_names = _user_names(user_ids)
     for lst in (active_orders, recent_closed):
         for o in lst:
             o["customer_name"] = customer_names.get(o["customer_id"], "")
@@ -75,6 +80,8 @@ async def orders_board(request: Request):
                 o["customer_id"], o["printer_id"],
                 None,  # model unknown at kanban time; override or template by-id only
                 o["color"])
+            o["ordered_by_name"] = user_names.get(o.get("ordered_by_user_id"), "")
+            o["updated_by_name"] = user_names.get(o.get("updated_by_user_id"), "")
 
     grouped = orders.group_by_status(active_orders)
 
@@ -123,6 +130,32 @@ def _customer_names(ids: list[int]) -> dict[int, str]:
     return {r.id: r.name for r in rows}
 
 
+def _customer_row(customer_id: int) -> dict | None:
+    """Full customer record (name, address, our own customer_number) —
+    used by the mail-suggestion draft, which needs more than just the
+    display name _customer_names() returns."""
+    from sqlalchemy import select
+    with db.get_conn() as conn:
+        row = conn.execute(
+            select(customers_tbl).where(customers_tbl.c.id == customer_id)
+        ).first()
+    return db._row_to_dict(row) if row else None
+
+
+def _user_names(ids: set[int]) -> dict[int, str]:
+    """Who created / last touched an order — same "name, else email,
+    else system" fallback the dashboard activity feed uses."""
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            select(db.users.c.id, db.users.c.name, db.users.c.email)
+            .where(db.users.c.id.in_(ids))
+        ).all()
+    return {r.id: (r.name or r.email or "") for r in rows}
+
+
 @router.post("/orders/{order_id}/status", include_in_schema=False)
 async def orders_transition(order_id: int, request: Request):
     user = auth.require_user(request)
@@ -161,18 +194,26 @@ async def orders_mail_suggestion(order_id: int, request: Request):
     if not auth.user_can_see_customer(user, o["customer_id"]):
         return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
 
-    customer_names = _customer_names([o["customer_id"]])
+    customer = _customer_row(o["customer_id"])
     supply = supply_library.resolve_supply(
         o["customer_id"], o["printer_id"], None, o["color"])
     # v0.24.14: resolve the formal supplier record (if the SKU is
     # linked to one) into an actual contact — target mailbox + this
-    # customer's account number — so both the AI draft and the
-    # modal's "To:" field can use it without the operator typing it.
+    # customer's account number at THAT supplier — so both the AI
+    # draft and the modal's "To:" field can use it without the
+    # operator typing it.
     contact = suppliers.resolve_supplier_contact(
         o["customer_id"], (supply or {}).get("supplier_id"))
+    # v0.24.31: where the cartridge actually ships to — the specific
+    # printer's own delivery_address override if set, else the
+    # customer's own address on file.
+    info = printer_info.get_info(o["customer_id"], o["printer_id"])
+    delivery_address = ((info or {}).get("delivery_address")
+                         or (customer or {}).get("address") or "")
     mail = supply_library.ai_suggest_order_mail(
-        o, supply, customer_names.get(o["customer_id"], ""),
-        lang=request.state.lang, contact=contact)
+        o, supply, (customer or {}).get("name", ""),
+        lang=request.state.lang, contact=contact,
+        delivery_address=delivery_address)
     if mail is None:
         return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=400)
     return JSONResponse({
@@ -181,6 +222,8 @@ async def orders_mail_suggestion(order_id: int, request: Request):
         "customer_number": (contact or {}).get("customer_number", ""),
         "contact_person": (contact or {}).get("contact_person", ""),
         "phone": (contact or {}).get("phone", ""),
+        "our_customer_number": (customer or {}).get("customer_number", ""),
+        "delivery_address": delivery_address,
     })
 
 

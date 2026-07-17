@@ -254,6 +254,13 @@
   </form>
 {% endif %}
 
+<div style="margin: 0 0 var(--sp-3);">
+  <input type="search" id="orders-live-search" class="search"
+         placeholder="{{ _('orders.filter.search_placeholder', lang) }}"
+         style="width: 100%; max-width: 360px;"
+         autocomplete="off" spellcheck="false">
+</div>
+
 {% if info %}
   <div class="alert alert-info">
     {% if info.startswith('order_') %}{{ _('orders.info.' + info[6:], lang) }}
@@ -343,6 +350,29 @@
   {% endif %}
 </details>
 
+<script>
+(function () {
+  var input = document.getElementById('orders-live-search');
+  if (!input) return;
+  var cards = document.querySelectorAll('.order-card[data-search]');
+  var timer = null;
+  function apply() {
+    var q = (input.value || '').toLowerCase().trim();
+    var parts = q ? q.split(/\s+/).filter(Boolean) : [];
+    cards.forEach(function (c) {
+      if (!parts.length) { c.style.display = ''; return; }
+      var hay = c.getAttribute('data-search') || '';
+      var match = parts.every(function (p) { return hay.indexOf(p) !== -1; });
+      c.style.display = match ? '' : 'none';
+    });
+  }
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 60);
+  });
+})();
+</script>
+
 {% if highlight_id %}
 <script>
   // v0.24.1: draw the eye to the card the "🛒 Bestellen" button on
@@ -387,6 +417,8 @@
         <div id="mailsuggest-customer-number" style="font-size: 0.78rem;
              color: var(--tw-muted-blue); margin-top: 4px; display: none;"></div>
         <div id="mailsuggest-phone" style="font-size: 0.78rem;
+             color: var(--tw-muted-blue); margin-top: 2px; display: none;"></div>
+        <div id="mailsuggest-delivery" style="font-size: 0.78rem;
              color: var(--tw-muted-blue); margin-top: 2px; display: none;"></div>
       </div>
       <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
@@ -458,9 +490,10 @@
         var toBox = document.getElementById('mailsuggest-to');
         var custNumBox = document.getElementById('mailsuggest-customer-number');
         var phoneBox = document.getElementById('mailsuggest-phone');
+        var deliveryBox = document.getElementById('mailsuggest-delivery');
         if (j.to_email) {
           toBox.value = j.to_email;
-          toRow.style.display = '';
+          toBox.style.display = '';
           if (j.customer_number) {
             custNumBox.textContent = {{ _('orders.mailsuggest.customer_number', lang)|tojson }}
               + ': ' + j.customer_number;
@@ -478,8 +511,19 @@
             phoneBox.style.display = 'none';
           }
         } else {
-          toRow.style.display = 'none';
+          toBox.style.display = 'none';
+          custNumBox.style.display = 'none';
+          phoneBox.style.display = 'none';
         }
+        // v0.24.31: shown independent of the supplier "To:" fields —
+        // resolved from the printer/customer record, not the supplier.
+        if (j.delivery_address) {
+          deliveryBox.textContent = '📍 ' + j.delivery_address;
+          deliveryBox.style.display = '';
+        } else {
+          deliveryBox.style.display = 'none';
+        }
+        toRow.style.display = (j.to_email || j.delivery_address) ? '' : 'none';
         result.style.display = '';
       } catch (e) {
         status.textContent = '✗ ' + (e.message || e);

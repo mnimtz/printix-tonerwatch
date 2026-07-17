@@ -135,12 +135,26 @@
   <div class="info-card">
     <h3>{{ _('printer_info.section.contract', lang) }}</h3>
     <div class="body">
+      <div class="row-2col">
+        <div class="form-group">
+          <label for="contact_name">{{ _('printer_info.field.contact_name', lang) }}</label>
+          <input type="text" id="contact_name" name="contact_name"
+                 value="{{ info.contact_name or '' }}"
+                 placeholder="Max Mustermann">
+        </div>
+        <div class="form-group">
+          <label for="contact_email">{{ _('printer_info.field.contact_email', lang) }}</label>
+          <input type="email" id="contact_email" name="contact_email"
+                 value="{{ info.contact_email or '' }}"
+                 placeholder="pcs@example.com">
+          <div class="field-hint">{{ _('printer_info.hint.contact_email', lang) }}</div>
+        </div>
+      </div>
       <div class="form-group">
-        <label for="contact_email">{{ _('printer_info.field.contact_email', lang) }}</label>
-        <input type="email" id="contact_email" name="contact_email"
-               value="{{ info.contact_email or '' }}"
-               placeholder="pcs@example.com">
-        <div class="field-hint">{{ _('printer_info.hint.contact_email', lang) }}</div>
+        <label for="delivery_address">{{ _('printer_info.field.delivery_address', lang) }}</label>
+        <textarea id="delivery_address" name="delivery_address" rows="2"
+                  placeholder="{{ customer.address or _('printer_info.placeholder.delivery_address', lang) }}">{{ info.delivery_address or '' }}</textarea>
+        <div class="field-hint">{{ _('printer_info.hint.delivery_address', lang) }}</div>
       </div>
       <div class="row-2col">
         <div class="form-group">

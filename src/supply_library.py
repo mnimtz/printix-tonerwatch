@@ -416,7 +416,8 @@ def ai_suggest_supply_set(printer_model: str) -> dict[str, Any] | None:
 
 def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
                           customer_name: str, lang: str = "de",
-                          contact: dict[str, Any] | None = None) -> dict[str, str] | None:
+                          contact: dict[str, Any] | None = None,
+                          delivery_address: str = "") -> dict[str, str] | None:
     """v0.24.6 — draft a ready-to-send supplier order email for one
     order row. The LLM only writes the prose; every fact in it (SKU,
     quantity, printer, customer reference) is handed in already
@@ -433,6 +434,12 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
     distributors expect it in the mail body); the target address
     itself is returned alongside the draft rather than put in the
     prose, so the operator's own mail client addresses the message.
+
+    ``delivery_address`` — v0.24.31 — where the cartridge should
+    physically ship: the specific printer's own override if set, else
+    the customer's own address. Included in the draft body so the
+    supplier knows where to send it without the operator typing it in
+    by hand every time.
 
     Returns ``{"subject": .., "body": ..}`` or ``None`` if the LLM
     isn't configured or the call fails."""
@@ -463,7 +470,9 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
         "printer instead of guessing one. If a customer account number "
         "is given, mention it so the supplier can bill/ship to the "
         "right account. If a named contact person is given, address the "
-        "greeting to them by name instead of a generic salutation. Keep "
+        "greeting to them by name instead of a generic salutation. If a "
+        "delivery address is given, state it clearly as the shipping "
+        "destination for this order. Keep "
         "it short: a subject line and a brief "
         "body — greeting, the order itself, a polite close. No "
         "markdown, no placeholders like [Your Name]. Reply with ONE "
@@ -474,6 +483,7 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
         f"Customer reference: {customer_name}\n"
         f"Our account number with this supplier: {customer_number or 'n/a'}\n"
         f"Contact person at the supplier: {contact_person or 'n/a (use a generic greeting)'}\n"
+        f"Delivery address: {delivery_address or 'n/a — ask supplier to use the account on file'}\n"
         f"Printer: {printer}\n"
         f"Toner colour: {color_word or 'n/a'}\n"
         f"SKU: {sku or '(not on file — ask supplier to confirm)'}\n"
