@@ -32,19 +32,39 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _existing_columns(table_name: str) -> set[str]:
+    return {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table_name)}
+
+
 def upgrade() -> None:
+    # v0.24.32: SQLite DDL is non-transactional (see the fix below) —
+    # the ORIGINAL v0.24.31 release of this migration crashed partway
+    # through, on the toner_orders block. Depending on exactly where
+    # it died, customers/printer_info may already carry these columns
+    # on a production DB that's retrying this migration. Guard every
+    # add_column with an existence check so this is safe to run
+    # whether starting fresh from 0007 or resuming after that failure.
+    customers_cols = _existing_columns("customers")
     with op.batch_alter_table("customers") as batch:
-        batch.add_column(sa.Column(
-            "address", sa.Text(), nullable=False, server_default=""))
-        batch.add_column(sa.Column(
-            "customer_number", sa.Text(), nullable=False, server_default=""))
+        if "address" not in customers_cols:
+            batch.add_column(sa.Column(
+                "address", sa.Text(), nullable=False, server_default=""))
+        if "customer_number" not in customers_cols:
+            batch.add_column(sa.Column(
+                "customer_number", sa.Text(), nullable=False, server_default=""))
 
+    printer_info_cols = _existing_columns("printer_info")
     with op.batch_alter_table("printer_info") as batch:
-        batch.add_column(sa.Column(
-            "delivery_address", sa.Text(), nullable=False, server_default=""))
-        batch.add_column(sa.Column(
-            "contact_name", sa.Text(), nullable=False, server_default=""))
+        if "delivery_address" not in printer_info_cols:
+            batch.add_column(sa.Column(
+                "delivery_address", sa.Text(), nullable=False, server_default=""))
+        if "contact_name" not in printer_info_cols:
+            batch.add_column(sa.Column(
+                "contact_name", sa.Text(), nullable=False, server_default=""))
 
+    toner_orders_cols = _existing_columns("toner_orders")
+    if "updated_by_user_id" in toner_orders_cols and "updated_at" in toner_orders_cols:
+        return
     with op.batch_alter_table("toner_orders") as batch:
         # v0.24.32 fix: SQLite's batch recreate raises "Constraint must
         # have a name" for an unnamed FK added via add_column — this
