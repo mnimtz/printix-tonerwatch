@@ -46,9 +46,18 @@ def upgrade() -> None:
             "contact_name", sa.Text(), nullable=False, server_default=""))
 
     with op.batch_alter_table("toner_orders") as batch:
+        # v0.24.32 fix: SQLite's batch recreate raises "Constraint must
+        # have a name" for an unnamed FK added via add_column — this
+        # broke the migration outright (site down, "Application
+        # Error") until the constraint got an explicit name. Confirmed
+        # locally against a reconstructed pre-0008 schema, including
+        # that the partial unique index (uq_active_toner_order)
+        # survives the table recreate correctly either way.
         batch.add_column(sa.Column(
             "updated_by_user_id", sa.Integer(),
-            sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True))
+            sa.ForeignKey("users.id", ondelete="SET NULL",
+                          name="fk_toner_orders_updated_by_user_id"),
+            nullable=True))
         batch.add_column(sa.Column(
             "updated_at", sa.Text(), nullable=False, server_default=""))
 
