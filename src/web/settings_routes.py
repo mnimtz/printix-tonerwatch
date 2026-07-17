@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import os
 from typing import Any
 
@@ -16,6 +18,14 @@ from ..db import customers as customers_tbl
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _short_hash(value: str) -> str:
+    """8-hex-char fingerprint for correlating log lines across requests
+    without ever writing the actual device_code / access_token to
+    logs — short-lived credentials, but no reason to log them in full."""
+    return hashlib.sha256(value.encode()).hexdigest()[:8]
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +204,9 @@ async def entra_autosetup_start(request: Request):
     tenant = "common"  # multi-tenant device-code — Microsoft resolves
     d = entra_sso.start_device_code_flow(tenant=tenant)
     if "error" in d:
+        logger.warning("[entra-autosetup] start: Microsoft rejected the "
+                        "device-code request for admin=%s: %s",
+                        admin["id"], d["error"])
         return JSONResponse({"ok": False, "error": d["error"]}, status_code=400)
     # Session-stash for the poll endpoint. Device codes are single-use;
     # the admin's browser session owns this until they finish or it
@@ -202,8 +215,18 @@ async def entra_autosetup_start(request: Request):
         request.session["entra_setup_device_code"] = d["device_code"]
         request.session["entra_setup_tenant"] = tenant
     except AssertionError:
+        logger.warning("[entra-autosetup] start: request.session raised "
+                        "AssertionError for admin=%s — SessionMiddleware "
+                        "not active on this request?", admin["id"])
         return JSONResponse({"ok": False, "error": "session unavailable"},
                             status_code=500)
+    # v0.24.21: diagnostic breadcrumb — the next /poll for this admin
+    # should log the SAME hash. If it logs "missing" or a DIFFERENT
+    # hash instead, the session isn't round-tripping between requests
+    # (cookie not being set/sent, or a second /start overwrote it).
+    logger.info("[entra-autosetup] start: admin=%s device_code_hash=%s "
+                "stashed in session, expires_in=%ss",
+                admin["id"], _short_hash(d["device_code"]), d.get("expires_in"))
     db.audit(admin["id"], "settings.entra_autosetup_started",
              target_type="settings", target_id="entra_sso",
              meta_json=json.dumps({"user_code_len": len(d["user_code"])}))
@@ -355,20 +378,43 @@ async def entra_autosetup_poll(request: Request):
     try:
         device_code = request.session.get("entra_setup_device_code", "")
         tenant = request.session.get("entra_setup_tenant", "common")
+        session_error = None
     except AssertionError:
         device_code = ""
         tenant = "common"
+        session_error = "AssertionError reading request.session"
     if not device_code:
+        # v0.24.21: this is OUR OWN session check, not something
+        # Microsoft returned — if this fires on the very first poll
+        # after a fresh /start, the session cookie set by /start's
+        # response isn't being read back on this request. Logged at
+        # WARNING (not INFO) since it's the exact failure this
+        # diagnostic exists to catch.
+        logger.warning("[entra-autosetup] poll: admin=%s no device_code in "
+                        "session (session_error=%s) — either /start never "
+                        "ran for this session, a later /start already "
+                        "consumed/replaced it, or the session cookie isn't "
+                        "round-tripping between requests",
+                        admin["id"], session_error)
         return JSONResponse({"ok": False,
                               "status": "error",
                               "error": "no_device_code_in_session"},
                              status_code=400)
 
+    logger.info("[entra-autosetup] poll: admin=%s device_code_hash=%s "
+                "found in session, polling Microsoft",
+                admin["id"], _short_hash(device_code))
     poll = entra_sso.poll_device_code_token(device_code, tenant=tenant)
     status = poll.get("status")
     if status != "success":
+        if status == "error":
+            logger.warning("[entra-autosetup] poll: admin=%s Microsoft "
+                            "returned status=error: %s",
+                            admin["id"], poll.get("error", ""))
         return JSONResponse({"ok": True, "status": status,
                               "error": poll.get("error", "")})
+    logger.info("[entra-autosetup] poll: admin=%s device-code exchange "
+                "succeeded, proceeding to auto-registration", admin["id"])
 
     # Success — clear the device_code from the session so a stale
     # code can't be re-used, then run the auto-registration.
