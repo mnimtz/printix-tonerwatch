@@ -102,6 +102,11 @@ async def orders_board(request: Request):
             # hunting for it in three columns.
             "highlight_id":  q.get("highlight", ""),
             "highlight_new": q.get("highlight_new", "") == "1",
+            # v0.24.12: even after AI SKU-completion, still no SKU
+            # (no supply template, no AI, or AI came up empty) — the
+            # highlight banner says so explicitly instead of leaving
+            # the operator to notice "no SKU" on the card by chance.
+            "highlight_no_sku": q.get("no_sku", "") == "1",
         },
     )
 
@@ -249,9 +254,32 @@ async def toner_order_now(customer_id: int, printer_id: str, request: Request):
                  meta_json=json.dumps({"printer_id": printer_id, "color": color,
                                         "sku": sku, "via": "toner_grid"}))
 
+        # v0.24.12 — the alert runner has always AI-completed a missing
+        # SKU on a freshly-created draft (v0.20.0); this manual "🛒
+        # Bestellen" button never did, so clicking it on a printer with
+        # no supply template left the operator staring at an
+        # already-"finished-looking" draft that said "no SKU" with no
+        # next step. Same completion path, same created-only guard so
+        # it never overwrites an SKU an operator already edited.
+        if not sku and model:
+            ai = supply_library.ai_suggest_supply(model, color)
+            if ai and ai.get("sku"):
+                sku = ai["sku"]
+                orders.update_draft_sku(
+                    order_id, sku,
+                    notes_append=(
+                        f"AI-suggested {sku}"
+                        + (f" ({ai['description']})" if ai.get("description") else "")
+                        + f" via {ai.get('provider', 'llm')}"))
+                db.audit(user["id"], "order.ai_completed",
+                         target_type="order", target_id=str(order_id),
+                         meta_json=json.dumps({"sku": sku, "provider": ai.get("provider"),
+                                                "via": "toner_grid"}))
+
     return RedirectResponse(
         f"/orders?customer=all&highlight={order_id}"
-        f"&highlight_new={'1' if created else '0'}",
+        f"&highlight_new={'1' if created else '0'}"
+        f"&no_sku={'1' if created and not sku else '0'}",
         status_code=303)
 
 

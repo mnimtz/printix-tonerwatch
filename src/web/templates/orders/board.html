@@ -264,9 +264,18 @@
 {% endif %}
 {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 {% if highlight_id %}
-  {# v0.24.1: landed here via the toner-grid "🛒 Bestellen" button. #}
-  <div class="alert alert-info" id="highlight-banner">
-    {% if highlight_new %}
+  {# v0.24.1: landed here via the toner-grid "🛒 Bestellen" button.
+     v0.24.12: highlight_no_sku fires when even the AI completion
+     (same one the alert runner already had) came up empty — say so
+     explicitly instead of leaving "no SKU" on the card to be noticed
+     by chance, which read as the draft being silently unfinished. #}
+  <div class="alert {{ 'alert-warn' if highlight_no_sku else 'alert-info' }}" id="highlight-banner">
+    {% if highlight_no_sku %}
+      ⚠ {{ _('orders.info.highlight_no_sku', lang) }}
+      <a href="/supplies/new-set" style="font-weight: 700; margin-left: 6px;">
+        → {{ _('orders.info.highlight_no_sku.action', lang) }}
+      </a>
+    {% elif highlight_new %}
       ✓ {{ _('orders.info.highlight_created', lang) }}
     {% else %}
       ℹ {{ _('orders.info.highlight_existing', lang) }}
