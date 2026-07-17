@@ -289,7 +289,7 @@ async def entra_login(request: Request, next: str = "/dashboard"):
     except entra_sso.EntraSSOError as e:
         _entra_log.warning("[Entra login] build_auth_url raised: %s", e)
         return RedirectResponse(
-            "/login?error=" + quote_plus(f"SSO: {str(e)[:200]}"),
+            "/login?error=" + quote_plus(f"SSO: {str(e)[:500]}"),
             status_code=303)
     except Exception as e:  # noqa: BLE001
         _entra_log.exception(
@@ -337,7 +337,7 @@ async def entra_callback(request: Request,
     except entra_sso.EntraSSOError as e:
         _entra_log.warning("[Entra callback] token exchange failed: %s", e)
         return RedirectResponse(
-            "/login?error=" + quote_plus(f"SSO: {str(e)[:200]}"),
+            "/login?error=" + quote_plus(f"SSO: {str(e)[:500]}"),
             status_code=303)
 
     user = entra_sso.resolve_or_create_user(claims)

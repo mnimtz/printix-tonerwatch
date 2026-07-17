@@ -249,6 +249,31 @@ def _default_redirect(request) -> str:
     return f"{base}/auth/entra/callback"
 
 
+def _aadsts_hint(error_text: str) -> str:
+    """v0.24.2 — same actionable-hint mapping mail_client.py already
+    applies to Graph token failures, now also applied to the SSO
+    LOGIN callback. A broken client_secret blocks both mail-sending
+    AND signing in — the login error page should point at the same
+    fix (Settings → Entra ID → Reconfigure → 🔑 Rotate secret only)
+    instead of leaving the operator to piece it together from a raw
+    AADSTS code."""
+    if "AADSTS7000215" in error_text or "AADSTS7000222" in error_text:
+        return (" — the stored client_secret is wrong or expired. Fix: "
+                "Settings → Entra ID → Reconfigure → 🔑 Rotate secret only "
+                "(keeps the app, mints a fresh secret — no Azure Portal "
+                "needed). Local email+password login still works in the "
+                "meantime.")
+    if "AADSTS700016" in error_text:
+        return " — client_id not found in this tenant. Check Settings → Entra ID → Diagnose."
+    if "AADSTS90002" in error_text:
+        return " — tenant_id doesn't exist. Check Settings → Entra ID → Diagnose."
+    if "AADSTS50011" in error_text:
+        return (" — the redirect_uri doesn't match what's registered on "
+                "the Azure app. Check Settings → Entra ID → Diagnose for "
+                "the exact URI this server sends.")
+    return ""
+
+
 def handle_callback(request, code: str, state: str) -> dict[str, Any]:
     """Exchange the code for a token bundle + return the user claims.
 
@@ -276,8 +301,13 @@ def handle_callback(request, code: str, state: str) -> dict[str, Any]:
     result = app.acquire_token_by_authorization_code(
         code=code, scopes=_SCOPES, redirect_uri=redirect_uri)
     if "error" in result:
+        # v0.24.2: keep desc short enough that desc + the AADSTS hint
+        # both survive the [:500] truncation the /login redirect
+        # applies — a long raw AADSTS message used to push the
+        # actually-useful hint text off the end.
+        desc = result.get("error_description", "")[:180]
         raise EntraSSOError(
-            f"{result.get('error')}: {result.get('error_description', '')[:200]}")
+            f"{result.get('error')}: {desc}{_aadsts_hint(desc)}")
 
     # v0.15: fetch the profile from Graph /me rather than trusting
     # id_token_claims. Different tenants emit different claim
