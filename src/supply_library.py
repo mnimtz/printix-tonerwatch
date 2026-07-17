@@ -445,6 +445,7 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
     manufacturer = (supply or {}).get("manufacturer") or ""
     supplier    = (contact or {}).get("supplier_name") or (supply or {}).get("supplier") or ""
     customer_number = (contact or {}).get("customer_number") or ""
+    contact_person  = (contact or {}).get("contact_person") or ""
     quantity    = order.get("quantity") or 1
     printer     = order.get("printer_name") or order.get("printer_id") or ""
     color_word  = {"K": "black", "C": "cyan", "M": "magenta",
@@ -461,7 +462,9 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
         "ask the supplier to confirm the correct part for the stated "
         "printer instead of guessing one. If a customer account number "
         "is given, mention it so the supplier can bill/ship to the "
-        "right account. Keep it short: a subject line and a brief "
+        "right account. If a named contact person is given, address the "
+        "greeting to them by name instead of a generic salutation. Keep "
+        "it short: a subject line and a brief "
         "body — greeting, the order itself, a polite close. No "
         "markdown, no placeholders like [Your Name]. Reply with ONE "
         "JSON object only, no prose, no code fences: "
@@ -470,6 +473,7 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
     user = (
         f"Customer reference: {customer_name}\n"
         f"Our account number with this supplier: {customer_number or 'n/a'}\n"
+        f"Contact person at the supplier: {contact_person or 'n/a (use a generic greeting)'}\n"
         f"Printer: {printer}\n"
         f"Toner colour: {color_word or 'n/a'}\n"
         f"SKU: {sku or '(not on file — ask supplier to confirm)'}\n"

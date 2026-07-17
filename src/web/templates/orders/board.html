@@ -386,6 +386,8 @@
                border: 1px solid var(--tw-gray-300); border-radius: 6px;">
         <div id="mailsuggest-customer-number" style="font-size: 0.78rem;
              color: var(--tw-muted-blue); margin-top: 4px; display: none;"></div>
+        <div id="mailsuggest-phone" style="font-size: 0.78rem;
+             color: var(--tw-muted-blue); margin-top: 2px; display: none;"></div>
       </div>
       <label style="font-size: 0.78rem; color: var(--tw-muted-blue);
                     text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">
@@ -455,6 +457,7 @@
         var toRow = document.getElementById('mailsuggest-to-row');
         var toBox = document.getElementById('mailsuggest-to');
         var custNumBox = document.getElementById('mailsuggest-customer-number');
+        var phoneBox = document.getElementById('mailsuggest-phone');
         if (j.to_email) {
           toBox.value = j.to_email;
           toRow.style.display = '';
@@ -464,6 +467,15 @@
             custNumBox.style.display = '';
           } else {
             custNumBox.style.display = 'none';
+          }
+          if (j.phone) {
+            // v0.24.20: shown for a quick call on an urgent shortage —
+            // never part of the mail body itself.
+            phoneBox.textContent = '📞 ' + j.phone
+              + (j.contact_person ? ' (' + j.contact_person + ')' : '');
+            phoneBox.style.display = '';
+          } else {
+            phoneBox.style.display = 'none';
           }
         } else {
           toRow.style.display = 'none';

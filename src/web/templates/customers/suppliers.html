@@ -22,7 +22,8 @@
   }
   .supplier-link-card.assigned .assigned-dot { background: var(--status-ok); }
   .row-3col { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: var(--sp-4); }
-  @media (max-width: 720px) { .row-3col { grid-template-columns: 1fr; } }
+  .row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-top: var(--sp-3); }
+  @media (max-width: 720px) { .row-3col, .row-2col { grid-template-columns: 1fr; } }
   .form-actions {
     margin-top: var(--sp-5); display: flex; justify-content: flex-end;
   }
@@ -53,9 +54,9 @@
     {% for row in rows %}
     <div class="supplier-link-card {{ 'assigned' if row.link else '' }}">
       <h3><span class="assigned-dot"></span>{{ row.supplier.name }}
-        {% if row.supplier.order_email %}
+        {% if row.supplier.order_email or row.supplier.contact_person %}
           <span style="font-weight: 400; color: var(--tw-muted-blue); font-size: 0.82rem;">
-            ({{ row.supplier.order_email }})
+            ({{ [row.supplier.contact_person, row.supplier.order_email]|select|join(' · ') }})
           </span>
         {% endif %}
       </h3>
@@ -83,6 +84,26 @@
           <input type="text" id="notes_{{ row.supplier.id }}"
                  name="notes_{{ row.supplier.id }}"
                  value="{{ row.link.relationship_notes if row.link else '' }}">
+        </div>
+      </div>
+      <div class="row-2col">
+        <div class="form-group">
+          <label for="contact_person_override_{{ row.supplier.id }}">
+            {{ _('customer.suppliers.col.contact_override', lang) }}
+          </label>
+          <input type="text" id="contact_person_override_{{ row.supplier.id }}"
+                 name="contact_person_override_{{ row.supplier.id }}"
+                 value="{{ row.link.contact_person_override if row.link else '' }}"
+                 placeholder="{{ row.supplier.contact_person or _('customer.suppliers.col.contact_override.placeholder', lang) }}">
+        </div>
+        <div class="form-group">
+          <label for="phone_override_{{ row.supplier.id }}">
+            {{ _('customer.suppliers.col.phone_override', lang) }}
+          </label>
+          <input type="tel" id="phone_override_{{ row.supplier.id }}"
+                 name="phone_override_{{ row.supplier.id }}"
+                 value="{{ row.link.phone_override if row.link else '' }}"
+                 placeholder="{{ row.supplier.phone or _('customer.suppliers.col.phone_override.placeholder', lang) }}">
         </div>
       </div>
     </div>

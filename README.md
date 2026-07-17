@@ -138,18 +138,23 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 ### Suppliers
 
 - **Global vendor list** (`/suppliers`, admin-only) — name, default order
-  mailbox, website, notes. The same distributor usually serves multiple
-  customers, so suppliers are defined once and linked from templates and
-  overrides via a dropdown (kept in sync with the legacy free-text
-  `supplier` field for display/backward compatibility).
+  mailbox, contact person, phone, website, notes. The same distributor
+  usually serves multiple customers, so suppliers are defined once and
+  linked from templates and overrides via a dropdown (kept in sync with
+  the legacy free-text `supplier` field for display/backward
+  compatibility).
 - **Per-customer account details** (`/customers/{id}/suppliers`) — this
-  customer's account/customer number with each supplier, plus an optional
-  order-email override for the rare case they order through a different
-  address than the supplier's own default.
+  customer's account/customer number with each supplier, plus optional
+  overrides for the order-email, contact person, and phone — for the
+  rare case a customer orders through a different mailbox or has a
+  different account contact than the supplier's own default.
 - **Feeds the order-mail draft automatically.** Once a supply template or
   override is linked to a supplier and the customer has an account number
-  on file, the **✉️ Mail text** feature resolves both without the operator
-  typing anything.
+  on file, the **✉️ Mail text** feature resolves the target address,
+  account number, and — if a contact person is on file — personalizes
+  the greeting instead of a generic salutation. The phone number is
+  shown alongside the draft for a quick call on an urgent shortage,
+  never part of the mail body itself.
 
 ### Per-printer metadata overrides
 

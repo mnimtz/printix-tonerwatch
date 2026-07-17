@@ -172,13 +172,16 @@ async def customer_suppliers_save(customer_id: int, request: Request):
     for s in suppliers.list_suppliers():
         sid = s["id"]
         keys = (f"customer_number_{sid}", f"order_email_override_{sid}",
+                f"contact_person_override_{sid}", f"phone_override_{sid}",
                 f"notes_{sid}")
         if not any(k in form for k in keys):
             continue
         fields = {
-            "customer_number":       form.get(f"customer_number_{sid}") or "",
-            "order_email_override":  form.get(f"order_email_override_{sid}") or "",
-            "notes":                 form.get(f"notes_{sid}") or "",
+            "customer_number":          form.get(f"customer_number_{sid}") or "",
+            "order_email_override":     form.get(f"order_email_override_{sid}") or "",
+            "contact_person_override":  form.get(f"contact_person_override_{sid}") or "",
+            "phone_override":           form.get(f"phone_override_{sid}") or "",
+            "notes":                    form.get(f"notes_{sid}") or "",
         }
         had_link = suppliers.get_customer_supplier(customer_id, sid) is not None
         if any(fields.values()):

@@ -308,6 +308,11 @@ suppliers = Table(
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("name", Text, nullable=False),
     Column("order_email", Text, nullable=False, server_default=""),
+    # v0.24.20: who to address the order email to / call for an urgent
+    # shortage — optional, both blank means "Sehr geehrte Damen und
+    # Herren" and no phone shown anywhere.
+    Column("contact_person", Text, nullable=False, server_default=""),
+    Column("phone", Text, nullable=False, server_default=""),
     Column("website_url", Text, nullable=False, server_default=""),
     Column("notes", Text, nullable=False, server_default=""),
     Column("active", Integer, nullable=False, server_default="1"),
@@ -329,6 +334,11 @@ customer_suppliers = Table(
     # when the customer genuinely orders through a different mailbox
     # than the supplier's default (e.g. a dedicated account manager).
     Column("order_email_override", Text, nullable=False, server_default=""),
+    # v0.24.20: same override pattern — empty means "use the supplier's
+    # own contact_person / phone", set only when this customer has a
+    # different account contact at the same distributor.
+    Column("contact_person_override", Text, nullable=False, server_default=""),
+    Column("phone_override", Text, nullable=False, server_default=""),
     Column("notes", Text, nullable=False, server_default=""),
     Column("updated_at", Text, nullable=False,
            server_default=func.current_timestamp()),

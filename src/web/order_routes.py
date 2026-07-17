@@ -179,6 +179,8 @@ async def orders_mail_suggestion(order_id: int, request: Request):
         "ok": True, **mail,
         "to_email": (contact or {}).get("order_email", ""),
         "customer_number": (contact or {}).get("customer_number", ""),
+        "contact_person": (contact or {}).get("contact_person", ""),
+        "phone": (contact or {}).get("phone", ""),
     })
 
 

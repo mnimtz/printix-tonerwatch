@@ -48,11 +48,13 @@ class SupplierError(Exception):
 def upsert_supplier(supplier_id: int | None, fields: dict[str, Any],
                     updated_by_user_id: int | None) -> int:
     payload = {
-        "name":        (fields.get("name") or "").strip(),
-        "order_email": (fields.get("order_email") or "").strip(),
-        "website_url": (fields.get("website_url") or "").strip(),
-        "notes":       (fields.get("notes") or "").strip(),
-        "active":      1 if fields.get("active", True) else 0,
+        "name":           (fields.get("name") or "").strip(),
+        "order_email":    (fields.get("order_email") or "").strip(),
+        "contact_person": (fields.get("contact_person") or "").strip(),
+        "phone":          (fields.get("phone") or "").strip(),
+        "website_url":    (fields.get("website_url") or "").strip(),
+        "notes":          (fields.get("notes") or "").strip(),
+        "active":         1 if fields.get("active", True) else 0,
         "updated_by_user_id": updated_by_user_id,
     }
     if not payload["name"]:
@@ -94,6 +96,8 @@ def list_customer_suppliers(customer_id: int) -> list[dict[str, Any]]:
         rows = conn.execute(
             select(db.suppliers, db.customer_suppliers.c.customer_number,
                    db.customer_suppliers.c.order_email_override,
+                   db.customer_suppliers.c.contact_person_override,
+                   db.customer_suppliers.c.phone_override,
                    db.customer_suppliers.c.notes.label("relationship_notes"))
             .select_from(db.suppliers.join(
                 db.customer_suppliers,
@@ -120,6 +124,8 @@ def upsert_customer_supplier(customer_id: int, supplier_id: int,
     payload = {
         "customer_number": (fields.get("customer_number") or "").strip(),
         "order_email_override": (fields.get("order_email_override") or "").strip(),
+        "contact_person_override": (fields.get("contact_person_override") or "").strip(),
+        "phone_override": (fields.get("phone_override") or "").strip(),
         "notes": (fields.get("notes") or "").strip(),
     }
     with db.get_conn() as conn:
@@ -152,9 +158,10 @@ def remove_customer_supplier(customer_id: int, supplier_id: int) -> None:
 def resolve_supplier_contact(customer_id: int, supplier_id: int | None
                              ) -> dict[str, Any] | None:
     """The order-mail feature's entry point: given the supplier a SKU
-    is linked to, resolve the actual send-to address + this customer's
-    account number with them. Prefers the per-customer email override
-    over the supplier's own default; returns ``None`` if there's no
+    is linked to, resolve the actual send-to address, this customer's
+    account number, and who to address the mail to / call for an
+    urgent shortage. Prefers per-customer overrides over the
+    supplier's own defaults; returns ``None`` if there's no
     supplier_id at all (SKU not yet linked to a formal supplier
     record) so callers can fall back to their existing behaviour."""
     if not supplier_id:
@@ -163,11 +170,16 @@ def resolve_supplier_contact(customer_id: int, supplier_id: int | None
     if not supplier or not supplier.get("active"):
         return None
     link = get_customer_supplier(customer_id, supplier_id)
-    email = ((link or {}).get("order_email_override")
-             or supplier.get("order_email") or "")
+    link = link or {}
+    email = link.get("order_email_override") or supplier.get("order_email") or ""
+    contact_person = (link.get("contact_person_override")
+                      or supplier.get("contact_person") or "")
+    phone = link.get("phone_override") or supplier.get("phone") or ""
     return {
         "supplier_id": supplier_id,
         "supplier_name": supplier["name"],
         "order_email": email,
-        "customer_number": (link or {}).get("customer_number", ""),
+        "customer_number": link.get("customer_number", ""),
+        "contact_person": contact_person,
+        "phone": phone,
     }
