@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import delete, func, insert, select, update
 
-from .. import auth, bi_client, crypto, db, savings_report
+from .. import auth, bi_client, crypto, db, savings_report, toner_alerts
 from ..db import audit_log, customer_access, customers, users
 from . import i18n
 
@@ -310,6 +310,7 @@ async def customer_detail(customer_id: int, request: Request):
             "customer": _customer_form_from_row(row),
             "access": [dict(r._mapping) for r in access_rows],
             "recent_events": [dict(r._mapping) for r in recent_events],
+            "anomalies": toner_alerts.list_recent_anomalies(customer_id),
         },
     )
 

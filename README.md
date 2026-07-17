@@ -60,6 +60,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   🤖 *Auto-ordered — no action needed* badge on rows the runner sent itself.
 - **Alert runner** on APScheduler; default 15 min, configurable via
   `ALERT_INTERVAL_MINUTES`.
+- **Anomaly detection on toner-level jumps.** Every poll tick compares the
+  new level against the previous one — an increase that lands short of a
+  full reset (not a real cartridge replacement) or a very steep one-tick
+  drop gets flagged on the customer detail page, no historical time series
+  needed. Pure threshold logic on data already collected each tick, not an
+  LLM call.
 
 ### Order flow (kanban)
 

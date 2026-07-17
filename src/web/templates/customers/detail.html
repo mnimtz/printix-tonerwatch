@@ -133,6 +133,46 @@
   {% endif %}
 </div>
 
+{% if anomalies %}
+  <div class="card" style="margin-top: var(--sp-5); border-left: 4px solid var(--status-warn, #b8860b);">
+    <h3 style="margin-bottom: var(--sp-2);">
+      ⚠ {{ _('customer.detail.section.anomalies', lang) }}
+    </h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-3);">
+      {{ _('customer.detail.anomalies_intro', lang) }}
+    </p>
+    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
+      {% for a in anomalies %}
+        <li style="padding: var(--sp-2) 0;
+                   border-bottom: 1px solid var(--tw-gray-200);
+                   display: flex; justify-content: space-between; gap: var(--sp-4);
+                   align-items: baseline;">
+          <span>
+            <code style="background: var(--tw-gray-200); padding: 2px 6px;
+                         border-radius: 4px; font-size: 0.82em;">
+              {{ a.printer_id }} · {{ a.color }}
+            </code>
+            <span style="margin-left: 8px;">
+              {{ a.meta.prev_level }}% → {{ a.level }}%
+            </span>
+            <span style="margin-left: 8px; color: var(--tw-muted-blue); font-size: 0.85em;">
+              {% if a.meta.kind == 'partial_increase' %}
+                {{ _('customer.detail.anomaly.partial_increase', lang) }}
+              {% elif a.meta.kind == 'steep_drop' %}
+                {{ _('customer.detail.anomaly.steep_drop', lang) }}
+              {% endif %}
+            </span>
+          </span>
+          <time style="color: var(--tw-muted-blue); white-space: nowrap;
+                       font-family: var(--font-mono); font-size: 0.82rem;">
+            {{ a.created_at }}
+          </time>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
 {% if recent_events %}
   <div class="card" style="margin-top: var(--sp-5);">
     <h3 style="margin-bottom: var(--sp-4);">

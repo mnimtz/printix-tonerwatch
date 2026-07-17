@@ -93,6 +93,50 @@ def _log_event(customer_id: int, kind: str, *, printer_id: str = "",
         ))
 
 
+def _detect_level_anomaly(prev_level: int, level: int) -> str | None:
+    """v0.24.5 — flag a toner-level reading that doesn't match any
+    normal real-world event between two poll ticks, without needing
+    any historical time series (we only ever have "previous tick" vs
+    "this tick" from ``toner_state``).
+
+    A cartridge replacement resets the level close to 100% — an
+    increase that lands somewhere in the middle instead is the
+    clearest signal a real event can't produce, so it's the primary,
+    high-confidence finding. A very steep one-tick drop is softer
+    evidence (a large print job is plausible) but still worth a look.
+    Both thresholds are deliberately conservative to avoid noise —
+    this only flags for review, it never blocks or auto-acts on
+    anything."""
+    delta = level - prev_level
+    if delta >= 5 and level < 85:
+        return "partial_increase"
+    if delta <= -40:
+        return "steep_drop"
+    return None
+
+
+def list_recent_anomalies(customer_id: int, limit: int = 5) -> list[dict]:
+    """v0.24.5 — most recent ``toner.anomaly`` events for one customer,
+    newest first. Backs the customer detail page's anomaly card."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            select(db.toner_events)
+            .where(db.toner_events.c.customer_id == customer_id)
+            .where(db.toner_events.c.kind == "toner.anomaly")
+            .order_by(db.toner_events.c.created_at.desc())
+            .limit(limit)
+        ).all()
+    out = []
+    for r in rows:
+        d = db._row_to_dict(r)
+        try:
+            d["meta"] = json.loads(d.get("meta_json") or "{}")
+        except json.JSONDecodeError:
+            d["meta"] = {}
+        out.append(d)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Time helpers
 # ---------------------------------------------------------------------------
@@ -174,6 +218,16 @@ def evaluate_and_notify(customer: dict, *,
             key = (p["printer_id"], color)
             prev = prior_state.get(key, {})
             prev_sev = (prev.get("severity") or "OK").upper()
+
+            prev_level = prev.get("level")
+            if prev_level is not None and level is not None:
+                anomaly = _detect_level_anomaly(prev_level, level)
+                if anomaly:
+                    _log_event(customer["id"], "toner.anomaly",
+                               printer_id=p["printer_id"], color=color,
+                               level=level, severity=severity,
+                               meta={"prev_level": prev_level, "kind": anomaly,
+                                     "printer_name": p["printer_name"] or ""})
 
             row = {
                 "printer_id":   p["printer_id"],
