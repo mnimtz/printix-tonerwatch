@@ -161,6 +161,17 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   throwaway engine, never touches the running one) and copy a
   ready-to-paste `DATABASE_URL` for Azure App Service → Application
   Settings.
+- **One-click automated cutover.** On Azure App Service, the site carries a
+  System-Assigned Managed Identity (Bicep `identity: SystemAssigned` +
+  a self-scoped "Website Contributor" role assignment) and can switch its
+  own `DATABASE_URL` and restart itself via the ARM REST API — no manual
+  Portal copy-paste. It authenticates to Azure via the Instance Metadata
+  Service, so no credential is ever stored. The switch always fetches the
+  *full* current app-settings collection and merges in the new
+  `DATABASE_URL` before writing back — never a blind overwrite — so
+  `FERNET_KEY` and every other secret survive untouched. Deployments that
+  predate this feature need a one-time `az cli` bootstrap (shown inline on
+  `/settings/database` — assigns the identity + role once).
 
 ### AI / LLM integration
 

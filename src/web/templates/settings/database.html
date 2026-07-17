@@ -138,6 +138,42 @@
   </div>
 </section>
 
+<section class="card" style="padding: var(--sp-4); margin-bottom: var(--sp-4);">
+  <h2 style="margin: 0 0 6px;">
+    {{ _('settings.database.automation_title', lang) }}
+  </h2>
+  <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-bottom: var(--sp-3);">
+    {{ _('settings.database.automation_intro', lang) }}
+  </p>
+  <div id="dbauto-status" style="font-size: 0.85rem; margin-bottom: var(--sp-3);">
+    {{ _('settings.database.automation_checking', lang) }}
+  </div>
+  <div id="dbauto-rg-row" style="display: none; gap: var(--sp-3); align-items: flex-end;
+       margin-bottom: var(--sp-3);">
+    <div class="form-group" style="margin-bottom: 0; max-width: 280px;">
+      <label for="dbauto-rg">{{ _('settings.database.bootstrap_rg_label', lang) }}</label>
+      <input id="dbauto-rg" type="text" autocomplete="off"
+             placeholder="{{ _('settings.database.bootstrap_rg_placeholder', lang) }}">
+    </div>
+    <button type="button" id="dbauto-rg-refresh" class="btn btn-secondary" data-noloader>
+      {{ _('settings.database.bootstrap_refresh_button', lang) }}
+    </button>
+  </div>
+  <pre id="dbauto-bootstrap" style="display: none; background: var(--tw-gray-900,#1a1a1a);
+       color: #d4f7dc; padding: 10px 12px; border-radius: 6px; font-size: 0.75rem;
+       overflow-x: auto; white-space: pre;"></pre>
+  <button type="button" id="dbauto-bootstrap-copy" class="btn btn-secondary"
+          data-noloader style="display: none; margin-top: 6px; margin-bottom: var(--sp-3);">
+    📋 {{ _('settings.database.bootstrap_copy_button', lang) }}
+  </button>
+  <div>
+    <button type="button" id="dbauto-switch-btn" class="btn" data-noloader
+            style="display: none;" disabled>
+      {{ _('settings.database.automation_button', lang) }}
+    </button>
+  </div>
+</section>
+
 <script>
 (function () {
   var form = document.getElementById('dbtest-form');
@@ -145,11 +181,21 @@
   var result = document.getElementById('dbtest-result');
   var urlBox = document.getElementById('dbtest-url');
   var copyBtn = document.getElementById('dbtest-copy');
+  var autoStatus = document.getElementById('dbauto-status');
+  var autoBootstrap = document.getElementById('dbauto-bootstrap');
+  var autoBootstrapCopy = document.getElementById('dbauto-bootstrap-copy');
+  var rgRow = document.getElementById('dbauto-rg-row');
+  var rgInput = document.getElementById('dbauto-rg');
+  var rgRefresh = document.getElementById('dbauto-rg-refresh');
+  var switchBtn = document.getElementById('dbauto-switch-btn');
+  var automationReady = false;
+
   form.addEventListener('submit', async function (ev) {
     ev.preventDefault();
     status.textContent = {{ _('settings.database.testing', lang)|tojson }};
     status.style.color = 'var(--tw-muted-blue)';
     result.style.display = 'none';
+    switchBtn.style.display = 'none';
     var fd = new FormData(form);
     fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
     try {
@@ -166,17 +212,103 @@
       status.style.color = 'var(--status-ok)';
       urlBox.value = j.database_url;
       result.style.display = '';
+      if (automationReady) { switchBtn.style.display = ''; }
     } catch (e) {
       status.innerHTML = '✗ ' + (e.message || e);
       status.style.color = 'var(--status-critical)';
     }
   });
+
   copyBtn.addEventListener('click', function () {
     urlBox.select();
     document.execCommand('copy');
     copyBtn.textContent = '✓ {{ _('settings.database.copied', lang)|e }}';
     setTimeout(function () {
       copyBtn.textContent = '📋 {{ _('settings.database.copy_button', lang)|e }}';
+    }, 1500);
+  });
+
+  switchBtn.addEventListener('click', async function () {
+    if (!urlBox.value) { return; }
+    if (!window.confirm({{ _('settings.database.automation_confirm', lang)|tojson }})) { return; }
+    switchBtn.disabled = true;
+    var prevText = switchBtn.textContent;
+    switchBtn.textContent = {{ _('settings.database.automation_switching', lang)|tojson }};
+    try {
+      var fd = new FormData();
+      fd.append('database_url', urlBox.value);
+      fd.append('csrf_token', window.__CSRF_TOKEN__ || '');
+      var r = await fetch('/settings/database/switch', {method: 'POST', body: fd,
+        credentials: 'same-origin',
+        headers: {'X-CSRF-Token': window.__CSRF_TOKEN__}});
+      var j = await r.json();
+      if (!j.ok) {
+        autoStatus.innerHTML = '✗ ' + (j.detail || j.error || 'error');
+        autoStatus.style.color = 'var(--status-critical)';
+        switchBtn.disabled = false;
+        switchBtn.textContent = prevText;
+        return;
+      }
+      autoStatus.innerHTML = '✓ ' + {{ _('settings.database.automation_success', lang)|tojson }};
+      autoStatus.style.color = 'var(--status-ok)';
+      switchBtn.style.display = 'none';
+    } catch (e) {
+      autoStatus.innerHTML = '✗ ' + (e.message || e);
+      autoStatus.style.color = 'var(--status-critical)';
+      switchBtn.disabled = false;
+      switchBtn.textContent = prevText;
+    }
+  });
+
+  function checkAutomation(rg) {
+    var qs = rg ? ('?resource_group=' + encodeURIComponent(rg)) : '';
+    return fetch('/settings/database/automation_status' + qs, {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok) {
+          automationReady = true;
+          autoStatus.innerHTML = '✓ ' + {{ _('settings.database.automation_ready', lang)|tojson }};
+          autoStatus.style.color = 'var(--status-ok)';
+          rgRow.style.display = 'none';
+          autoBootstrap.style.display = 'none';
+          autoBootstrapCopy.style.display = 'none';
+          if (result.style.display !== 'none') { switchBtn.style.display = ''; }
+        } else if (j.hint === 'one_time_setup_needed') {
+          autoStatus.innerHTML = {{ _('settings.database.automation_not_ready', lang)|tojson }};
+          autoStatus.style.color = 'var(--status-warn, #b8860b)';
+          rgRow.style.display = 'flex';
+          if (j.bootstrap) {
+            autoBootstrap.textContent = j.bootstrap;
+            autoBootstrap.style.display = '';
+            autoBootstrapCopy.style.display = '';
+          }
+        } else {
+          autoStatus.innerHTML = {{ _('settings.database.automation_unreachable', lang)|tojson }};
+          autoStatus.style.color = 'var(--tw-muted-blue)';
+        }
+      })
+      .catch(function () {
+        autoStatus.innerHTML = {{ _('settings.database.automation_unreachable', lang)|tojson }};
+        autoStatus.style.color = 'var(--tw-muted-blue)';
+      });
+  }
+
+  checkAutomation();
+
+  rgRefresh.addEventListener('click', function () {
+    checkAutomation(rgInput.value.trim());
+  });
+
+  autoBootstrapCopy.addEventListener('click', function () {
+    var ta = document.createElement('textarea');
+    ta.value = autoBootstrap.textContent;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    autoBootstrapCopy.textContent = '✓ {{ _('settings.database.copied', lang)|e }}';
+    setTimeout(function () {
+      autoBootstrapCopy.textContent = '📋 {{ _('settings.database.bootstrap_copy_button', lang)|e }}';
     }, 1500);
   });
 })();

@@ -9,8 +9,9 @@ from typing import Any
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .. import (auth, backup, bi_client, db, entra_sso, graph_connector,
-                 llm_client, mail_client, runner_config, toner_alerts)
+from .. import (auth, azure_mgmt, backup, bi_client, db, entra_sso,
+                 graph_connector, llm_client, mail_client, runner_config,
+                 toner_alerts)
 from ..db import customers as customers_tbl
 
 
@@ -86,6 +87,46 @@ async def settings_database_test(request: Request):
         {"ok": True, "detail": "SELECT 1 succeeded",
          "database_url": url,
          "database_url_masked": db._mask_password(url)})
+
+
+@router.get("/settings/database/automation_status", include_in_schema=False)
+async def settings_database_automation_status(request: Request):
+    """v0.24.3 — can this process switch its own DATABASE_URL via its
+    Managed Identity? Never touches app settings, just probes IMDS.
+    ``resource_group`` is optional: App Service doesn't expose its own
+    resource group name until AZURE_RESOURCE_GROUP is set (which is
+    exactly what's missing in the one-time-setup case), so the admin
+    can type it in and the bootstrap snippet fills it in live."""
+    auth.require_admin(request)
+    result = azure_mgmt.probe()
+    if not result.get("ok") and result.get("hint") == "one_time_setup_needed":
+        rg = (request.query_params.get("resource_group") or "").strip()
+        result["bootstrap"] = azure_mgmt.bootstrap_instructions(resource_group=rg)
+    return JSONResponse(result)
+
+
+@router.post("/settings/database/switch", include_in_schema=False)
+async def settings_database_switch(request: Request):
+    """v0.24.3 — the automated cutover: re-validate the connection with
+    a fresh SELECT 1 (never trust a URL that only came from the client),
+    then hand off to azure_mgmt to merge DATABASE_URL into the live
+    App Service settings and restart. Admin-only, audited."""
+    admin = auth.require_admin(request)
+    form = await request.form()
+    url = (form.get("database_url") or "").strip()
+    if not url:
+        return JSONResponse({"ok": False, "error": "database_url required"},
+                             status_code=400)
+    ok, detail = db.try_connect(url, timeout=8.0)
+    if not ok:
+        return JSONResponse(
+            {"ok": False, "error": f"pre-flight check failed: {detail}"},
+            status_code=400)
+    result = azure_mgmt.switch_database_url(url)
+    if result.get("ok"):
+        db.audit(admin["id"], "settings.database_switched",
+                  meta_json=json.dumps({"database_url_masked": db._mask_password(url)}))
+    return JSONResponse(result, status_code=(200 if result.get("ok") else 400))
 
 
 @router.get("/settings/mail/graph/auth_probe", include_in_schema=False)

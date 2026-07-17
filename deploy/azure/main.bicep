@@ -65,6 +65,15 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
   location: location
   kind: 'app,linux,container'
   dependsOn: [ share ]
+  // v0.24.3 — System-Assigned Managed Identity so the running app can
+  // manage its OWN App Service configuration (switching DATABASE_URL
+  // to Azure SQL + restarting itself) via the ARM REST API, without
+  // ever storing a long-lived Azure credential anywhere. Azure issues
+  // short-lived tokens to the container via the instance metadata
+  // endpoint (169.254.169.254) — nothing to leak, nothing to rotate.
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: plan.id
     httpsOnly: true
@@ -87,6 +96,12 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'DB_PATH', value: '/data/tonerwatch.sqlite' }
         { name: 'DEFAULT_LANG', value: defaultLang }
         { name: 'TZ', value: tz }
+        // v0.24.3 — the app reads these three to address itself on the
+        // ARM API (the site's own name comes for free via the
+        // Azure-injected WEBSITE_SITE_NAME). Values are known at deploy
+        // time, not secrets — safe as plain app settings.
+        { name: 'AZURE_SUBSCRIPTION_ID', value: subscription().subscriptionId }
+        { name: 'AZURE_RESOURCE_GROUP', value: resourceGroup().name }
       ]
       azureStorageAccounts: {
         data: {
@@ -98,6 +113,23 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         }
       }
     }
+  }
+}
+
+// v0.24.3 — grant the site's own identity "Website Contributor" scoped
+// ONLY to itself (not the whole subscription/resource group), so the
+// self-management automation can read/patch its own app settings and
+// restart itself, and nothing else. Built-in role
+// de139f84-1756-47ae-9be6-808fbbe84772 = Website Contributor.
+resource selfManageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(site.id, 'website-contributor-self')
+  scope: site
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      'de139f84-1756-47ae-9be6-808fbbe84772')
+    principalId: site.identity.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
