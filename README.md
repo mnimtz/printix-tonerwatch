@@ -34,6 +34,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   audit log with `👤 Marcus signed in · 3 min ago` and 30+ localized
   action templates. Icons per family (⚙ settings, 👤 user, 🏢 customer,
   🖨 toner, 📦 order, 🛒 supply).
+- **Priority-first dashboard.** A personalized one-line status summary
+  ("3 critical, 7 warning — Acme GmbH and Beta AG need a look first"),
+  a fleet-health donut, and customer cards sorted worst-first (critical →
+  warn → healthy → no data yet) instead of insertion order, so the thing
+  that needs attention is the first thing you see, not something you have
+  to scan for.
 - **Human-friendly status badges.** Bare SNMP codes (`NO_PAPER`,
   `MARKER_SUPPLY_LOW`, `DOOR_OPEN`, …) rendered as colored pill badges
   with icons and translated captions; unknown codes fall back to the raw

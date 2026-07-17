@@ -3,156 +3,195 @@
 {% block breadcrumb %}{{ _('nav.dashboard', lang) }}{% endblock %}
 {% block extra_head %}
 <style>
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--sp-4);
-    margin-bottom: var(--sp-6);
+  /* v0.24.10 — dashboard redesign. Reuses the app's existing tokens
+     (--tw-primary, --status-*, .card, .btn) throughout — this is a
+     restyle of composition and information density, not a new
+     visual language. */
+
+  .greet {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-4);
+    justify-content: space-between; margin-bottom: var(--sp-6);
   }
+  .greet h1 { margin: 0 0 6px; }
+  .greet .summary { color: var(--tw-muted-blue); font-size: 0.95rem; max-width: 62ch; }
+  .greet .summary strong { color: var(--tw-primary); }
+  .greet .summary strong.crit { color: var(--status-critical); }
+  .greet .summary strong.warn { color: #B45309; }
+  .freshness {
+    font-family: var(--font-mono); font-size: 0.75rem; color: var(--tw-muted-blue);
+    margin-top: 6px;
+  }
+  .freshness .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--status-ok); margin-right: 6px;
+  }
+  .quick-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+  /* ---------- Fleet health ---------- */
+  .health-panel {
+    display: grid; grid-template-columns: repeat(4, 1fr) auto;
+    gap: var(--sp-3); margin-bottom: var(--sp-6); align-items: stretch;
+  }
+  @media (max-width: 960px) { .health-panel { grid-template-columns: 1fr 1fr; } }
+
   .stat-tile {
-    background: var(--tw-white);
-    border: 1px solid var(--tw-gray-300);
-    border-radius: var(--r-lg);
-    padding: var(--sp-5);
-    position: relative; overflow: hidden;
+    text-decoration: none; color: inherit; display: flex;
+    flex-direction: column; justify-content: space-between;
+    transition: transform var(--t-fast), box-shadow var(--t-fast);
+    position: relative; overflow: hidden; padding: var(--sp-4) var(--sp-5);
+  }
+  .stat-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow); text-decoration: none; }
+  .stat-tile .eyebrow {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--tw-muted-blue);
   }
   .stat-tile .value {
-    font-size: 2.4rem; font-weight: 900;
-    color: var(--tw-primary); letter-spacing: -0.03em;
-    line-height: 1;
+    font-size: 2.3rem; font-weight: 900; letter-spacing: -0.03em;
+    line-height: 1; margin-top: 10px; color: var(--tw-primary);
+    font-variant-numeric: tabular-nums;
   }
-  .stat-tile .label {
-    font-size: 0.78rem; font-weight: 700;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--tw-muted-blue); margin-top: var(--sp-3);
+  .stat-tile .delta { font-size: 0.74rem; margin-top: 6px; color: var(--tw-muted-blue); }
+  .stat-tile.crit { background: linear-gradient(160deg, #FEF2F2, var(--tw-white) 65%); }
+  .stat-tile.crit .value { color: var(--status-critical); }
+  .stat-tile.warn { background: linear-gradient(160deg, #FFFBEB, var(--tw-white) 65%); }
+  .stat-tile.warn .value { color: #B45309; }
+  .stat-tile.crit::after,
+  .stat-tile.warn::after {
+    content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
   }
-  .stat-tile { text-decoration: none; display: block; }
-  .stat-tile:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
-    text-decoration: none;
+  .stat-tile.crit::after { background: var(--status-critical); }
+  .stat-tile.warn::after { background: var(--status-warn); }
+
+  .donut-card {
+    display: flex; align-items: center; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4); min-width: 210px;
   }
-  .stat-tile.critical .value { color: var(--status-critical); }
-  .stat-tile.warn     .value { color: #B45309; }
-  .stat-tile.critical::before,
-  .stat-tile.warn::before {
-    content: '';
-    position: absolute; top: 0; right: 0; bottom: 0; width: 4px;
+  .donut-card .legend { display: flex; flex-direction: column; gap: 5px; font-size: 0.76rem; }
+  .donut-card .legend .row { display: flex; align-items: center; gap: 7px; color: var(--tw-muted-blue); }
+  .donut-card .legend .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .donut-card .legend b { color: var(--tw-primary); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Customers ---------- */
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: var(--sp-3); gap: var(--sp-3); flex-wrap: wrap;
   }
-  .stat-tile.critical::before { background: var(--status-critical); }
-  .stat-tile.warn::before     { background: var(--status-warn); }
+  .section-head h2 { margin: 0; }
+  .section-head .hint { font-size: 0.78rem; color: var(--tw-muted-blue); }
 
   .customer-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--sp-3);
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: var(--sp-3); margin-bottom: var(--sp-6);
   }
-  .customer-tile {
-    background: var(--tw-white);
-    border: 1px solid var(--tw-gray-300);
-    border-radius: var(--r);
+  .ctile {
+    text-decoration: none; color: inherit; display: block; position: relative;
     padding: var(--sp-4);
-    text-decoration: none;
-    color: inherit;
-    transition: box-shadow var(--t-fast), transform var(--t-fast);
-    display: block;
+    transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
   }
-  .customer-tile:hover {
-    box-shadow: var(--shadow); transform: translateY(-1px);
-    color: inherit;
+  .ctile:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--tw-accent); text-decoration: none; }
+  .ctile.needs-attn { border-color: #FCA5A5; }
+  .ctile .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-2); }
+  .ctile .name { font-weight: 700; font-size: 0.98rem; color: var(--tw-primary); }
+  .ctile .url {
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--tw-muted-blue);
+    margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .customer-tile .name {
-    font-weight: 700; color: var(--tw-primary);
-    font-size: 1rem; margin-bottom: 2px;
+  .badge-attn {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em;
+    color: #991B1B; background: #FEF2F2; border: 1px solid #FCA5A5;
+    padding: 2px 7px; border-radius: 999px; white-space: nowrap; flex: none;
   }
-  .customer-tile .sub {
-    font-size: 0.78rem; color: var(--tw-muted-blue);
-    margin-bottom: var(--sp-3);
-    font-family: var(--font-mono);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .proportion-bar {
+    display: flex; height: 6px; border-radius: 4px; overflow: hidden;
+    margin-top: 13px; background: var(--tw-gray-200);
   }
-  .customer-tile .stats {
-    display: flex; gap: var(--sp-2); flex-wrap: wrap;
-    font-size: 0.78rem;
+  .proportion-bar span { height: 100%; }
+  .proportion-bar .seg-crit { background: var(--status-critical); }
+  .proportion-bar .seg-warn { background: var(--status-warn); }
+  .proportion-bar .seg-ok   { background: var(--status-ok); }
+  .ctile .counts {
+    display: flex; gap: var(--sp-3); margin-top: 9px; font-size: 0.76rem;
+    color: var(--tw-muted-blue);
   }
-  .customer-tile .stats .pill {
-    padding: 2px 8px; border-radius: 10px;
-    background: var(--tw-gray-200); color: var(--tw-muted-blue);
-    font-weight: 600;
-  }
-  .customer-tile .stats .pill.critical {
-    background: #FEF2F2; color: #991B1B;
-  }
-  .customer-tile .stats .pill.warn {
-    background: #FFFBEB; color: #92400E;
-  }
-  .customer-tile .stats .pill.ok {
-    background: #ECFDF5; color: #065F46;
-  }
-  .customer-tile .hint {
-    font-size: 0.72rem; color: var(--tw-muted-blue);
-    margin-top: var(--sp-2); font-style: italic;
-  }
+  .ctile .counts b { color: var(--tw-primary); font-variant-numeric: tabular-nums; }
+  .ctile .counts .c-crit b { color: var(--status-critical); }
+  .ctile .counts .c-warn b { color: #B45309; }
+  .ctile.empty { display: flex; align-items: center; justify-content: center; min-height: 96px; }
+  .ctile.empty .msg { text-align: center; color: var(--tw-muted-blue); font-size: 0.8rem; }
+  .ctile.empty .msg .name { display: block; margin-bottom: 4px; }
 
-  .activity {
-    background: var(--tw-white);
-    border: 1px solid var(--tw-gray-300);
-    border-radius: var(--r);
-    padding: var(--sp-4) var(--sp-5);
-    margin-top: var(--sp-6);
+  /* ---------- Activity ---------- */
+  .activity h2 { margin: 0 0 4px; font-size: 1.05rem; }
+  .rail { position: relative; margin-top: var(--sp-3); }
+  .rail::before {
+    content: ''; position: absolute; left: 13px; top: 4px; bottom: 4px;
+    width: 1px; background: var(--tw-gray-300);
   }
-  .activity ul { list-style: none; margin: 0; padding: 0; }
-  .activity li {
-    padding: var(--sp-2) 0;
-    display: flex; justify-content: space-between; gap: var(--sp-4);
-    border-bottom: 1px solid var(--tw-gray-200);
-    font-size: 0.9rem;
+  .rail-item { display: flex; gap: var(--sp-3); padding: 9px 0; position: relative; }
+  .rail-item .dot-icon {
+    width: 27px; height: 27px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--tw-gray-100); border: 1px solid var(--tw-gray-300);
+    font-size: 0.85rem; z-index: 1;
   }
-  .activity li:last-child { border-bottom: 0; }
-  .activity code {
-    background: var(--tw-gray-200); padding: 2px 6px;
-    border-radius: 4px; font-size: 0.82em;
-  }
-  .activity time {
-    color: var(--tw-muted-blue); font-family: var(--font-mono);
-    font-size: 0.82em; white-space: nowrap;
+  .rail-item .body { flex: 1; padding-top: 3px; font-size: 0.9rem; line-height: 1.4; }
+  .rail-item time {
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--tw-muted-blue);
+    white-space: nowrap; padding-top: 4px;
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<h1>{{ _('dashboard.title', lang) }}</h1>
-<p style="color: var(--tw-muted-blue); margin: 4px 0 var(--sp-6);">
-  {{ _('dashboard.intro', lang) }}
-</p>
+{% set has_fleet_data = counts.printers > 0 %}
 
-<!-- Top-line stats — every tile is a clickable link into /toner
-     filtered by that severity. Empty cache is disclosed inline so
-     "0 critical" doesn't get mistaken for "no problems". -->
-<div class="stat-grid">
-  <a href="/customers" class="stat-tile" data-noloader>
-    <div class="value">{{ counts.customers }}</div>
-    <div class="label">{{ _('dashboard.stat.customers', lang) }}</div>
-  </a>
-  <a href="/toner" class="stat-tile" data-noloader>
-    <div class="value">{{ counts.printers }}</div>
-    <div class="label">{{ _('dashboard.stat.printers', lang) }}</div>
-  </a>
-  <a href="/toner?severity=CRITICAL"
-     class="stat-tile {{ 'critical' if counts.critical else '' }}"
-     data-noloader>
-    <div class="value">{{ counts.critical }}</div>
-    <div class="label">{{ _('dashboard.stat.critical', lang) }}</div>
-  </a>
-  <a href="/toner?severity=WARN"
-     class="stat-tile {{ 'warn' if counts.warn else '' }}"
-     data-noloader>
-    <div class="value">{{ counts.warn }}</div>
-    <div class="label">{{ _('dashboard.stat.warn', lang) }}</div>
-  </a>
+<div class="greet">
+  <div>
+    <h1>{{ _('dashboard.greeting.hello', lang) }}, {{ user.name or user.email }} 👋</h1>
+    <div class="summary">
+      {% if has_fleet_data %}
+        <strong>{{ counts.printers }} {{ _('dashboard.stat.printers', lang) }}</strong>
+        · <strong>{{ counts.customers }} {{ _('dashboard.stat.customers', lang) }}</strong>.
+        {% if counts.critical or counts.warn %}
+          <strong class="crit">{{ counts.critical }} {{ _('dashboard.stat.critical', lang) }}</strong>,
+          <strong class="warn">{{ counts.warn }} {{ _('dashboard.stat.warn', lang) }}</strong>
+          {% if urgent_names %}
+            — {{ urgent_names|join(', ') }} {{ _('dashboard.greeting.need_attention', lang) }}
+          {% endif %}.
+        {% else %}
+          {{ _('dashboard.greeting.all_clear', lang) }}
+        {% endif %}
+      {% else %}
+        {{ _('dashboard.intro', lang) }}
+      {% endif %}
+    </div>
+    <div class="freshness">
+      <span class="dot"></span>
+      {% if last_seen_at %}
+        {{ _('dashboard.freshness.updated', lang) }}
+        <time data-relative datetime="{{ last_seen_at }}">{{ last_seen_at }}</time>
+        · {{ _('dashboard.freshness.cache_only', lang) }}
+      {% else %}
+        {{ _('dashboard.freshness.never', lang) }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="quick-actions">
+    {% if user.role == 'admin' %}
+      <a href="/customers/new" class="btn" data-noloader>+ {{ _('customer.new_button', lang) }}</a>
+    {% endif %}
+    <a href="/supplies/new-set" class="btn btn-secondary" data-noloader>🎨 {{ _('supplies.new_set', lang) }}</a>
+    {% if counts.critical or counts.warn %}
+      <a href="/toner?severity=WARN" class="btn btn-secondary" data-noloader>
+        → {{ _('dashboard.jump_to_toner', lang) }}
+      </a>
+    {% endif %}
+    <a href="/settings" class="btn btn-secondary" data-noloader>⚙ {{ _('nav.settings', lang) }}</a>
+  </div>
 </div>
+
 {% if counts.printers == 0 and per_customer %}
-  <div class="alert alert-info" style="margin-top: var(--sp-3);">
+  <div class="alert alert-info" style="margin-bottom: var(--sp-5);">
     ℹ {{ _('dashboard.cache_cold', lang) }}
     <a href="/toner" style="margin-left: 6px; font-weight: 700;">
       → {{ _('dashboard.open_toner_now', lang) }}
@@ -160,47 +199,108 @@
   </div>
 {% endif %}
 
-{% if counts.critical or counts.warn %}
-  <div style="margin: var(--sp-3) 0 var(--sp-6); text-align: right;">
-    <a href="/toner?severity=WARN" class="btn btn-primary">
-      → {{ _('dashboard.jump_to_toner', lang) }}
-    </a>
-  </div>
-{% endif %}
+<!-- Fleet health -->
+<div class="health-panel">
+  <a href="/customers" class="stat-tile card" data-noloader>
+    <div class="eyebrow">🏢 {{ _('dashboard.stat.customers', lang) }}</div>
+    <div class="value">{{ counts.customers }}</div>
+  </a>
+  <a href="/toner" class="stat-tile card" data-noloader>
+    <div class="eyebrow">🖨 {{ _('dashboard.stat.printers', lang) }}</div>
+    <div class="value">{{ counts.printers }}</div>
+  </a>
+  <a href="/toner?severity=CRITICAL"
+     class="stat-tile card {{ 'crit' if counts.critical else '' }}" data-noloader>
+    <div class="eyebrow">🔴 {{ _('dashboard.stat.critical', lang) }}</div>
+    <div class="value">{{ counts.critical }}</div>
+  </a>
+  <a href="/toner?severity=WARN"
+     class="stat-tile card {{ 'warn' if counts.warn else '' }}" data-noloader>
+    <div class="eyebrow">⚠ {{ _('dashboard.stat.warn', lang) }}</div>
+    <div class="value">{{ counts.warn }}</div>
+  </a>
+
+  {% if has_fleet_data %}
+    {% set ok_frac   = counts.ok       / counts.printers %}
+    {% set warn_frac = counts.warn     / counts.printers %}
+    {% set crit_frac = counts.critical / counts.printers %}
+    {% set circ = 188.5 %}
+    {% set ok_len   = (ok_frac   * circ)|round(1) %}
+    {% set warn_len = (warn_frac * circ)|round(1) %}
+    {% set crit_len = (crit_frac * circ)|round(1) %}
+    <div class="donut-card card">
+      <svg width="72" height="72" viewBox="0 0 76 76" aria-label="{{ counts.ok }} ok, {{ counts.warn }} warn, {{ counts.critical }} critical">
+        <circle cx="38" cy="38" r="30" fill="none" stroke="var(--tw-gray-200)" stroke-width="10"/>
+        <circle cx="38" cy="38" r="30" fill="none" stroke="var(--status-ok)" stroke-width="10"
+                stroke-dasharray="{{ ok_len }} {{ circ }}" stroke-dashoffset="0"
+                stroke-linecap="round" transform="rotate(-90 38 38)"/>
+        <circle cx="38" cy="38" r="30" fill="none" stroke="var(--status-warn)" stroke-width="10"
+                stroke-dasharray="{{ warn_len }} {{ circ }}" stroke-dashoffset="{{ -ok_len }}"
+                stroke-linecap="round" transform="rotate(-90 38 38)"/>
+        <circle cx="38" cy="38" r="30" fill="none" stroke="var(--status-critical)" stroke-width="10"
+                stroke-dasharray="{{ crit_len }} {{ circ }}" stroke-dashoffset="{{ -(ok_len + warn_len) }}"
+                stroke-linecap="round" transform="rotate(-90 38 38)"/>
+        <text x="38" y="34" text-anchor="middle" font-size="15" font-weight="900"
+              fill="var(--tw-primary)" font-family="var(--font-sans)">{{ (ok_frac * 100)|round|int }}%</text>
+        <text x="38" y="47" text-anchor="middle" font-size="7.5" fill="var(--tw-muted-blue)"
+              font-family="var(--font-sans)">ok</text>
+      </svg>
+      <div class="legend">
+        <div class="row"><span class="swatch" style="background:var(--status-ok);"></span><b>{{ counts.ok }}</b> {{ _('dashboard.customer.all_ok', lang) }}</div>
+        <div class="row"><span class="swatch" style="background:var(--status-warn);"></span><b>{{ counts.warn }}</b> {{ _('dashboard.stat.warn', lang) }}</div>
+        <div class="row"><span class="swatch" style="background:var(--status-critical);"></span><b>{{ counts.critical }}</b> {{ _('dashboard.stat.critical', lang) }}</div>
+      </div>
+    </div>
+  {% endif %}
+</div>
 
 <!-- Per-customer overview -->
 {% if per_customer %}
-  <h2 style="margin-bottom: var(--sp-4);">{{ _('nav.customers', lang) }}</h2>
+  <div class="section-head">
+    <h2>{{ _('nav.customers', lang) }}</h2>
+    <div class="hint">{{ _('dashboard.customers.sort_hint', lang) }}</div>
+  </div>
   <div class="customer-grid">
     {% for c in per_customer %}
-      <a href="/customers/{{ c.id }}" class="customer-tile">
-        <div class="name">{{ c.name }}</div>
-        {% if c.tenant_url %}
-          <div class="sub">{{ c.tenant_url }}</div>
-        {% endif %}
-        {% if c.creds_missing %}
-          <div class="hint">⚠ {{ _('dashboard.customer.no_credentials', lang) }}</div>
-        {% elif not c.has_data %}
-          <div class="hint">— {{ _('dashboard.customer.no_snapshot_yet', lang) }}</div>
-        {% else %}
-          <div class="stats">
-            <span class="pill">{{ c.printers }} {{ _('dashboard.customer.printers', lang) }}</span>
-            {% if c.critical %}
-              <span class="pill critical">🔴 {{ c.critical }}</span>
-            {% endif %}
-            {% if c.warn %}
-              <span class="pill warn">⚠ {{ c.warn }}</span>
-            {% endif %}
-            {% if c.ok and not c.critical and not c.warn %}
-              <span class="pill ok">● {{ _('dashboard.customer.all_ok', lang) }}</span>
+      {% if c.creds_missing or not c.has_data %}
+        <a href="/customers/{{ c.id }}" class="ctile card empty">
+          <div class="msg">
+            <span class="name">{{ c.name }}</span>
+            {% if c.creds_missing %}
+              ⚠ {{ _('dashboard.customer.no_credentials', lang) }}
+            {% else %}
+              — {{ _('dashboard.customer.no_snapshot_yet', lang) }}
             {% endif %}
           </div>
-        {% endif %}
-      </a>
+        </a>
+      {% else %}
+        <a href="/customers/{{ c.id }}" class="ctile card {{ 'needs-attn' if c.critical else '' }}">
+          <div class="top-row">
+            <div>
+              <div class="name">{{ c.name }}</div>
+              {% if c.tenant_url %}<div class="url">{{ c.tenant_url }}</div>{% endif %}
+            </div>
+            {% if c.critical %}
+              <span class="badge-attn">{{ c.critical }} {{ _('dashboard.stat.critical', lang) }}</span>
+            {% endif %}
+          </div>
+          <div class="proportion-bar">
+            {% if c.critical %}<span class="seg-crit" style="width: {{ (c.critical / c.printers * 100)|round(1) }}%;"></span>{% endif %}
+            {% if c.warn %}<span class="seg-warn" style="width: {{ (c.warn / c.printers * 100)|round(1) }}%;"></span>{% endif %}
+            {% if c.ok %}<span class="seg-ok" style="width: {{ (c.ok / c.printers * 100)|round(1) }}%;"></span>{% endif %}
+          </div>
+          <div class="counts">
+            <span>{{ c.printers }} {{ _('dashboard.customer.printers', lang) }}</span>
+            {% if c.critical %}<span class="c-crit"><b>{{ c.critical }}</b> {{ _('dashboard.stat.critical', lang)|lower }}</span>{% endif %}
+            {% if c.warn %}<span class="c-warn"><b>{{ c.warn }}</b> {{ _('dashboard.stat.warn', lang)|lower }}</span>{% endif %}
+            {% if not c.critical and not c.warn %}<span style="color: var(--status-ok);">● {{ _('dashboard.customer.all_ok', lang) }}</span>{% endif %}
+          </div>
+        </a>
+      {% endif %}
     {% endfor %}
   </div>
 {% else %}
-  <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6);">
+  <div class="card" style="text-align: center; padding: var(--sp-12) var(--sp-6); margin-bottom: var(--sp-6);">
     <h2 style="margin-bottom: var(--sp-3);">
       {{ _('dashboard.empty.title', lang) }}
     </h2>
@@ -215,8 +315,6 @@
 
 <!-- Recent activity -->
 {% if recent_events %}
-  {# v0.19.0: readable activity feed — icon + natural-language sentence
-     + relative time. Falls back gracefully for actions with no i18n key. #}
   {% set _icons = {
       'settings': '⚙',
       'user':     '👤',
@@ -228,29 +326,21 @@
       'backup':   '💾',
       'restore':  '♻',
   } %}
-  <div class="activity">
-    <h3 style="margin-bottom: var(--sp-3);">
-      {{ _('dashboard.recent_activity', lang) }}
-    </h3>
-    <ul>
+  <div class="activity card">
+    <h2>{{ _('dashboard.recent_activity', lang) }}</h2>
+    <div class="rail">
       {% for e in recent_events %}
         {% set _prefix = (e.action.split('.')[0] if '.' in e.action else e.action) %}
         {% set _icon = _icons.get(_prefix, '•') %}
         {% set _msg_key = 'activity.' + e.action %}
         {% set _msg = _(_msg_key, lang) %}
-        {# v0.19.0: for login/logout actions, the user IS the target,
-           so skip the redundant target label. Also strip when the
-           target_id equals the actor's own name. #}
         {% set _skip_target = (e.action.startswith('user.login')
                                 or e.action == 'user.logout'
                                 or e.target_label == e.actor_display) %}
-        <li style="display: flex; align-items: center;
-                   gap: var(--sp-3); padding: 10px 0;">
-          <span style="font-size: 1.05rem; width: 22px; text-align: center;">
-            {{ _icon }}
-          </span>
-          <span style="flex: 1; font-size: 0.9rem; line-height: 1.4;">
-            <strong style="color: var(--tw-primary);">{{ e.actor_display }}</strong>
+        <div class="rail-item">
+          <div class="dot-icon">{{ _icon }}</div>
+          <div class="body">
+            <strong style="color: var(--tw-accent);">{{ e.actor_display }}</strong>
             {% if _msg != _msg_key %}
               {{ _msg }}
               {% if e.target_label and not _skip_target %}
@@ -260,54 +350,48 @@
               <code style="font-size: 0.78rem;">{{ e.action }}</code>
               {% if e.target_label and not _skip_target %}→ {{ e.target_label }}{% endif %}
             {% endif %}
-          </span>
-          <time datetime="{{ e.created_at }}" data-relative
-                style="font-size: 0.78rem; color: var(--tw-muted-blue);
-                       white-space: nowrap;">
-            {{ e.created_at }}
-          </time>
-        </li>
+          </div>
+          <time datetime="{{ e.created_at }}" data-relative>{{ e.created_at }}</time>
+        </div>
       {% endfor %}
-    </ul>
+    </div>
   </div>
-
-  <script>
-  // v0.19.0 — hydrate <time data-relative> into "2 min ago" style.
-  (function () {
-    var STR = {
-      s: {{ _('activity.rel.sec', lang)|tojson }},
-      m: {{ _('activity.rel.min', lang)|tojson }},
-      h: {{ _('activity.rel.hour', lang)|tojson }},
-      d: {{ _('activity.rel.day', lang)|tojson }},
-      just_now: {{ _('activity.rel.just_now', lang)|tojson }},
-      ago:        {{ _('activity.rel.ago', lang)|tojson }},
-      ago_prefix: {{ _('activity.rel.ago_prefix', lang)|tojson }}
-    };
-    function fmt(n, unit) {
-      // "ago" style keys use "prefix N unit suffix" so DE can prefix
-      // "vor" and EN can suffix "ago" without hand-rolling a translation
-      // string per bucket.
-      var parts = [STR.ago_prefix, String(n), unit, STR.ago].filter(Boolean);
-      return parts.join(' ');
-    }
-    function rel(iso) {
-      var d = new Date(iso.indexOf('T') === -1 ? iso.replace(' ', 'T') + 'Z' : iso);
-      if (isNaN(d)) return iso;
-      var secs = Math.max(0, (Date.now() - d.getTime()) / 1000);
-      if (secs < 45) return STR.just_now;
-      var mins = Math.round(secs / 60);
-      if (mins < 60) return fmt(mins, STR.m);
-      var hours = Math.round(mins / 60);
-      if (hours < 24) return fmt(hours, STR.h);
-      var days = Math.round(hours / 24);
-      return fmt(days, STR.d);
-    }
-    document.querySelectorAll('time[data-relative]').forEach(function (t) {
-      var iso = t.getAttribute('datetime') || t.textContent.trim();
-      t.title = iso;
-      t.textContent = rel(iso);
-    });
-  })();
-  </script>
 {% endif %}
+
+<script>
+// v0.19.0 — hydrate <time data-relative> into "2 min ago" style.
+// v0.24.10 — also used for the greeting's freshness timestamp.
+(function () {
+  var STR = {
+    s: {{ _('activity.rel.sec', lang)|tojson }},
+    m: {{ _('activity.rel.min', lang)|tojson }},
+    h: {{ _('activity.rel.hour', lang)|tojson }},
+    d: {{ _('activity.rel.day', lang)|tojson }},
+    just_now: {{ _('activity.rel.just_now', lang)|tojson }},
+    ago:        {{ _('activity.rel.ago', lang)|tojson }},
+    ago_prefix: {{ _('activity.rel.ago_prefix', lang)|tojson }}
+  };
+  function fmt(n, unit) {
+    var parts = [STR.ago_prefix, String(n), unit, STR.ago].filter(Boolean);
+    return parts.join(' ');
+  }
+  function rel(iso) {
+    var d = new Date(iso.indexOf('T') === -1 ? iso.replace(' ', 'T') + 'Z' : iso);
+    if (isNaN(d)) return iso;
+    var secs = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (secs < 45) return STR.just_now;
+    var mins = Math.round(secs / 60);
+    if (mins < 60) return fmt(mins, STR.m);
+    var hours = Math.round(mins / 60);
+    if (hours < 24) return fmt(hours, STR.h);
+    var days = Math.round(hours / 24);
+    return fmt(days, STR.d);
+  }
+  document.querySelectorAll('time[data-relative]').forEach(function (t) {
+    var iso = t.getAttribute('datetime') || t.textContent.trim();
+    t.title = iso;
+    t.textContent = rel(iso);
+  });
+})();
+</script>
 {% endblock %}

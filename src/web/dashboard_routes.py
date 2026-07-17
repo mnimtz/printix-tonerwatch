@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 
 from .. import auth, bi_client, db
 from ..db import audit_log
@@ -55,6 +55,39 @@ async def dashboard(request: Request):
         critical_count  += stats["critical"]
         warn_count      += stats["warn"]
         unknown_count   += stats["unknown"]
+
+    ok_count = sum(c["ok"] for c in per_customer_stats)
+
+    # v0.24.10 — urgency-first ordering: customers with a critical
+    # supply float to the top (worst customer's worst count first),
+    # then warn-only, then fully-healthy, then no-data/no-credentials
+    # last — those need a setup action, not a toner check.
+    def _urgency_key(c: dict) -> tuple:
+        if not c["has_data"]:
+            return (3, c["name"])
+        if c["critical"]:
+            return (0, -c["critical"], -c["warn"], c["name"])
+        if c["warn"]:
+            return (1, -c["warn"], c["name"])
+        return (2, c["name"])
+    per_customer_stats.sort(key=_urgency_key)
+
+    # Names of the (up to 2) worst-off customers, for the one-line
+    # greeting summary — "Acme GmbH and Beta AG need a look first".
+    urgent_names = [c["name"] for c in per_customer_stats if c["critical"]][:2]
+
+    # v0.24.10 — cache freshness for the greeting line. toner_state is
+    # the only place a "last seen" timestamp exists; MAX across every
+    # customer the user can see is a reasonable proxy for "how stale
+    # could this page be" without a live BI round-trip.
+    visible_ids = [c["id"] for c in customers]
+    last_seen_at = None
+    if visible_ids:
+        with db.get_conn() as conn:
+            last_seen_at = conn.execute(
+                select(func.max(db.toner_state.c.last_seen_at))
+                .where(db.toner_state.c.customer_id.in_(visible_ids))
+            ).scalar()
 
     # Recent audit events (across all customers the user can see; admins
     # see everything).
@@ -130,9 +163,12 @@ async def dashboard(request: Request):
                 "printers":  total_printers,
                 "critical":  critical_count,
                 "warn":      warn_count,
+                "ok":        ok_count,
                 "unknown":   unknown_count,
             },
             "per_customer": per_customer_stats,
+            "urgent_names": urgent_names,
+            "last_seen_at": last_seen_at or "",
             "recent_events": recent_events,
         },
     )
