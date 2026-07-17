@@ -79,6 +79,12 @@
   </div>
 
   <div class="form-group">
+    <label for="address">{{ _('suppliers.col.address', lang) }}</label>
+    <textarea id="address" name="address" rows="2"
+              placeholder="Musterstraße 1&#10;12345 Musterstadt">{{ supplier.address if supplier else '' }}</textarea>
+  </div>
+
+  <div class="form-group">
     <label for="notes">{{ _('suppliers.col.notes', lang) }}</label>
     <textarea id="notes" name="notes" rows="3">{{ supplier.notes if supplier else '' }}</textarea>
   </div>

@@ -130,7 +130,14 @@
 
   /* ---------- Activity ---------- */
   .activity h2 { margin: 0 0 4px; font-size: 1.05rem; }
-  .rail { position: relative; margin-top: var(--sp-3); }
+  /* v0.24.30: 10 events at full height ran to ~500px, dominating the
+     page. Capped to roughly half that with its own scrollbar instead
+     of shrinking the row height — items stay readable, the page just
+     stops growing past them. */
+  .rail {
+    position: relative; margin-top: var(--sp-3);
+    max-height: 260px; overflow-y: auto; padding-right: 4px;
+  }
   .rail::before {
     content: ''; position: absolute; left: 13px; top: 4px; bottom: 4px;
     width: 1px; background: var(--tw-gray-300);

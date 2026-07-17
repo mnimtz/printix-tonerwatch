@@ -313,6 +313,10 @@ suppliers = Table(
     # Herren" and no phone shown anywhere.
     Column("contact_person", Text, nullable=False, server_default=""),
     Column("phone", Text, nullable=False, server_default=""),
+    # v0.24.30: postal address — for invoices/order confirmations that
+    # reference "our" delivery/billing address at this supplier, or
+    # just so it's on hand without digging through old emails.
+    Column("address", Text, nullable=False, server_default=""),
     Column("website_url", Text, nullable=False, server_default=""),
     Column("notes", Text, nullable=False, server_default=""),
     Column("active", Integer, nullable=False, server_default="1"),
