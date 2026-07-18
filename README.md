@@ -127,6 +127,35 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   (marked ordered, delivered, installed, …), so "who ordered this" and
   "who confirmed delivery" are both a glance away.
 
+### Reports
+
+- **Flexible builder** (`/reports`) — any date range (presets for
+  7/30/90 days, this quarter, this year, or a custom from/to), a single
+  customer or every customer this operator can see, and four
+  combinable categories: **orders** (volume, status breakdown, average
+  fulfillment time), **consumption** (toner actually shipped —
+  delivered/installed orders — by color, printer and customer, with
+  spend), **device health** (toner-level anomalies flagged in the
+  window, plus printers with unusually many orders as an order-based
+  proxy for "might need a look"), and **supplier performance**
+  (orders, spend and average fulfillment time per supplier). No
+  continuous toner-level time series exists in TonerWatch's own
+  database (see Data model), so "consumption" is measured the honest
+  way — cartridges that actually shipped — rather than a level curve.
+- **Quick-launch templates** on the hub — full 30-day overview,
+  consumption trend, supplier performance, and a link straight into
+  the existing per-customer savings report.
+- **AI executive summary** — button-triggered (never automatic), asks
+  the configured LLM to phrase the already-computed numbers into a
+  short paragraph suitable for a quarterly business review. Same rule
+  as every other AI feature here: the model only ever narrates numbers
+  that were already computed in Python, never a source of a number
+  itself.
+- **CSV export** and a print-friendly layout (`window.print()` → save
+  as PDF) for sharing outside the app.
+- Same tenant fence as every other page — a technician only ever sees
+  data for customers they've been explicitly granted access to.
+
 ### Supply library
 
 - **Model templates.** One entry per (printer_model, colour) with SKU,
