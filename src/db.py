@@ -169,7 +169,18 @@ def build_azure_sql_url(server: str, database: str,
     """v0.23.0 — compose a SQLAlchemy URL for an Azure SQL database.
     Uses pyodbc + ODBC Driver 18 for SQL Server (available in the
     container image). Encoded so the settings UI can copy-paste it
-    into Azure App Service → Application Settings → DATABASE_URL."""
+    into Azure App Service → Application Settings → DATABASE_URL.
+
+    v0.24.35: Connection Timeout raised 15s -> 60s. This is the ONLY
+    timeout that actually applies to an Azure SQL target — try_connect()
+    below only passes its own `timeout` kwarg for SQLite, so a
+    too-short value here was the sole cause of a hard-to-diagnose
+    "Login timeout expired" on the very first connect: Azure SQL
+    Serverless auto-pauses when idle, and Microsoft's own docs say
+    resuming a paused database commonly takes up to ~60s. 15s wasn't
+    a bug in the traditional sense — everything was configured
+    correctly — it just wasn't a wait a cold Serverless tier can
+    ever make in time."""
     from urllib.parse import quote_plus
     conn_str = (
         f"DRIVER={{ODBC Driver 18 for SQL Server}};"
@@ -177,7 +188,7 @@ def build_azure_sql_url(server: str, database: str,
         f"DATABASE={database};"
         f"UID={username};"
         f"PWD={password};"
-        f"Encrypt=yes;TrustServerCertificate=no;Connection Timeout=15;"
+        f"Encrypt=yes;TrustServerCertificate=no;Connection Timeout=60;"
     )
     return "mssql+pyodbc:///?odbc_connect=" + quote_plus(conn_str)
 
