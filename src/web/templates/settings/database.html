@@ -253,8 +253,14 @@
       autoStatus.style.color = 'var(--status-ok)';
       switchBtn.style.display = 'none';
     } catch (e) {
-      autoStatus.innerHTML = '✗ ' + (e.message || e);
-      autoStatus.style.color = 'var(--status-critical)';
+      // v0.24.37: Azure restarts this app's OWN container the moment
+      // the DATABASE_URL app-setting change lands — meaning the
+      // request can succeed server-side and still never make it back
+      // as a clean response, because the process sending it just got
+      // torn down mid-flight. A network-level failure here is not
+      // necessarily a real failure; say so instead of a plain red error.
+      autoStatus.innerHTML = '⏳ ' + {{ _('settings.database.automation_maybe_restarting', lang)|tojson }};
+      autoStatus.style.color = 'var(--tw-muted-blue)';
       switchBtn.disabled = false;
       switchBtn.textContent = prevText;
     }

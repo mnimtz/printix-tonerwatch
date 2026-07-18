@@ -145,22 +145,25 @@ def _put_app_settings(token: str, sub: str, rg: str, site: str,
     r.raise_for_status()
 
 
-def _restart(token: str, sub: str, rg: str, site: str, timeout: float = 20.0) -> None:
-    r = httpx.post(
-        _site_url(sub, rg, site, "/restart"),
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=timeout,
-    )
-    r.raise_for_status()
-
-
 def switch_database_url(new_database_url: str) -> dict:
     """The full automated cutover: mint a token, fetch the FULL current
     app-settings collection, merge in the new ``DATABASE_URL`` (every
     other key — ``FERNET_KEY`` above all — passes through untouched),
-    PUT the merged set back, then restart the site so the new engine
-    picks it up on boot. Mirrors the manual Portal flow it replaces;
-    does not touch this process's own live engine."""
+    PUT the merged set back. Mirrors the manual Portal flow it
+    replaces; does not touch this process's own live engine.
+
+    v0.24.37: no longer calls /restart explicitly afterward — Azure
+    App Service ALWAYS restarts the worker automatically the moment
+    Application Settings change via this same PUT, so the extra call
+    was redundant. Worse than redundant: this process is itself the
+    one running on the site being restarted, so by the time the
+    explicit /restart request went out, the container could already
+    be mid-teardown from Azure's own automatic restart — the request
+    (and the JSON response this function still owed the browser) had
+    a real chance of never completing, which is exactly what showed
+    up as "I click the button and nothing happens, forever." Dropping
+    the redundant call shortens the window between "settings changed"
+    and "response sent" as much as this endpoint can control."""
     ids = _site_identity()
     if ids is None:
         return {"ok": False, "error": "not_configured",
@@ -174,7 +177,6 @@ def switch_database_url(new_database_url: str) -> dict:
         merged = dict(current)
         merged["DATABASE_URL"] = new_database_url
         _put_app_settings(token, sub, rg, site, merged)
-        _restart(token, sub, rg, site)
     except httpx.HTTPStatusError as e:
         return {"ok": False, "error": "arm_error",
                 "detail": f"{e.response.status_code}: {e.response.text[:400]}"}
