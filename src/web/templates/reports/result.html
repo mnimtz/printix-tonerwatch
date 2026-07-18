@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}{{ _('reports.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/reports" style="color: inherit;" data-noloader>{{ _('reports.title', lang) }}</a> ›
+  {{ date_from }} – {{ date_to }}
+{% endblock %}
+{% block extra_head %}
+<style>
+  .rp-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-4);
+  }
+  .rp-head .scope { color: var(--tw-muted-blue); font-size: 0.92rem; }
+  .rp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--sp-3); margin-bottom: var(--sp-4); }
+  .rp-tile { background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-sm); }
+  .rp-tile .lbl { font-size: 0.72rem; color: var(--tw-muted-blue); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 6px; }
+  .rp-tile .val { font-size: 1.5rem; font-weight: 700; color: var(--tw-primary); }
+  .rp-section { background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-4); margin-bottom: var(--sp-5);
+    box-shadow: var(--shadow-sm); }
+  .rp-section h2 { margin: 0 0 var(--sp-3); font-size: 1.05rem; }
+  .rp-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; }
+  .rp-table th { text-align: left; color: var(--tw-muted-blue); font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px 6px 0; }
+  .rp-table td { padding: 6px 10px 6px 0; border-top: 1px solid var(--tw-gray-200); }
+  .rp-table td.num, .rp-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rp-empty { color: var(--tw-muted-blue); font-size: 0.85rem; }
+  #rp-narrative-box { display: none; }
+  @media print {
+    .app-sidebar, .content-topbar, .app-footer, .rp-actions, #rp-narrative-btn { display: none !important; }
+    .rp-section { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rp-head">
+  <div>
+    <h1 style="margin-bottom: 4px;">📊 {{ _('reports.title', lang) }}</h1>
+    <div class="scope">
+      {% if scope_label == 'all' %}{{ _('reports.scope.all', lang) }}{% else %}{{ scope_label }}{% endif %}
+      &nbsp;·&nbsp; {{ date_from }} – {{ date_to }}
+    </div>
+  </div>
+  <div class="rp-actions">
+    <a href="/reports" class="btn btn-secondary" data-noloader>← {{ _('reports.back_to_builder', lang) }}</a>
+    <button type="button" id="rp-narrative-btn" class="btn btn-secondary">
+      🤖 {{ _('reports.narrative_button', lang) }}
+    </button>
+    <a href="/reports/run/export.csv?{{ query_string }}" class="btn btn-secondary" data-noloader>
+      📋 {{ _('reports.export_csv', lang) }}
+    </a>
+    <button type="button" onclick="window.print()" class="btn btn-secondary">
+      🖨 {{ _('reports.print_button', lang) }}
+    </button>
+  </div>
+</div>
+
+<div id="rp-narrative-status" style="font-size: 0.88rem; margin-bottom: var(--sp-3); display: none;"></div>
+<section id="rp-narrative-box" class="rp-section" style="border-left: 4px solid var(--tw-primary);">
+  <p id="rp-narrative-text" style="margin: 0; font-size: 1rem; line-height: 1.6;"></p>
+</section>
+
+{% if not facts %}
+  <div class="alert alert-info">{{ _('reports.no_categories', lang) }}</div>
+{% endif %}
+
+{% if facts.orders %}
+  {% set f = facts.orders %}
+  <section class="rp-section">
+    <h2>📦 {{ _('reports.category.orders', lang) }}</h2>
+    <div class="rp-stats">
+      <div class="rp-tile"><div class="lbl">{{ _('reports.orders.total', lang) }}</div>
+        <div class="val">{{ f.total_orders }}</div></div>
+      <div class="rp-tile"><div class="lbl">{{ _('reports.orders.quantity', lang) }}</div>
+        <div class="val">{{ f.total_quantity }}</div></div>
+      <div class="rp-tile"><div class="lbl">{{ _('reports.orders.avg_fulfillment', lang) }}</div>
+        <div class="val">{% if f.avg_fulfillment_days is not none %}{{ f.avg_fulfillment_days }} {{ _('reports.days', lang) }}{% else %}—{% endif %}</div></div>
+    </div>
+    {% if f.by_status %}
+    <table class="rp-table" style="margin-bottom: var(--sp-4);">
+      <thead><tr><th>{{ _('reports.col.status', lang) }}</th><th class="num">{{ _('reports.col.count', lang) }}</th></tr></thead>
+      <tbody>
+        {% for status, count in f.by_status.items() %}
+        <tr><td>{{ _('orders.status.' + status, lang) }}</td><td class="num">{{ count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if f.top_printers %}
+    <table class="rp-table">
+      <thead><tr><th>{{ _('reports.col.printer', lang) }}</th><th class="num">{{ _('reports.col.orders', lang) }}</th><th class="num">{{ _('reports.col.quantity', lang) }}</th></tr></thead>
+      <tbody>
+        {% for row in f.top_printers %}
+        <tr><td>{{ row.printer_name }}</td><td class="num">{{ row.orders }}</td><td class="num">{{ row.quantity }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="rp-empty">{{ _('reports.empty', lang) }}</p>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if facts.consumption %}
+  {% set f = facts.consumption %}
+  <section class="rp-section">
+    <h2>🖨 {{ _('reports.category.consumption', lang) }}</h2>
+    <div class="rp-stats">
+      <div class="rp-tile"><div class="lbl">{{ _('reports.consumption.units', lang) }}</div>
+        <div class="val">{{ f.total_units }}</div></div>
+      <div class="rp-tile"><div class="lbl">{{ _('reports.consumption.spend', lang) }}</div>
+        <div class="val">{{ '%.2f'|format(f.total_spend_cents / 100) }} €</div></div>
+      <div class="rp-tile"><div class="lbl">{{ _('reports.consumption.priced', lang) }}</div>
+        <div class="val">{{ f.priced_units }}/{{ f.total_units }}</div></div>
+    </div>
+    {% if f.by_color %}
+    <table class="rp-table" style="margin-bottom: var(--sp-4);">
+      <thead><tr><th>{{ _('reports.col.color', lang) }}</th><th class="num">{{ _('reports.col.units', lang) }}</th></tr></thead>
+      <tbody>
+        {% for color, units in f.by_color.items() %}
+        <tr><td>{{ color }}</td><td class="num">{{ units }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if f.top_printers %}
+    <table class="rp-table">
+      <thead><tr><th>{{ _('reports.col.printer', lang) }}</th><th class="num">{{ _('reports.col.units', lang) }}</th><th class="num">{{ _('reports.consumption.spend', lang) }}</th></tr></thead>
+      <tbody>
+        {% for row in f.top_printers %}
+        <tr><td>{{ row.printer_name }}</td><td class="num">{{ row.units }}</td><td class="num">{{ '%.2f'|format(row.spend_cents / 100) }} €</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="rp-empty">{{ _('reports.empty', lang) }}</p>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if facts.device_health %}
+  {% set f = facts.device_health %}
+  <section class="rp-section">
+    <h2>⚠ {{ _('reports.category.device_health', lang) }}</h2>
+    <div class="rp-stats">
+      <div class="rp-tile"><div class="lbl">{{ _('reports.health.anomalies', lang) }}</div>
+        <div class="val">{{ f.total_anomalies }}</div></div>
+      <div class="rp-tile"><div class="lbl">{{ _('reports.health.high_turnover', lang) }}</div>
+        <div class="val">{{ f.high_turnover_printers|length }}</div></div>
+    </div>
+    {% if f.recent_anomalies %}
+    <table class="rp-table" style="margin-bottom: var(--sp-4);">
+      <thead><tr><th>{{ _('reports.col.printer', lang) }}</th><th>{{ _('reports.col.color', lang) }}</th>
+        <th class="num">{{ _('reports.health.col_level', lang) }}</th><th>{{ _('reports.col.date', lang) }}</th>
+        <th>{{ _('reports.health.col_kind', lang) }}</th></tr></thead>
+      <tbody>
+        {% for a in f.recent_anomalies %}
+        <tr>
+          <td>{{ a.printer_id }}</td><td>{{ a.color }}</td>
+          <td class="num">{% if a.prev_level is not none %}{{ a.prev_level }}%→{% endif %}{{ a.level }}%</td>
+          <td>{{ a.created_at.split('.')[0] if '.' in a.created_at else a.created_at }}</td>
+          <td style="font-size: 0.8rem; color: var(--tw-muted-blue);">
+            {% if a.anomaly_kind == 'partial_increase' %}{{ _('customer.detail.anomaly.partial_increase', lang) }}
+            {% elif a.anomaly_kind == 'steep_drop' %}{{ _('customer.detail.anomaly.steep_drop', lang) }}
+            {% else %}{{ a.anomaly_kind }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="rp-empty">{{ _('reports.health.no_anomalies', lang) }}</p>
+    {% endif %}
+    {% if f.high_turnover_printers %}
+    <h3 style="font-size: 0.9rem; margin: var(--sp-3) 0 8px;">{{ _('reports.health.high_turnover', lang) }}</h3>
+    <table class="rp-table">
+      <thead><tr><th>{{ _('reports.col.printer', lang) }}</th><th class="num">{{ _('reports.col.orders', lang) }}</th></tr></thead>
+      <tbody>
+        {% for row in f.high_turnover_printers %}
+        <tr><td>{{ row.printer_name }}</td><td class="num">{{ row.orders }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if facts.supplier_performance %}
+  {% set f = facts.supplier_performance %}
+  <section class="rp-section">
+    <h2>🚚 {{ _('reports.category.supplier_performance', lang) }}</h2>
+    {% if f.suppliers %}
+    <table class="rp-table">
+      <thead><tr>
+        <th>{{ _('reports.col.supplier', lang) }}</th>
+        <th class="num">{{ _('reports.col.orders', lang) }}</th>
+        <th class="num">{{ _('reports.col.quantity', lang) }}</th>
+        <th class="num">{{ _('reports.consumption.spend', lang) }}</th>
+        <th class="num">{{ _('reports.orders.avg_fulfillment', lang) }}</th>
+      </tr></thead>
+      <tbody>
+        {% for row in f.suppliers %}
+        <tr>
+          <td>{{ row.supplier }}</td>
+          <td class="num">{{ row.orders }}</td>
+          <td class="num">{{ row.quantity }}</td>
+          <td class="num">{{ '%.2f'|format(row.spend_cents / 100) }} €</td>
+          <td class="num">{% if row.avg_fulfillment_days is not none %}{{ row.avg_fulfillment_days }} {{ _('reports.days', lang) }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if f.unresolved_orders %}
+      <p class="rp-empty" style="margin-top: var(--sp-3);">
+        {{ f.unresolved_orders }} {{ _('reports.supplier.unresolved_hint', lang) }}
+      </p>
+    {% endif %}
+    {% else %}
+      <p class="rp-empty">{{ _('reports.empty', lang) }}</p>
+    {% endif %}
+  </section>
+{% endif %}
+
+<script>
+(function () {
+  var btn = document.getElementById('rp-narrative-btn');
+  if (!btn) return;
+  var status = document.getElementById('rp-narrative-status');
+  var box = document.getElementById('rp-narrative-box');
+  var text = document.getElementById('rp-narrative-text');
+  btn.addEventListener('click', async function () {
+    btn.disabled = true;
+    status.style.display = '';
+    status.style.color = 'var(--tw-muted-blue)';
+    status.textContent = {{ _('reports.narrative_loading', lang)|tojson }};
+    box.style.display = 'none';
+    try {
+      var r = await fetch('/reports/run/narrative?{{ query_string }}', {credentials: 'same-origin'});
+      var j = await r.json();
+      if (!j.ok) {
+        status.textContent = '✗ ' + (j.error === 'llm_unavailable'
+          ? {{ _('reports.narrative_unavailable', lang)|tojson }} : (j.error || 'error'));
+        status.style.color = 'var(--status-critical)';
+        btn.disabled = false;
+        return;
+      }
+      status.style.display = 'none';
+      text.textContent = j.narrative;
+      box.style.display = '';
+    } catch (e) {
+      status.textContent = '✗ ' + (e.message || e);
+      status.style.color = 'var(--status-critical)';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

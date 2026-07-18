@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}{{ _('reports.title', lang) }} · {{ _('brand.product_name', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('reports.title', lang) }}{% endblock %}
+{% block extra_head %}
+<style>
+  .tpl-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--sp-3); margin-bottom: var(--sp-6);
+  }
+  .tpl-card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-4);
+    box-shadow: var(--shadow-sm); transition: transform var(--t-fast), box-shadow var(--t-fast);
+  }
+  .tpl-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 6px 16px rgba(0,0,0,.08)); }
+  .tpl-card .icon { font-size: 1.4rem; margin-bottom: 6px; }
+  .tpl-card .name { font-weight: 700; color: var(--tw-primary); margin-bottom: 4px; }
+  .tpl-card .desc { font-size: 0.82rem; color: var(--tw-muted-blue); line-height: 1.4; }
+
+  .builder { background: var(--tw-white); border: 1px solid var(--tw-gray-300);
+    border-radius: var(--r-lg); padding: var(--sp-5); box-shadow: var(--shadow-sm); }
+  .date-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: var(--sp-3); }
+  .date-presets button {
+    padding: 5px 12px; border-radius: 999px; border: 1px solid var(--tw-gray-300);
+    background: var(--tw-white); color: var(--tw-primary); font-size: 0.82rem; cursor: pointer;
+  }
+  .date-presets button:hover { background: var(--tw-faint-blue); }
+  .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-3); }
+  .cat-option {
+    display: flex; gap: 10px; align-items: flex-start;
+    border: 1px solid var(--tw-gray-300); border-radius: var(--r); padding: 10px 12px;
+    cursor: pointer;
+  }
+  .cat-option input { margin-top: 3px; }
+  .cat-option .lbl { font-weight: 600; font-size: 0.9rem; }
+  .cat-option .hint { font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: var(--sp-2);">📊 {{ _('reports.title', lang) }}</h1>
+<p style="color: var(--tw-muted-blue); margin-bottom: var(--sp-5); max-width: 68ch;">
+  {{ _('reports.intro', lang) }}
+</p>
+
+<h2 style="font-size: 1rem; margin-bottom: var(--sp-3);">{{ _('reports.templates_title', lang) }}</h2>
+<div class="tpl-grid">
+  <a class="tpl-card" data-noloader
+     href="/reports/run?date_from={{ default_from }}&date_to={{ default_to }}&category=orders&category=consumption&category=device_health&category=supplier_performance">
+    <div class="icon">📈</div>
+    <div class="name">{{ _('reports.template.overview', lang) }}</div>
+    <div class="desc">{{ _('reports.template.overview.desc', lang) }}</div>
+  </a>
+  <a class="tpl-card" data-noloader
+     href="/reports/run?date_from={{ default_from }}&date_to={{ default_to }}&category=consumption">
+    <div class="icon">🖨</div>
+    <div class="name">{{ _('reports.template.consumption', lang) }}</div>
+    <div class="desc">{{ _('reports.template.consumption.desc', lang) }}</div>
+  </a>
+  <a class="tpl-card" data-noloader
+     href="/reports/run?date_from={{ default_from }}&date_to={{ default_to }}&category=supplier_performance">
+    <div class="icon">🚚</div>
+    <div class="name">{{ _('reports.template.supplier', lang) }}</div>
+    <div class="desc">{{ _('reports.template.supplier.desc', lang) }}</div>
+  </a>
+  {% if customer_choices %}
+  <a class="tpl-card" data-noloader
+     href="/customers/{{ customer_choices[0][0] }}/savings">
+    <div class="icon">💡</div>
+    <div class="name">{{ _('reports.template.savings', lang) }}</div>
+    <div class="desc">{{ _('reports.template.savings.desc', lang) }}</div>
+  </a>
+  {% endif %}
+</div>
+
+<h2 style="font-size: 1rem; margin-bottom: var(--sp-3);">{{ _('reports.builder_title', lang) }}</h2>
+<form class="builder" method="get" action="/reports/run">
+  <div class="form-group">
+    <label>{{ _('reports.field.period', lang) }}</label>
+    <div class="date-presets">
+      <button type="button" data-days="7">{{ _('reports.preset.7d', lang) }}</button>
+      <button type="button" data-days="30">{{ _('reports.preset.30d', lang) }}</button>
+      <button type="button" data-days="90">{{ _('reports.preset.90d', lang) }}</button>
+      <button type="button" data-quarter="1">{{ _('reports.preset.quarter', lang) }}</button>
+      <button type="button" data-year="1">{{ _('reports.preset.year', lang) }}</button>
+    </div>
+    <div class="row-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+      <input type="date" name="date_from" id="rp-date-from" value="{{ default_from }}" max="{{ today }}">
+      <input type="date" name="date_to" id="rp-date-to" value="{{ default_to }}" max="{{ today }}">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="rp-customer">{{ _('reports.field.scope', lang) }}</label>
+    <select id="rp-customer" name="customer">
+      <option value="all">{{ _('reports.scope.all', lang) }}</option>
+      {% for cid, cname in customer_choices %}
+        <option value="{{ cid }}">{{ cname }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group" style="margin-bottom: var(--sp-4);">
+    <label>{{ _('reports.field.categories', lang) }}</label>
+    <div class="cat-grid">
+      <label class="cat-option">
+        <input type="checkbox" name="category" value="orders" checked>
+        <span>
+          <div class="lbl">{{ _('reports.category.orders', lang) }}</div>
+          <div class="hint">{{ _('reports.category.orders.hint', lang) }}</div>
+        </span>
+      </label>
+      <label class="cat-option">
+        <input type="checkbox" name="category" value="consumption" checked>
+        <span>
+          <div class="lbl">{{ _('reports.category.consumption', lang) }}</div>
+          <div class="hint">{{ _('reports.category.consumption.hint', lang) }}</div>
+        </span>
+      </label>
+      <label class="cat-option">
+        <input type="checkbox" name="category" value="device_health" checked>
+        <span>
+          <div class="lbl">{{ _('reports.category.device_health', lang) }}</div>
+          <div class="hint">{{ _('reports.category.device_health.hint', lang) }}</div>
+        </span>
+      </label>
+      <label class="cat-option">
+        <input type="checkbox" name="category" value="supplier_performance" checked>
+        <span>
+          <div class="lbl">{{ _('reports.category.supplier_performance', lang) }}</div>
+          <div class="hint">{{ _('reports.category.supplier_performance.hint', lang) }}</div>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <button type="submit" class="btn">📊 {{ _('reports.generate_button', lang) }}</button>
+</form>
+
+<script>
+(function () {
+  var from = document.getElementById('rp-date-from');
+  var to = document.getElementById('rp-date-to');
+  function iso(d) { return d.toISOString().slice(0, 10); }
+  document.querySelectorAll('.date-presets button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var today = new Date();
+      if (btn.dataset.days) {
+        var start = new Date();
+        start.setDate(today.getDate() - parseInt(btn.dataset.days, 10));
+        from.value = iso(start);
+        to.value = iso(today);
+      } else if (btn.dataset.quarter) {
+        var q = Math.floor(today.getMonth() / 3);
+        from.value = iso(new Date(today.getFullYear(), q * 3, 1));
+        to.value = iso(today);
+      } else if (btn.dataset.year) {
+        from.value = iso(new Date(today.getFullYear(), 0, 1));
+        to.value = iso(today);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

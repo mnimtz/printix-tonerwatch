@@ -568,6 +568,16 @@
             {{ _('nav.customers', lang) }}
           </a>
 
+          <a href="/reports"
+             class="{{ 'active' if request.url.path.startswith('/reports') else '' }}">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17 V3 M3 17 h14"/>
+              <path d="M6 17 v-5 M10 17 V8 M14 17 v-8"/>
+            </svg>
+            {{ _('nav.reports', lang) }}
+          </a>
+
           {% if user.role == 'admin' %}
           <div class="sidebar-section-label">{{ _('nav.settings', lang) }}</div>
 
