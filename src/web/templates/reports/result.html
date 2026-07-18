@@ -243,8 +243,14 @@
       var r = await fetch('/reports/run/narrative?{{ query_string }}', {credentials: 'same-origin'});
       var j = await r.json();
       if (!j.ok) {
-        status.textContent = '✗ ' + (j.error === 'llm_unavailable'
-          ? {{ _('reports.narrative_unavailable', lang)|tojson }} : (j.error || 'error'));
+        if (j.error === 'llm_unavailable') {
+          status.textContent = '✗ ' + {{ _('reports.narrative_unavailable', lang)|tojson }};
+        } else if (j.error === 'llm_call_failed') {
+          status.textContent = '✗ ' + {{ _('reports.narrative_call_failed', lang)|tojson }}
+            + (j.detail ? ' (' + j.detail + ')' : '');
+        } else {
+          status.textContent = '✗ ' + (j.error || 'error');
+        }
         status.style.color = 'var(--status-critical)';
         btn.disabled = false;
         return;

@@ -19,6 +19,13 @@
             border-left: 4px solid var(--tw-primary);">
     <p style="margin: 0; font-size: 1rem; line-height: 1.6;">{{ narrative }}</p>
   </section>
+{% elif narrative_error %}
+  <div class="alert alert-warn" style="margin-bottom: var(--sp-5);">
+    {{ _('customer.savings.narrative_error', lang) }}
+    <div style="font-family: monospace; font-size: 0.82rem; margin-top: 6px; opacity: 0.85;">
+      {{ narrative_error }}
+    </div>
+  </div>
 {% else %}
   <div class="alert alert-info" style="margin-bottom: var(--sp-5);">
     {{ _('customer.savings.no_narrative', lang) }}

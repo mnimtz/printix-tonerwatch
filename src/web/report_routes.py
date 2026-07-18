@@ -174,9 +174,13 @@ async def reports_run_narrative(request: Request):
     if scope_label == "all":
         scope_label = "all customers"
 
-    narrative = reports.generate_report_narrative(
+    narrative, narrative_error = reports.generate_report_narrative(
         scope_label, date_from, date_to, facts, lang=request.state.lang)
     if narrative is None:
+        if narrative_error:
+            return JSONResponse(
+                {"ok": False, "error": "llm_call_failed", "detail": narrative_error},
+                status_code=502)
         return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=400)
     return JSONResponse({"ok": True, "narrative": narrative})
 

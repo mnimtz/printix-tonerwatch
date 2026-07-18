@@ -127,14 +127,18 @@ def compute_savings_facts(customer_id: int) -> dict[str, Any]:
 
 
 def generate_savings_narrative(customer_name: str, facts: dict[str, Any],
-                                lang: str = "de") -> str | None:
+                                lang: str = "de") -> tuple[str | None, str | None]:
     """Ask the configured LLM to phrase the already-computed facts as a
-    short sales-ready paragraph. Returns ``None`` if the LLM isn't
-    configured or the call fails — callers show the facts table either
-    way, the narrative is a bonus, never a dependency."""
+    short sales-ready paragraph. Returns ``(narrative, error)`` — callers
+    show the facts table either way, the narrative is a bonus, never a
+    dependency. ``error`` is ``None`` when the LLM isn't configured at
+    all (nothing to report) or the call succeeded; it carries the
+    provider's error text when the LLM *is* configured but the call
+    itself failed, so the UI can tell "not set up" apart from "set up
+    but broken" instead of showing the same generic message for both."""
     from . import llm_client
     if not llm_client.is_configured():
-        return None
+        return None, None
 
     lang_name = {"de": "German", "en": "English", "fr": "French",
                  "it": "Italian", "es": "Spanish"}.get(lang, "English")
@@ -154,5 +158,5 @@ def generate_savings_narrative(customer_name: str, facts: dict[str, Any],
         resp = llm_client.chat(system, user)
     except llm_client.LLMError as e:
         logger.warning("[savings_report] LLM error for customer %r: %s", customer_name, e)
-        return None
-    return (resp.text or "").strip() or None
+        return None, str(e)
+    return (resp.text or "").strip() or None, None

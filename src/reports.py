@@ -350,14 +350,18 @@ def compute_supplier_performance_facts(customer_ids: list[int], date_from: str,
 
 def generate_report_narrative(scope_label: str, date_from: str, date_to: str,
                               facts_by_category: dict[str, Any],
-                              lang: str = "de") -> str | None:
+                              lang: str = "de") -> tuple[str | None, str | None]:
     """``facts_by_category`` — e.g. {"orders": {...}, "consumption": {...}}
-    — only the categories the operator actually selected. Returns None
-    if the LLM isn't configured or the call fails; callers always show
-    the underlying tables regardless, this is a bonus paragraph."""
+    — only the categories the operator actually selected. Returns
+    ``(narrative, error)`` — callers always show the underlying tables
+    regardless, this is a bonus paragraph. ``error`` is ``None`` when
+    the LLM isn't configured at all, or set on the actual provider
+    error text when it IS configured but the call failed, so the UI
+    doesn't tell an operator "not configured" when it's really a
+    provider timeout / quota / bad-response issue."""
     from . import llm_client
     if not llm_client.is_configured():
-        return None
+        return None, None
 
     lang_name = {"de": "German", "en": "English", "fr": "French",
                  "it": "Italian", "es": "Spanish"}.get(lang, "English")
@@ -380,5 +384,5 @@ def generate_report_narrative(scope_label: str, date_from: str, date_to: str,
         resp = llm_client.chat(system, user)
     except llm_client.LLMError as e:
         logger.warning("[reports] LLM error for scope %r: %s", scope_label, e)
-        return None
-    return (resp.text or "").strip() or None
+        return None, str(e)
+    return (resp.text or "").strip() or None, None

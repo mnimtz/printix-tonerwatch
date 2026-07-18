@@ -335,7 +335,7 @@ async def customer_savings_report(customer_id: int, request: Request):
         raise HTTPException(status.HTTP_404_NOT_FOUND)
 
     facts = savings_report.compute_savings_facts(customer_id)
-    narrative = savings_report.generate_savings_narrative(
+    narrative, narrative_error = savings_report.generate_savings_narrative(
         row["name"], facts, lang=request.state.lang)
 
     templates = request.app.state.templates
@@ -348,6 +348,7 @@ async def customer_savings_report(customer_id: int, request: Request):
             "customer": _customer_form_from_row(row),
             "facts": facts,
             "narrative": narrative,
+            "narrative_error": narrative_error,
         },
     )
 

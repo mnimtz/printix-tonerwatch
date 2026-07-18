@@ -302,6 +302,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   never from the LLM. The LLM only phrases those exact numbers into a
   short paragraph for a sales conversation; if it's not configured the
   page still shows the full numbers, just without the narrative.
+- **"Not configured" vs. "configured but failed" are shown separately.**
+  Every AI-narrative surface (Reports, savings report) tells the two
+  apart instead of using one generic message for both — if the provider
+  is set up but the actual call errors out (bad key, rate limit,
+  timeout, model rejected the prompt), the page shows that real error
+  text inline rather than the misleading "AI isn't configured".
 
 ### Microsoft 365 Copilot Connector
 
