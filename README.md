@@ -91,6 +91,15 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   drop gets flagged on the customer detail page, no historical time series
   needed. Pure threshold logic on data already collected each tick, not an
   LLM call.
+- **Toner-level history.** Every time a printer's level actually changes,
+  the reading is appended to a time series (`toner_readings`) — not one
+  row per poll, only on real transitions, so the table stays proportional
+  to real-world change events. Raw readings age out after an
+  admin-configurable retention window (Settings → Alert-Runner, default
+  90 days / one quarter) into `toner_readings_daily`, a daily
+  avg/min/max/sample-count rollup, so long-run trend analysis stays cheap
+  even after months of data. Foundation for a real level-over-time chart
+  in Reports once enough history accumulates.
 
 ### Order flow (kanban)
 
@@ -138,10 +147,11 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   spend), **device health** (toner-level anomalies flagged in the
   window, plus printers with unusually many orders as an order-based
   proxy for "might need a look"), and **supplier performance**
-  (orders, spend and average fulfillment time per supplier). No
-  continuous toner-level time series exists in TonerWatch's own
-  database (see Data model), so "consumption" is measured the honest
-  way — cartridges that actually shipped — rather than a level curve.
+  (orders, spend and average fulfillment time per supplier).
+  "Consumption" is measured the honest way — cartridges that actually
+  shipped — rather than a level curve; a level-over-time chart becomes
+  possible once enough toner-level history (see Alerting) has
+  accumulated.
 - **Quick-launch templates** on the hub — full 30-day overview,
   consumption trend, supplier performance, and a link straight into
   the existing per-customer savings report.

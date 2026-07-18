@@ -476,6 +476,42 @@ toner_state = Table(
                     name="ck_toner_state_severity"),
 )
 
+toner_readings = Table(
+    "toner_readings", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("customer_id", Integer,
+           ForeignKey("customers.id", ondelete="CASCADE"), nullable=False),
+    Column("printer_id", Text, nullable=False),
+    Column("color", Text, nullable=False),
+    Column("level", Integer),
+    Column("recorded_at", Text, nullable=False,
+           server_default=func.current_timestamp()),
+)
+Index("idx_toner_readings_slot_time",
+      toner_readings.c.customer_id, toner_readings.c.printer_id,
+      toner_readings.c.color, toner_readings.c.recorded_at)
+
+# v0.24.38: delta-based toner-level history (see toner_history.py's
+# module docstring) — a row here only when the level actually changed
+# from the last recorded reading for that slot, so this stays far
+# smaller than "one row per poll" while still capturing every real
+# transition with a timestamp. Raw rows age out into
+# toner_readings_daily after runner_config's
+# toner_history_raw_retention_days (default 90).
+toner_readings_daily = Table(
+    "toner_readings_daily", metadata,
+    Column("customer_id", Integer,
+           ForeignKey("customers.id", ondelete="CASCADE"), nullable=False),
+    Column("printer_id", Text, nullable=False),
+    Column("color", Text, nullable=False),
+    Column("date", Text, nullable=False),
+    Column("avg_level", Integer, nullable=False),
+    Column("min_level", Integer, nullable=False),
+    Column("max_level", Integer, nullable=False),
+    Column("sample_count", Integer, nullable=False),
+    PrimaryKeyConstraint("customer_id", "printer_id", "color", "date"),
+)
+
 toner_events = Table(
     "toner_events", metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),

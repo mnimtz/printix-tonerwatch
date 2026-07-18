@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func, insert, select, update
 
 from . import backup as _backup
-from . import bi_client, db, mail_client, orders, supply_library
+from . import bi_client, db, mail_client, orders, supply_library, toner_history
 from . import graph_connector as _graph
 
 
@@ -55,8 +55,8 @@ def _upsert_state(customer_id: int, printer_id: str, color: str,
                   level: int | None, severity: str,
                   notified: bool, notified_severity: str = "") -> None:
     with db.get_conn() as conn:
-        exists = conn.execute(
-            select(db.toner_state.c.customer_id).where(
+        existing = conn.execute(
+            select(db.toner_state.c.level).where(
                 (db.toner_state.c.customer_id == customer_id) &
                 (db.toner_state.c.printer_id == printer_id) &
                 (db.toner_state.c.color == color)
@@ -69,7 +69,7 @@ def _upsert_state(customer_id: int, printer_id: str, color: str,
         if notified:
             values["last_notified_at"] = _now_iso()
             values["last_notified_sev"] = notified_severity or severity
-        if exists is None:
+        if existing is None:
             conn.execute(insert(db.toner_state).values(
                 customer_id=customer_id, printer_id=printer_id,
                 color=color, **values,
@@ -80,6 +80,14 @@ def _upsert_state(customer_id: int, printer_id: str, color: str,
                 (db.toner_state.c.printer_id == printer_id) &
                 (db.toner_state.c.color == color)
             ).values(**values))
+
+    # v0.24.38: append to the delta-based level-history time series
+    # whenever the value actually changed (or this slot has never
+    # been seen before) — see toner_history.py's module docstring for
+    # why this isn't "one row per poll".
+    prev_level = existing.level if existing is not None else None
+    if level is not None and level != prev_level:
+        toner_history.record_reading(customer_id, printer_id, color, level)
 
 
 def _log_event(customer_id: int, kind: str, *, printer_id: str = "",
@@ -747,6 +755,18 @@ def start_runner(interval_minutes: int | None = None) -> None:
                       + _dt.timedelta(minutes=10),
     )
 
+    # v0.24.38: daily toner-history compaction — see toner_history.py.
+    _scheduler.add_job(
+        _tick_toner_history_downsample,
+        trigger=IntervalTrigger(hours=24),
+        id="toner_history_downsample",
+        name="Toner history — daily compaction",
+        max_instances=1,
+        coalesce=True,
+        next_run_time=_dt.datetime.now(_dt.timezone.utc)
+                      + _dt.timedelta(minutes=15),
+    )
+
     _scheduler.start()
     logger.info("toner_alerts: scheduler started, alerts every %d min, "
                 "cache refresh every %d min", alert_min, refresh_min)
@@ -792,6 +812,25 @@ def _tick_graph_sync() -> None:
         logger.info("scheduled graph sync: pushed %d, errors: %s", pushed, err)
     else:
         logger.info("scheduled graph sync: pushed %d items OK", pushed)
+
+
+def _tick_toner_history_downsample() -> None:
+    """Daily maintenance: compact raw toner-level readings older than
+    the configured retention window into daily aggregates. Reads the
+    persisted retention setting fresh on every tick, same debounce-
+    free pattern as the other maintenance jobs here — cheap to run,
+    idempotent if it fires more than once."""
+    from . import runner_config
+    try:
+        retention_days = runner_config.load_config()["toner_history_raw_retention_days"]
+        result = toner_history.downsample_old_readings(retention_days)
+    except Exception as e:  # noqa: BLE001 — runner mustn't die
+        logger.warning("toner history downsample failed: %s", e)
+        return
+    if result["days_compacted"]:
+        logger.info("toner history downsample: %d day-slots compacted, "
+                    "%d raw rows removed", result["days_compacted"],
+                    result["raw_rows_deleted"])
 
 
 def _tick_backup_upload() -> None:

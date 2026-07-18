@@ -33,6 +33,11 @@ SETTINGS_KEY = "runner"
 
 DEFAULT_ALERT_MINUTES   = 15
 DEFAULT_REFRESH_MINUTES = 5
+# v0.24.38: how long raw toner-level readings (toner_readings) are
+# kept before being compacted into daily averages
+# (toner_readings_daily) — see toner_history.py. One quarter by
+# default; admin-editable in Settings → Alert-Runner.
+DEFAULT_TONER_HISTORY_RETENTION_DAYS = 90
 
 
 def load_config() -> dict[str, Any]:
@@ -64,9 +69,14 @@ def load_config() -> dict[str, Any]:
     else:
         refresh_source = "db"
 
+    retention = stored.get("toner_history_raw_retention_days")
+    if retention is None or retention < 1:
+        retention = DEFAULT_TONER_HISTORY_RETENTION_DAYS
+
     return {
         "alert_interval_minutes":   int(alert),
         "refresh_interval_minutes": int(refresh),
+        "toner_history_raw_retention_days": int(retention),
         "alert_source":             alert_source,
         "refresh_source":           refresh_source,
         # Expose env values so the UI can hint at what would be used
@@ -76,13 +86,21 @@ def load_config() -> dict[str, Any]:
     }
 
 
-def save_config(alert_minutes: int, refresh_minutes: int) -> None:
-    """Persist the intervals + trigger a live scheduler reschedule."""
+def save_config(alert_minutes: int, refresh_minutes: int,
+                toner_history_retention_days: int | None = None) -> None:
+    """Persist the intervals + trigger a live scheduler reschedule.
+    ``toner_history_retention_days`` defaults to the current stored
+    value (or the module default) when omitted, so existing callers
+    that only pass the two original intervals keep working unchanged."""
     alert_minutes   = _clamp(alert_minutes,   1, 1440)
     refresh_minutes = _clamp(refresh_minutes, 1, 1440)
+    if toner_history_retention_days is None:
+        toner_history_retention_days = load_config()["toner_history_raw_retention_days"]
+    toner_history_retention_days = _clamp(toner_history_retention_days, 7, 3650)
     payload = {
         "alert_interval_minutes":   alert_minutes,
         "refresh_interval_minutes": refresh_minutes,
+        "toner_history_raw_retention_days": toner_history_retention_days,
     }
     value_json = json.dumps(payload, ensure_ascii=False)
     with db.get_conn() as conn:

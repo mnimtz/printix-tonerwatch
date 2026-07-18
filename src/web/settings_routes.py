@@ -544,11 +544,16 @@ async def settings_runner_save(request: Request):
         refresh_min = int(form.get("refresh_interval_minutes") or 5)
     except ValueError:
         refresh_min = 5
-    runner_config.save_config(alert_min, refresh_min)
+    try:
+        history_days = int(form.get("toner_history_raw_retention_days") or 90)
+    except ValueError:
+        history_days = 90
+    runner_config.save_config(alert_min, refresh_min, history_days)
     db.audit(admin["id"], "settings.runner_updated",
              target_type="settings", target_id="runner",
              meta_json=json.dumps({"alert_min": alert_min,
-                                    "refresh_min": refresh_min}))
+                                    "refresh_min": refresh_min,
+                                    "history_days": history_days}))
     return RedirectResponse("/settings?info=runner_saved#runner",
                             status_code=303)
 
