@@ -128,6 +128,17 @@
   .ctile.empty .msg { text-align: center; color: var(--tw-muted-blue); font-size: 0.8rem; }
   .ctile.empty .msg .name { display: block; margin-bottom: 4px; }
 
+  /* v0.24.32: pin the activity card to the bottom of the viewport
+     instead of letting it sit right after the customer grid — with
+     few customers that read as an arbitrary jump-cut. Same
+     specificity as base.html's own `main.workspace` rule, declared
+     later in the cascade, so it wins on THIS page only (other pages
+     never include this block). As the customer grid grows with more
+     tenants, it pushes activity down and this margin naturally
+     collapses to nothing — no layout change needed later. */
+  main.workspace { display: flex; flex-direction: column; }
+  .activity { margin-top: auto; padding-top: var(--sp-6); }
+
   /* ---------- Activity ---------- */
   .activity h2 { margin: 0 0 4px; font-size: 1.05rem; }
   /* v0.24.30: 10 events at full height ran to ~500px, dominating the
