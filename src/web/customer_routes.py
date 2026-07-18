@@ -110,15 +110,27 @@ async def customers_list(request: Request):
 
 @router.get("/customers/new", response_class=HTMLResponse, include_in_schema=False)
 async def customer_new_form(request: Request):
+    """v0.24.40: accepts optional ?name=&tenant_url= to pre-fill from
+    the "Als TonerWatch-Kunde anlegen" link on a Printix Mandant's
+    detail page — a convenience bridge, not an auto-merge. A Printix
+    tenant and a TonerWatch customer stay two separate concepts; this
+    just saves retyping the name/URL when an admin wants both."""
     user = auth.require_admin(request)
     templates = request.app.state.templates
+    form = _customer_form_from_row(None)
+    prefill_name = (request.query_params.get("name") or "").strip()[:200]
+    prefill_url = (request.query_params.get("tenant_url") or "").strip()[:300]
+    if prefill_name:
+        form["name"] = prefill_name
+    if prefill_url:
+        form["tenant_url"] = prefill_url
     return templates.TemplateResponse(
         "customers/edit.html",
         {
             "request": request,
             "lang": request.state.lang,
             "user": user,
-            "form": _customer_form_from_row(None),
+            "form": form,
             "is_new": True,
             "error": None,
         },

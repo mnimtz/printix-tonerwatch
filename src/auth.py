@@ -27,6 +27,8 @@ from .db import customer_access, customers
 
 BCRYPT_ROUNDS = 12
 MAGIC_LINK_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
+INVITE_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
+INVITE_TOKEN_SALT = "user-invite"
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +145,22 @@ def require_customer_access(request: Request, customer_id: int) -> dict:
     if not user_can_see_customer(user, customer_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN,
                             detail="customer_access_denied")
+    return user
+
+
+def require_printix_tenants_access(request: Request) -> dict:
+    """Admins always see the Printix Mandanten section when it's
+    globally enabled; technicians only if an admin explicitly granted
+    them ``printix_tenants_access``. Late import to avoid a circular
+    reference at module load (printix_partner doesn't import auth,
+    but auth is imported by nearly everything else)."""
+    from . import printix_partner
+    user = require_user(request)
+    if not printix_partner.is_enabled():
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    if user["role"] != "admin" and not user.get("printix_tenants_access"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            detail="printix_tenants_access_denied")
     return user
 
 

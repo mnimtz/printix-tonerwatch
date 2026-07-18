@@ -18,12 +18,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from urllib.parse import quote as _urlquote
 
-from .. import auth, db, toner_alerts
+from .. import auth, db, printix_partner, toner_alerts
 from . import (access_routes, auth_routes, backup_routes, customer_routes,
                dashboard_routes, graph_routes, i18n, order_routes,
-               printer_info_routes, report_routes, saved_view_routes,
-               settings_routes, supplier_routes, supply_routes, toner_routes,
-               user_routes)
+               printer_info_routes, printix_partner_routes, report_routes,
+               saved_view_routes, settings_routes, supplier_routes,
+               supply_routes, toner_routes, user_routes)
 from .lang import LanguageMiddleware
 
 
@@ -159,6 +159,11 @@ def create_app() -> FastAPI:
     templates.env.globals["reported_state_meta"] = _labels.reported_state_meta
     templates.env.globals["is_hidden_state"]     = _labels.is_hidden_reported_state
 
+    # v0.24.40: nav-visibility check for the (off-by-default) Printix
+    # Mandanten section — a function global so base.html can call it
+    # without every single route threading an extra context variable.
+    templates.env.globals["printix_partner_enabled"] = printix_partner.is_enabled
+
     app.state.templates = templates
 
     # Routers.
@@ -177,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(backup_routes.router)      # v0.10: backup download + Azure Blob upload
     app.include_router(saved_view_routes.router)  # v0.11: saved filter presets on /toner
     app.include_router(graph_routes.router)       # v0.14: Copilot Connector admin
+    app.include_router(printix_partner_routes.router)  # v0.24.40: Printix Mandanten (partner API)
 
     # ── Alert runner (P3) ─────────────────────────────────────────────
     # Env-driven cadence: 0 disables the scheduler entirely (useful for

@@ -243,6 +243,11 @@ users = Table(
     Column("active", Integer, nullable=False, server_default="1"),
     Column("created_at", Text, nullable=False, server_default=func.current_timestamp()),
     Column("last_login_at", Text, nullable=False, server_default=""),
+    # v0.24.40: per-user grant for the (globally toggled, off-by-default)
+    # "Printix Mandanten" nav section — admins always see it when the
+    # global switch is on, this lets an admin additionally hand it to
+    # specific technicians without making them full admins.
+    Column("printix_tenants_access", Integer, nullable=False, server_default="0"),
     CheckConstraint("role IN ('admin','technician')", name="ck_users_role"),
 )
 Index("idx_users_entra_oid", users.c.entra_oid,

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, insert, select, update
 
-from .. import auth, db
+from .. import auth, db, mail_client
 from ..db import users
 from . import i18n
 
@@ -170,6 +170,139 @@ async def user_new_submit(request: Request,
 
 
 # ---------------------------------------------------------------------------
+# Invite — v0.24.40: email + name + role only, no admin-set password.
+# password_hash stays "" (auth.verify_password already rejects any
+# login attempt against an empty hash) until the invitee completes
+# /invite/{token}, which is how the pending-invite state is detected
+# everywhere (users/list.html badge, resend button) — no extra column.
+# ---------------------------------------------------------------------------
+
+def _build_invite_url(request: Request, token: str) -> str:
+    return str(request.base_url).rstrip("/") + "/invite/" + token
+
+
+def _send_invite_mail(to_email: str, name: str, invite_url: str,
+                      lang: str) -> tuple[bool, str]:
+    """Returns (sent, error). sent=False + error="" means mail simply
+    isn't configured (not a failure) — the caller shows the raw link
+    instead. sent=False + a non-empty error means mail IS configured
+    but the send itself failed."""
+    cfg = mail_client.load_config()
+    if cfg["provider"] == "disabled":
+        return False, ""
+    subject = i18n.t("user.invite.mail_subject", lang)
+    greeting = name or to_email
+    html = (
+        '<!doctype html><html><body style="font-family:Arial,sans-serif;">'
+        f'<h2 style="color:#002854;">{subject}</h2>'
+        f'<p>{i18n.t("user.invite.mail_greeting", lang)} {greeting},</p>'
+        f'<p>{i18n.t("user.invite.mail_body", lang)}</p>'
+        f'<p><a href="{invite_url}" style="display:inline-block;background:#002854;'
+        'color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;">'
+        f'{i18n.t("user.invite.mail_button", lang)}</a></p>'
+        f'<p style="color:#8094AA;font-size:0.85rem;">{invite_url}</p>'
+        '</body></html>'
+    )
+    text = f'{i18n.t("user.invite.mail_body", lang)}\n\n{invite_url}'
+    try:
+        mail_client.send([to_email], subject, html, text, config=cfg)
+        return True, ""
+    except mail_client.MailSendError as e:
+        return False, str(e)
+
+
+def _issue_invite(request: Request, admin: dict, user_id: int,
+                  email: str, name: str, lang: str):
+    token = auth.sign_magic_token({"user_id": user_id}, salt=auth.INVITE_TOKEN_SALT)
+    invite_url = _build_invite_url(request, token)
+    sent, mail_error = _send_invite_mail(email, name, invite_url, lang)
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "users/invite_sent.html",
+        {
+            "request": request, "lang": request.state.lang, "user": admin,
+            "target_user_id": user_id, "email": email,
+            "invite_url": invite_url,
+            "mail_sent": sent, "mail_error": mail_error,
+        },
+    )
+
+
+@router.get("/users/invite", response_class=HTMLResponse, include_in_schema=False)
+async def user_invite_form(request: Request):
+    admin = auth.require_admin(request)
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        "users/invite.html",
+        {
+            "request": request, "lang": request.state.lang, "user": admin,
+            "form": {"email": "", "name": "", "role": "technician"},
+            "error": None,
+        },
+    )
+
+
+@router.post("/users/invite", include_in_schema=False)
+async def user_invite_submit(request: Request,
+                             email: str = Form(""),
+                             name: str = Form(""),
+                             role: str = Form("technician")):
+    admin = auth.require_admin(request)
+    templates = request.app.state.templates
+    ui_lang = request.state.lang
+
+    email = email.strip().lower()
+    name = name.strip()
+    role = role if role in ("admin", "technician") else "technician"
+
+    err = None
+    if not email:
+        err = i18n.t("user.error.email_required", ui_lang)
+    elif "@" not in email:
+        err = i18n.t("user.error.email_invalid", ui_lang)
+    elif db.find_user_by_email(email) is not None:
+        err = i18n.t("user.error.email_taken", ui_lang)
+
+    if err:
+        return templates.TemplateResponse(
+            "users/invite.html",
+            {
+                "request": request, "lang": ui_lang, "user": admin,
+                "form": {"email": email, "name": name, "role": role},
+                "error": err,
+            },
+            status_code=400,
+        )
+
+    with db.get_conn() as conn:
+        result = conn.execute(insert(users).values(
+            email=email, password_hash="", name=name, role=role,
+            lang=ui_lang, active=1,
+        ))
+        new_id = result.inserted_primary_key[0]
+    db.audit(admin["id"], "user.invited",
+             target_type="user", target_id=str(new_id),
+             meta_json=json.dumps({"email": email, "role": role}))
+
+    return _issue_invite(request, admin, new_id, email, name, ui_lang)
+
+
+@router.post("/users/{user_id}/invite/resend", include_in_schema=False)
+async def user_invite_resend(user_id: int, request: Request):
+    admin = auth.require_admin(request)
+    row = _user_row(user_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    if row["password_hash"]:
+        # Already completed — nothing to resend, just go back.
+        return RedirectResponse("/users", status_code=303)
+    db.audit(admin["id"], "user.invite_resent",
+             target_type="user", target_id=str(user_id))
+    lang = row["lang"] if row["lang"] in i18n.SUPPORTED_LANGS else request.state.lang
+    return _issue_invite(request, admin, user_id, row["email"], row["name"], lang)
+
+
+# ---------------------------------------------------------------------------
 # Edit
 # ---------------------------------------------------------------------------
 
@@ -201,7 +334,8 @@ async def user_edit_submit(user_id: int, request: Request,
                            role: str = Form("technician"),
                            new_password: str = Form(""),
                            lang: str = Form("en"),
-                           active: str = Form("")):
+                           active: str = Form(""),
+                           printix_tenants_access: str = Form("")):
     admin = auth.require_admin(request)
     templates = request.app.state.templates
     ui_lang = request.state.lang
@@ -252,7 +386,9 @@ async def user_edit_submit(user_id: int, request: Request,
 
     values: dict = {"email": email, "name": name, "role": role,
                     "lang": lang,
-                    "active": 1 if active in ("1", "on", "true", "yes") else 0}
+                    "active": 1 if active in ("1", "on", "true", "yes") else 0,
+                    "printix_tenants_access":
+                        1 if printix_tenants_access in ("1", "on", "true", "yes") else 0}
     if new_password:
         values["password_hash"] = auth.hash_password(new_password)
 

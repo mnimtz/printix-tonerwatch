@@ -243,6 +243,105 @@ async def login_submit(request: Request,
     return RedirectResponse(next_path, status_code=303)
 
 
+# --------------------------------------------------------------------------
+# Invite completion — v0.24.40. Public (unauthenticated) route: the
+# signed token IS the credential, same trust model as the order
+# magic-links. password_hash == "" is how a pending invite is
+# detected everywhere else (users/list.html, resend button) — once
+# set here, that check naturally stops matching.
+# --------------------------------------------------------------------------
+
+def _invite_user_row(token: str) -> dict | None:
+    payload = auth.verify_magic_token(
+        token, max_age=auth.INVITE_TOKEN_TTL_SECONDS, salt=auth.INVITE_TOKEN_SALT)
+    if payload is None:
+        return None
+    user_id = payload.get("user_id")
+    if user_id is None:
+        return None
+    row = db.find_user_by_id(int(user_id))
+    if row is None or not row["active"]:
+        return None
+    return row
+
+
+@router.get("/invite/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def invite_set_password_form(token: str, request: Request):
+    templates = request.app.state.templates
+    lang = request.state.lang
+    row = _invite_user_row(token)
+    if row is None:
+        return templates.TemplateResponse(
+            "invite_set_password.html",
+            {"request": request, "lang": lang,
+             "error": i18n.t("invite.error.invalid_or_expired", lang),
+             "token": None, "email": None},
+            status_code=400,
+        )
+    if row["password_hash"]:
+        return templates.TemplateResponse(
+            "invite_set_password.html",
+            {"request": request, "lang": lang,
+             "error": i18n.t("invite.error.already_completed", lang),
+             "token": None, "email": None},
+            status_code=400,
+        )
+    return templates.TemplateResponse(
+        "invite_set_password.html",
+        {"request": request, "lang": lang, "error": None,
+         "token": token, "email": row["email"]},
+    )
+
+
+@router.post("/invite/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def invite_set_password_submit(token: str, request: Request,
+                                     password: str = Form(""),
+                                     password_confirm: str = Form("")):
+    templates = request.app.state.templates
+    lang = request.state.lang
+    row = _invite_user_row(token)
+    if row is None or row["password_hash"]:
+        return templates.TemplateResponse(
+            "invite_set_password.html",
+            {"request": request, "lang": lang,
+             "error": i18n.t("invite.error.invalid_or_expired", lang)
+                      if row is None else
+                      i18n.t("invite.error.already_completed", lang),
+             "token": None, "email": None},
+            status_code=400,
+        )
+
+    error = None
+    if len(password) < 12:
+        error = i18n.t("setup.password_too_short", lang)
+    elif password != password_confirm:
+        error = i18n.t("setup.password_mismatch", lang)
+
+    if error:
+        return templates.TemplateResponse(
+            "invite_set_password.html",
+            {"request": request, "lang": lang, "error": error,
+             "token": token, "email": row["email"]},
+            status_code=400,
+        )
+
+    with db.get_conn() as conn:
+        conn.execute(
+            update(users).where(users.c.id == row["id"])
+            .values(password_hash=auth.hash_password(password)))
+    db.audit(row["id"], "user.invite_completed",
+             target_type="user", target_id=str(row["id"]))
+
+    request.session.clear()
+    request.session["user_id"] = row["id"]
+    if row["lang"] in i18n.SUPPORTED_LANGS:
+        request.session["lang"] = row["lang"]
+    db.touch_last_login(row["id"])
+    db.audit(row["id"], "user.login",
+             target_type="user", target_id=str(row["id"]))
+    return RedirectResponse("/dashboard", status_code=303)
+
+
 @router.post("/logout", include_in_schema=False)
 async def logout(request: Request):
     user_id = request.session.get("user_id")

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ _('user.invite_title', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/users" style="color: inherit;">{{ _('nav.users', lang) }}</a> ›
+  {{ _('user.invite_title', lang) }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 640px;">
+  <h1>{{ _('user.invite_title', lang) }}</h1>
+  <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+    {{ _('user.invite_intro', lang) }}
+  </p>
+
+  {% if error %}
+    <div class="alert alert-error" style="margin-top: var(--sp-4);">{{ error }}</div>
+  {% endif %}
+
+  <div class="card" style="margin-top: var(--sp-5);">
+    <form method="post" action="/users/invite" autocomplete="off">
+      {% include "_csrf_input.html" %}
+      <div class="form-group">
+        <label for="email">{{ _('user.field.email', lang) }} *</label>
+        <input id="email" name="email" type="email" required
+               value="{{ form.email or '' }}">
+      </div>
+      <div class="form-group">
+        <label for="name">{{ _('user.field.name', lang) }}</label>
+        <input id="name" name="name" type="text" value="{{ form.name or '' }}">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="role">{{ _('user.field.role', lang) }}</label>
+        <select id="role" name="role">
+          <option value="technician" {% if form.role == 'technician' %}selected{% endif %}>
+            {{ _('user.role.technician', lang) }}
+          </option>
+          <option value="admin" {% if form.role == 'admin' %}selected{% endif %}>
+            {{ _('user.role.admin', lang) }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn">
+          ✉ {{ _('user.invite.send_button', lang) }}
+        </button>
+        <a href="/users" class="btn btn-secondary">
+          {{ _('common.cancel', lang) }}
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

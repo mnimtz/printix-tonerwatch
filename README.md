@@ -204,6 +204,31 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   shown alongside the draft for a quick call on an urgent shortage,
   never part of the mail body itself.
 
+### Printix Partner API (Printix Mandanten)
+
+- **Off by default, one settings switch.** Settings → Printix Partner —
+  partner ID, client ID, client secret (Fernet-encrypted), Production
+  vs. Test environment. Nothing calls out to Printix until an admin
+  both saves credentials *and* flips the switch on.
+- **"Printix Mandanten" nav item** appears for admins once enabled, and
+  for any individual technician an admin explicitly grants access to
+  from that user's edit page — independent of the customer-access
+  grants used everywhere else, since this operates across the whole
+  partner account rather than one customer.
+- **List / create / view tenants + billing**, straight from Printix's
+  own partner API (`https://printix.bitbucket.io`) — tenant name,
+  domain, optional initial user (with an admin flag) on create; current
+  and previous billing period (license count, printing users) on the
+  detail page. No update/delete/cancel endpoint is publicly documented,
+  so this doesn't offer one either.
+- **"Add as TonerWatch customer"** on a tenant's detail page pre-fills
+  the name and URL into `/customers/new` — a convenience bridge, not an
+  auto-merge. A Printix tenant and a TonerWatch customer (with its own
+  BI-DB credentials) stay two separate concepts.
+- **Readable errors**, not raw API dumps — bad credentials, an
+  already-taken domain, a stale token, all get a specific message
+  pointing at what to fix.
+
 ### Per-printer metadata overrides
 
 - **Enrich BI with your own info.** `/toner/{customer}/{printer}/info`
@@ -247,6 +272,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   for new users.
 - **Role-based access.** Admins see every customer; technicians only see
   the customers they were explicitly granted access to (M:N table).
+- **Invite users by email.** Users → *Invite user* creates the account
+  with no password (login-blocked until completed) and emails a signed,
+  7-day link to set one — no password to generate or hand over
+  yourself. If no mail provider is configured, or the send fails, the
+  admin gets the raw link to forward manually instead of a dead end.
+  Pending invites show a badge on the user list with a one-click resend.
 
 ### Backup
 

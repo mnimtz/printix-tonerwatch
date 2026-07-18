@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ _('printix_tenants.title', lang) }}{% endblock %}
+{% block breadcrumb %}{{ _('printix_tenants.title', lang) }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between;
+            gap: var(--sp-4); margin-bottom: var(--sp-4);">
+  <div>
+    <h1>{{ _('printix_tenants.title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+      {{ _('printix_tenants.intro', lang) }}
+    </p>
+  </div>
+  {% if configured %}
+    <a href="/printix-tenants/new" class="btn">+ {{ _('printix_tenants.new_button', lang) }}</a>
+  {% endif %}
+</div>
+
+{% if not configured %}
+  <div class="alert alert-info">
+    {{ _('printix_tenants.not_configured', lang) }}
+    {% if user.role == 'admin' %}
+      <a href="/settings#printix-partner">{{ _('printix_tenants.not_configured.settings_link', lang) }}</a>
+    {% endif %}
+  </div>
+{% elif error %}
+  <div class="alert alert-error">{{ error }}</div>
+{% elif not tenants %}
+  <div class="alert alert-info">{{ _('printix_tenants.empty', lang) }}</div>
+{% else %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead style="background: var(--tw-gray-200); color: var(--tw-primary);
+                    font-weight: 700; font-size: 0.82rem;
+                    letter-spacing: 0.06em; text-transform: uppercase;">
+        <tr>
+          <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+            {{ _('printix_tenants.col.name', lang) }}
+          </th>
+          <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
+            {{ _('printix_tenants.col.domain', lang) }}
+          </th>
+          <th style="text-align: right; padding: var(--sp-3) var(--sp-4); width: 160px;">
+            {{ _('printix_tenants.col.licenses', lang) }}
+          </th>
+          <th style="text-align: right; padding: var(--sp-3) var(--sp-4); width: 160px;">
+            {{ _('printix_tenants.col.printing_users', lang) }}
+          </th>
+          <th style="text-align: right; padding: var(--sp-3) var(--sp-4); width: 100px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for t in tenants %}
+        {% set bi = t.billing_info or {} %}
+        {% set period = bi.current_billing_period or {} %}
+        <tr style="border-top: 1px solid var(--tw-gray-300);">
+          <td style="padding: var(--sp-3) var(--sp-4); font-weight: 600;">
+            {{ t.tenant_name }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); font-family: var(--font-mono);
+                     font-size: 0.88rem; color: var(--tw-muted-blue);">
+            {{ t.tenant_domain }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); text-align: right;
+                     font-variant-numeric: tabular-nums;">
+            {{ period.user_licenses if period.user_licenses is not none else '—' }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); text-align: right;
+                     font-variant-numeric: tabular-nums;">
+            {{ period.printing_users if period.printing_users is not none else '—' }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); text-align: right;">
+            <a href="/printix-tenants/{{ t.tenant_id }}" class="btn btn-secondary"
+               style="padding: 6px 12px; font-size: 0.82rem;">
+              {{ _('printix_tenants.action.view', lang) }}
+            </a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

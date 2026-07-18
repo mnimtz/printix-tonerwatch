@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ (tenant.tenant_name if tenant else _('printix_tenants.title', lang)) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/printix-tenants" style="color: inherit;">{{ _('printix_tenants.title', lang) }}</a> ›
+  {{ (tenant.tenant_name if tenant else _('printix_tenants.detail_error_title', lang)) }}
+{% endblock %}
+
+{% block content %}
+{% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+  <a href="/printix-tenants" class="btn btn-secondary" style="margin-top: var(--sp-4);">
+    {{ _('common.back', lang) }}
+  </a>
+{% else %}
+  {% set bi = tenant.billing_info or {} %}
+  {% set current = bi.current_billing_period or {} %}
+  {% set previous = bi.previous_billing_period or {} %}
+  <div style="display: flex; align-items: center; justify-content: space-between;
+              gap: var(--sp-4); margin-bottom: var(--sp-4);">
+    <div>
+      <h1>{{ tenant.tenant_name }}</h1>
+      <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);
+                font-family: var(--font-mono);">
+        {{ tenant.tenant_domain }}
+      </p>
+    </div>
+    <a href="/customers/new?name={{ tenant.tenant_name|urlencode }}&tenant_url=https://{{ tenant.tenant_domain|urlencode }}"
+       class="btn btn-secondary">
+      {{ _('printix_tenants.action.add_as_customer', lang) }}
+    </a>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);">
+    <div class="card" style="padding: var(--sp-4);">
+      <h3 style="margin-top: 0;">{{ _('printix_tenants.detail.current_period', lang) }}</h3>
+      {% if current %}
+        <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-top: -8px;">
+          {{ current.period_start.split('T')[0] if current.period_start else '—' }}
+          –
+          {{ current.period_end.split('T')[0] if current.period_end else '—' }}
+        </p>
+        <div style="display: flex; gap: var(--sp-5); margin-top: var(--sp-3);">
+          <div>
+            <div style="font-size: 1.6rem; font-weight: 700;">
+              {{ current.user_licenses if current.user_licenses is not none else '—' }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--tw-muted-blue);">
+              {{ _('printix_tenants.detail.user_licenses', lang) }}
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 1.6rem; font-weight: 700;">
+              {{ current.printing_users if current.printing_users is not none else '—' }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--tw-muted-blue);">
+              {{ _('printix_tenants.detail.printing_users', lang) }}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <p style="color: var(--tw-muted-blue);">{{ _('printix_tenants.detail.no_billing', lang) }}</p>
+      {% endif %}
+    </div>
+
+    <div class="card" style="padding: var(--sp-4);">
+      <h3 style="margin-top: 0;">{{ _('printix_tenants.detail.previous_period', lang) }}</h3>
+      {% if previous %}
+        <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin-top: -8px;">
+          {{ previous.period_start.split('T')[0] if previous.period_start else '—' }}
+          –
+          {{ previous.period_end.split('T')[0] if previous.period_end else '—' }}
+        </p>
+        <div style="display: flex; gap: var(--sp-5); margin-top: var(--sp-3);">
+          <div>
+            <div style="font-size: 1.6rem; font-weight: 700;">
+              {{ previous.user_licenses if previous.user_licenses is not none else '—' }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--tw-muted-blue);">
+              {{ _('printix_tenants.detail.user_licenses', lang) }}
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 1.6rem; font-weight: 700;">
+              {{ previous.printing_users if previous.printing_users is not none else '—' }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--tw-muted-blue);">
+              {{ _('printix_tenants.detail.printing_users', lang) }}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <p style="color: var(--tw-muted-blue);">{{ _('printix_tenants.detail.no_billing', lang) }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <p style="color: var(--tw-muted-blue); font-size: 0.82rem; margin-top: var(--sp-5);
+            font-family: var(--font-mono);">
+    {{ _('printix_tenants.detail.tenant_id', lang) }}: {{ tenant.tenant_id }}
+  </p>
+{% endif %}
+{% endblock %}

@@ -13,8 +13,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .. import (auth, azure_mgmt, backup, bi_client, db, entra_sso,
-                 graph_connector, llm_client, mail_client, runner_config,
-                 toner_alerts)
+                 graph_connector, llm_client, mail_client, printix_partner,
+                 runner_config, toner_alerts)
 from ..db import customers as customers_tbl
 
 
@@ -82,6 +82,7 @@ async def settings_page(request: Request):
             "llm":    llm_client.load_config(),
             "graph":  graph_connector.load_config(),
             "runner": runner_config.load_config(),
+            "printix_partner": printix_partner.load_config(),
             "info":   request.query_params.get("info", ""),
             "error":  request.query_params.get("error", ""),
         },
@@ -755,6 +756,51 @@ async def settings_llm_test(request: Request):
             status_code=303)
     return RedirectResponse(
         f"/settings?info=llm_test_ok_{r.provider}#llm", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Printix Partner API (Printix Mandanten)
+# ---------------------------------------------------------------------------
+
+@router.post("/settings/printix-partner", include_in_schema=False)
+async def settings_printix_partner_save(request: Request):
+    admin = auth.require_admin(request)
+    form = await request.form()
+    cfg = {
+        "enabled":       (form.get("enabled") or "") in ("1", "on", "true", "yes"),
+        "environment":   form.get("environment") or "production",
+        "partner_id":    form.get("partner_id") or "",
+        "client_id":     form.get("client_id") or "",
+        "client_secret": form.get("client_secret") or "",
+        "api_host":      form.get("api_host") or "",
+    }
+    printix_partner.save_config(cfg)
+    db.audit(admin["id"], "settings.printix_partner_updated",
+             target_type="settings", target_id="printix_partner",
+             meta_json=json.dumps({"enabled": cfg["enabled"],
+                                    "environment": cfg["environment"]}))
+    return RedirectResponse(
+        "/settings?info=printix_partner_saved#printix-partner",
+        status_code=303)
+
+
+@router.post("/settings/printix-partner/test", include_in_schema=False)
+async def settings_printix_partner_test(request: Request):
+    auth.require_admin(request)
+    try:
+        count = printix_partner.test_connection()
+    except printix_partner.PrintixPartnerError as e:
+        return RedirectResponse(
+            f"/settings?error=printix_partner_test_{str(e)[:200].replace('&', '')}"
+            "#printix-partner", status_code=303)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("[Printix Partner test] unexpected exception")
+        return RedirectResponse(
+            f"/settings?error=printix_partner_test_{type(e).__name__}%3A%20"
+            f"{str(e)[:180].replace('&', '')}#printix-partner", status_code=303)
+    return RedirectResponse(
+        f"/settings?info=printix_partner_test_ok_{count}#printix-partner",
+        status_code=303)
 
 
 @router.post("/settings/mail/test", include_in_schema=False)

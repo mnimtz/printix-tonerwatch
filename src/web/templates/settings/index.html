@@ -47,6 +47,7 @@
     <li><a href="#llm"     data-tab="llm"     role="tab">🤖 {{ _('settings.llm.section', lang) }}</a></li>
     <li><a href="#entra"   data-tab="entra"   role="tab">🔐 {{ _('settings.entra.section', lang) }}</a></li>
     <li><a href="#graph"   data-tab="graph"   role="tab">☁ {{ _('settings.graph.section', lang) }}</a></li>
+    <li><a href="#printix-partner" data-tab="printix-partner" role="tab">🏢 {{ _('settings.printix_partner.section', lang) }}</a></li>
     <li><a href="#backup"  data-tab="backup"  role="tab">💾 {{ _('settings.backup.section', lang) }}</a></li>
     {# v0.24.11 — /settings/database is its own page, not an in-page
        tab-panel, so this link has no data-tab attribute: the tab-switch
@@ -930,6 +931,90 @@
   </div>
 
   </div><!-- /tab-panel: entra -->
+
+  <!-- v0.24.40: Printix Partner API (Printix Mandanten) -->
+  <div class="tab-panel" data-tab-panel="printix-partner">
+  <div class="card" id="printix-partner">
+    <h3>{{ _('settings.printix_partner.section', lang) }}</h3>
+    <p style="color: var(--tw-muted-blue); font-size: 0.88rem; margin-top: 2px;">
+      {{ _('settings.printix_partner.intro', lang) }}
+    </p>
+    <form method="post" action="/settings/printix-partner" style="margin-top: var(--sp-3);">
+      {% include "_csrf_input.html" %}
+      <div class="form-group" style="margin-bottom: 0;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" name="enabled" value="1"
+                 {% if printix_partner.enabled %}checked{% endif %}>
+          {{ _('settings.printix_partner.enabled', lang) }}
+        </label>
+        <p style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 6px;">
+          {{ _('settings.printix_partner.enabled_hint', lang) }}
+        </p>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+                  margin-top: var(--sp-4);">
+        <div class="form-group">
+          <label for="pp_environment">{{ _('settings.printix_partner.environment', lang) }}</label>
+          <select id="pp_environment" name="environment">
+            <option value="production" {% if printix_partner.environment == 'production' %}selected{% endif %}>
+              {{ _('settings.printix_partner.environment.production', lang) }}
+            </option>
+            <option value="test" {% if printix_partner.environment == 'test' %}selected{% endif %}>
+              {{ _('settings.printix_partner.environment.test', lang) }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="pp_partner_id">{{ _('settings.printix_partner.partner_id', lang) }}</label>
+          <input type="text" id="pp_partner_id" name="partner_id"
+                 value="{{ printix_partner.partner_id or '' }}"
+                 placeholder="00000000-1111-2222-3333-444444444444">
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+        <div class="form-group">
+          <label for="pp_client_id">{{ _('settings.printix_partner.client_id', lang) }}</label>
+          <input type="text" id="pp_client_id" name="client_id"
+                 value="{{ printix_partner.client_id or '' }}">
+        </div>
+        <div class="form-group">
+          <label for="pp_client_secret">{{ _('settings.printix_partner.client_secret', lang) }}</label>
+          <input type="password" id="pp_client_secret" name="client_secret"
+                 placeholder="{% if printix_partner.client_secret_present %}{{ _('settings.printix_partner.secret_kept', lang) }}{% else %}{{ _('settings.printix_partner.secret_hint', lang) }}{% endif %}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="pp_api_host">{{ _('settings.printix_partner.api_host', lang) }}</label>
+        <input type="url" id="pp_api_host" name="api_host"
+               value="{{ printix_partner.api_host or '' }}"
+               placeholder="https://api.printix.net">
+        <div style="font-size: 0.78rem; color: var(--tw-muted-blue); margin-top: 4px;">
+          {{ _('settings.printix_partner.api_host_hint', lang) }}
+        </div>
+      </div>
+      <div style="display: flex; gap: var(--sp-2); margin-top: var(--sp-3);">
+        <button type="submit" class="btn">{{ _('common.save', lang) }}</button>
+        <button type="submit" formaction="/settings/printix-partner/test"
+                formnovalidate class="btn btn-secondary">
+          🏢 {{ _('settings.printix_partner.test', lang) }}
+        </button>
+        <a href="/printix-tenants" class="btn btn-secondary">
+          {{ _('settings.printix_partner.open', lang) }}
+        </a>
+      </div>
+    </form>
+    {% if info == 'printix_partner_saved' %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        {{ _('settings.printix_partner.saved', lang) }}
+      </div>
+    {% elif info and info.startswith('printix_partner_test_ok_') %}
+      <div class="alert alert-info" style="margin-top: var(--sp-3);">
+        ✓ {{ _('settings.printix_partner.test_ok', lang) }} —
+        {{ info[len('printix_partner_test_ok_'):] }} {{ _('settings.printix_partner.tenants_found', lang) }}
+      </div>
+    {% endif %}
+  </div>
+  </div><!-- /tab-panel: printix-partner -->
 
   <!-- v0.10: backup -->
   <div class="tab-panel" data-tab-panel="backup">

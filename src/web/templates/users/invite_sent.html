@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ _('user.invite_title', lang) }}{% endblock %}
+{% block breadcrumb %}
+  <a href="/users" style="color: inherit;">{{ _('nav.users', lang) }}</a> ›
+  {{ _('user.invite_title', lang) }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 640px;">
+  {% if mail_sent %}
+    <h1>✓ {{ _('user.invite_sent.mailed_title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+      {{ _('user.invite_sent.mailed_intro', lang) }} <strong>{{ email }}</strong>.
+    </p>
+  {% else %}
+    <h1>{{ _('user.invite_sent.link_title', lang) }}</h1>
+    <p style="color: var(--tw-muted-blue); margin-top: var(--sp-2);">
+      {% if mail_error %}
+        {{ _('user.invite_sent.mail_failed', lang) }} {{ mail_error }}
+      {% else %}
+        {{ _('user.invite_sent.mail_disabled', lang) }}
+      {% endif %}
+    </p>
+    <div class="card" style="margin-top: var(--sp-4); padding: var(--sp-4);">
+      <label style="font-size: 0.82rem; color: var(--tw-muted-blue); text-transform: uppercase;
+                    letter-spacing: 0.06em; font-weight: 700;">
+        {{ _('user.invite_sent.link_label', lang) }}
+      </label>
+      <div style="display: flex; gap: var(--sp-2); margin-top: 8px;">
+        <input type="text" readonly value="{{ invite_url }}" id="invite-url-field"
+               style="flex: 1; font-family: var(--font-mono); font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="invite-url-copy">
+          {{ _('common.copy', lang) }}
+        </button>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="form-actions" style="margin-top: var(--sp-5);">
+    <a href="/users/{{ target_user_id }}/access" class="btn">
+      {{ _('user.invite_sent.continue_access', lang) }}
+    </a>
+    <a href="/users" class="btn btn-secondary">
+      {{ _('nav.users', lang) }}
+    </a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('invite-url-copy');
+  if (!btn) return;
+  var field = document.getElementById('invite-url-field');
+  btn.addEventListener('click', function () {
+    field.select();
+    navigator.clipboard.writeText(field.value).then(function () {
+      var orig = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(function () { btn.textContent = orig; }, 1500);
+    });
+  });
+})();
+</script>
+{% endblock %}

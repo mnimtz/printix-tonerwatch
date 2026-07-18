@@ -11,7 +11,10 @@
       {{ _('user.list_intro', lang) }}
     </p>
   </div>
-  <a href="/users/new" class="btn">+ {{ _('user.new_button', lang) }}</a>
+  <div style="display: flex; gap: var(--sp-2);">
+    <a href="/users/invite" class="btn btn-secondary">✉ {{ _('user.actions.invite', lang) }}</a>
+    <a href="/users/new" class="btn">+ {{ _('user.new_button', lang) }}</a>
+  </div>
 </div>
 
 {# v0.18.5: role chips + freetext live search. Chips are server-side
@@ -101,7 +104,10 @@
           {% endif %}
         </td>
         <td style="padding: var(--sp-3) var(--sp-4);">
-          {% if u.active %}
+          {% if not u.password_hash %}
+            <span style="color: #B45309; font-weight: 700;
+                         font-size: 0.85rem;">⏳ {{ _('user.status.invite_pending', lang) }}</span>
+          {% elif u.active %}
             <span style="color: var(--status-ok); font-weight: 700;
                          font-size: 0.85rem;">● {{ _('customer.status.active', lang) }}</span>
           {% else %}
@@ -110,6 +116,16 @@
           {% endif %}
         </td>
         <td style="padding: var(--sp-3) var(--sp-4); text-align: right;">
+          {% if not u.password_hash %}
+            <form method="post" action="/users/{{ u.id }}/invite/resend"
+                  style="display: inline;">
+              {% include "_csrf_input.html" %}
+              <button type="submit" class="btn btn-secondary"
+                      style="padding: 6px 12px; font-size: 0.82rem;">
+                ↻ {{ _('user.actions.resend_invite', lang) }}
+              </button>
+            </form>
+          {% endif %}
           <a href="/users/{{ u.id }}/access" class="btn btn-secondary"
              style="padding: 6px 12px; font-size: 0.82rem;">
             🔑 {{ _('user.actions.access', lang) }}

@@ -82,7 +82,7 @@
         </div>
       {% endif %}
 
-      <div class="form-group" style="margin-bottom: 0;">
+      <div class="form-group">
         <label style="display: flex; align-items: center; gap: 8px;
                       cursor: pointer;">
           <input type="checkbox" name="active" value="1"
@@ -90,6 +90,20 @@
           {{ _('user.field.active', lang) }}
         </label>
       </div>
+
+      {% if printix_partner_enabled() and form.role != 'admin' %}
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="display: flex; align-items: center; gap: 8px;
+                        cursor: pointer;">
+            <input type="checkbox" name="printix_tenants_access" value="1"
+                   {% if form.printix_tenants_access %}checked{% endif %}>
+            {{ _('user.field.printix_tenants_access', lang) }}
+          </label>
+          <p style="font-size: 0.82rem; color: var(--tw-muted-blue); margin-top: 6px;">
+            {{ _('user.field.printix_tenants_access_hint', lang) }}
+          </p>
+        </div>
+      {% endif %}
 
       <div class="form-actions">
         <button type="submit" class="btn">
