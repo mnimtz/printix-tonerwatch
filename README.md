@@ -365,9 +365,9 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 
 ### Internationalization
 
-- **EFIGS from day one.** English, French, Italian, German and Spanish —
+- **Six languages.** English, French, Italian, German, Spanish and Dutch —
   browser language auto-detected, user-switchable at any time.
-- **Boot-time completeness gate.** 448+ keys × 5 languages, verified at
+- **Boot-time completeness gate.** 898+ keys × 6 languages, verified at
   startup — a missing key fails the boot loudly instead of silently
   falling back to English.
 

@@ -5,7 +5,7 @@ Resolves the UI language for every request in this order:
     1. ``?lang=xx`` query parameter → persisted to the session
     2. ``lang`` on the session cookie
     3. User's stored ``users.lang`` preference (if logged in)
-    4. ``Accept-Language`` header, matched against the EFIGS set
+    4. ``Accept-Language`` header, matched against ``SUPPORTED_LANGS``
     5. ``DEFAULT_LANG`` environment variable (defaults to 'en')
 
 The resolved value is exposed as ``request.state.lang`` and threaded into
