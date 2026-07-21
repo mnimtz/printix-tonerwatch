@@ -42,7 +42,27 @@
   <div>
     <h1 style="margin-bottom: 4px;">📊 {{ _('reports.title', lang) }}</h1>
     <div class="scope">
-      {% if scope_label == 'all' %}{{ _('reports.scope.all', lang) }}{% else %}{{ scope_label }}{% endif %}
+      <form method="get" action="/reports/run" data-noloader
+            style="display: inline-flex; align-items: center; gap: 6px;">
+        <input type="hidden" name="date_from" value="{{ date_from }}">
+        <input type="hidden" name="date_to" value="{{ date_to }}">
+        {% for c in categories %}
+          <input type="hidden" name="category" value="{{ c }}">
+        {% endfor %}
+        <select name="customer" onchange="this.form.submit()"
+                style="font-size: 0.92rem; padding: 3px 8px; border-radius: 6px;
+                       border: 1px solid var(--tw-gray-300); color: inherit;
+                       background: var(--tw-white);">
+          <option value="all" {% if customer_id == 'all' %}selected{% endif %}>
+            {{ _('reports.scope.all', lang) }}
+          </option>
+          {% for cid, cname in customer_choices %}
+            <option value="{{ cid }}" {% if customer_id == cid|string %}selected{% endif %}>
+              {{ cname }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
       &nbsp;·&nbsp; {{ date_from }} – {{ date_to }}
     </div>
   </div>
