@@ -52,11 +52,15 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   to scan for.
 - **AI-phrased greeting (optional).** With an LLM configured, the summary
   line above is written by the model instead — built from the exact same
-  numbers plus recent toner-level anomalies, so it can call out a
-  specific situation ("Acme GmbH keeps tripping the anomaly check") by
-  name. Cached ~hourly per operator so it isn't an LLM call on every page
-  load; any failure (not configured, error, slow) falls straight back to
-  the static sentence — it's decoration, never a dependency.
+  numbers plus recent toner-level anomalies. When there's actually a
+  problem it writes two sentences and names the specific customers with
+  real critical/warn counts ("Acme has 3 critical and 1 warn, Beta has 2
+  warn"), not just a total; on a clean day it's one warm sentence. Cached
+  ~hourly per operator **and per language** (switching the UI language
+  gets a fresh sentence in that language immediately, not whatever got
+  cached first) so it isn't an LLM call on every page load; any failure
+  (not configured, error, slow) falls straight back to the static
+  sentence — it's decoration, never a dependency.
 - **Human-friendly status badges.** Bare SNMP codes (`NO_PAPER`,
   `MARKER_SUPPLY_LOW`, `DOOR_OPEN`, …) rendered as colored pill badges
   with icons and translated captions; unknown codes fall back to the raw

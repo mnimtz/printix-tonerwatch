@@ -80,6 +80,15 @@ async def dashboard(request: Request):
     # greeting summary — "Acme GmbH and Beta AG need a look first".
     urgent_names = [c["name"] for c in per_customer_stats if c["critical"]][:2]
 
+    # v0.24.45 — same idea but with real counts, not just names, so
+    # the AI greeting can say WHERE the problems are and how many
+    # ("Acme has 3 critical, 1 warn") instead of a bare total.
+    # per_customer_stats is already urgency-sorted above.
+    problem_customers = [
+        {"name": c["name"], "critical": c["critical"], "warn": c["warn"]}
+        for c in per_customer_stats if c["critical"] or c["warn"]
+    ][:3]
+
     # v0.24.13 — AI-phrased greeting, built from the exact same facts
     # as the static sentence below plus recent cross-customer
     # anomalies, so it can name a specific situation instead of just
@@ -92,7 +101,8 @@ async def dashboard(request: Request):
         user["id"], user.get("name") or user.get("email") or "",
         {"customers": len(customers), "printers": total_printers,
          "critical": critical_count, "warn": warn_count},
-        urgent_names, recent_anomalies, lang=request.state.lang)
+        urgent_names, recent_anomalies, lang=request.state.lang,
+        problem_customers=problem_customers)
 
     # v0.24.10 — cache freshness for the greeting line. toner_state is
     # the only place a "last seen" timestamp exists; MAX across every
