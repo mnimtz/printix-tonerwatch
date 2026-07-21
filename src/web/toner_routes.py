@@ -509,6 +509,92 @@ async def toner_printer_raw(request: Request):
         return _HTML(fallback, status_code=200)
 
 
+@router.get("/toner/bi_schema", response_class=HTMLResponse,
+            include_in_schema=False)
+async def toner_bi_schema(request: Request):
+    """v0.24.41 — read-only schema discovery for a customer's BI-DB.
+    TonerWatch has only ever queried dbo.printers/device_readings;
+    this lists every OTHER table Printix exposes (with an approximate
+    row count) so an operator can see at a glance whether something
+    like a users or print-jobs table exists before building a feature
+    around it. Admin-only (stricter than the other diagnose pages —
+    this one can browse arbitrary tables, not just printer data
+    already visible elsewhere in the app)."""
+    import logging as _logging
+    _log = _logging.getLogger("tonerwatch.bi_schema")
+
+    user = auth.require_admin(request)
+    customers = _visible_customers(user)
+
+    q = request.query_params
+    cust_id_raw = q.get("customer", "").strip()
+    table_key = q.get("table", "").strip()  # "schema.table"
+
+    selected_cust = None
+    if cust_id_raw.isdigit():
+        cid = int(cust_id_raw)
+        for c in customers:
+            if c["id"] == cid:
+                selected_cust = c
+                break
+
+    tables: list = []
+    tables_error = ""
+    columns: list = []
+    sample = None
+    table_error = ""
+    selected_schema = ""
+    selected_table = ""
+
+    if selected_cust:
+        try:
+            bi_cust = bi_client.customer_for_bi(selected_cust)
+        except Exception as exc:  # noqa: BLE001
+            _log.exception("[bi_schema] customer_for_bi failed")
+            bi_cust = None
+            tables_error = f"customer_for_bi: {type(exc).__name__}: {exc}"
+
+        if bi_cust:
+            try:
+                result = bi_client.list_all_tables(bi_cust)
+                tables = result if result is not None else []
+                if result is None:
+                    tables_error = "list_all_tables returned None — check container logs."
+            except Exception as exc:  # noqa: BLE001
+                _log.exception("[bi_schema] list_all_tables failed")
+                tables_error = f"{type(exc).__name__}: {exc}"
+
+            if table_key and "." in table_key:
+                selected_schema, selected_table = table_key.split(".", 1)
+                # Never trust the query string directly — only proceed
+                # if this exact (schema, table) pair was just returned
+                # by list_all_tables() for THIS customer.
+                valid = any(t.get("table_schema") == selected_schema and
+                           t.get("table_name") == selected_table
+                           for t in tables)
+                if valid:
+                    try:
+                        columns = bi_client.list_table_columns(
+                            bi_cust, selected_schema, selected_table) or []
+                        sample = bi_client.fetch_table_sample(
+                            bi_cust, selected_schema, selected_table, limit=5)
+                    except Exception as exc:  # noqa: BLE001
+                        _log.exception("[bi_schema] table detail failed")
+                        table_error = f"{type(exc).__name__}: {exc}"
+                else:
+                    table_error = ("unknown table — not in the list just "
+                                   "fetched for this customer.")
+
+    return request.app.state.templates.TemplateResponse(
+        "toner/bi_schema.html",
+        {"request": request, "lang": request.state.lang, "user": user,
+         "customers": customers, "selected_cust": selected_cust,
+         "tables": tables, "tables_error": tables_error,
+         "selected_schema": selected_schema, "selected_table": selected_table,
+         "columns": columns, "sample": sample, "table_error": table_error},
+    )
+
+
 def _looks_like_anywhere(p: dict) -> bool:
     """v0.23.13 — the actual Anywhere marker in Printix BI lives in
     the ``type`` column (NETWORK vs ANYWHERE) — Marcus's raw dump

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -283,6 +284,92 @@ def fetch_printers_raw(customer: dict, limit: int = 10,
             # v0.23.12 — same sanitisation as fetch_printer_raw so the
             # JSON dump doesn't stumble on datetime/bytes/decimal even
             # with default=str; keeps the payload cleaner too.
+            rows.append({k: _safe_value(v) for k, v in base.items()})
+        return {"columns": cols, "rows": rows}
+
+
+def list_all_tables(customer: dict) -> Optional[list[dict]]:
+    """v0.24.41 — schema discovery. TonerWatch has only ever queried
+    dbo.printers and dbo.device_readings; nobody has looked at what
+    ELSE Printix's BI-DB exposes per tenant (e.g. a users or
+    print-jobs table). Returns every table with an approximate row
+    count (via sys.partitions, index_id 0/1 = heap/clustered — cheap,
+    no full scan) so an operator can tell at a glance which tables
+    actually hold data worth exploring further."""
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT s.name AS table_schema, t.name AS table_name,
+                       SUM(p.rows) AS approx_row_count
+                  FROM sys.tables t
+                  JOIN sys.schemas s ON t.schema_id = s.schema_id
+                  JOIN sys.partitions p ON t.object_id = p.object_id
+                 WHERE p.index_id IN (0, 1)
+                 GROUP BY s.name, t.name
+                 ORDER BY s.name, t.name
+            """)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("list_all_tables failed: %s", exc)
+            return None
+        cols = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        return [({k: r.get(k) for k in cols} if isinstance(r, dict)
+                 else dict(zip(cols, r))) for r in rows]
+
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def list_table_columns(customer: dict, table_schema: str,
+                       table_name: str) -> Optional[list[dict]]:
+    """Column names + types for one table — values are passed as query
+    parameters (never interpolated), safe against injection regardless
+    of caller discipline."""
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE "
+                "FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s "
+                "ORDER BY ORDINAL_POSITION",
+                (table_schema, table_name),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("list_table_columns failed: %s", exc)
+            return None
+        cols = [d[0] for d in (cur.description or [])]
+        rows = cur.fetchall()
+        return [({k: r.get(k) for k in cols} if isinstance(r, dict)
+                 else dict(zip(cols, r))) for r in rows]
+
+
+def fetch_table_sample(customer: dict, table_schema: str, table_name: str,
+                       limit: int = 5) -> Optional[dict]:
+    """TOP N * FROM an arbitrary table. Table/schema names can't be
+    passed as SQL parameters (they're identifiers, not values) — the
+    caller MUST validate (table_schema, table_name) against a
+    same-request list_all_tables() result before calling this, but as
+    defense in depth this also rejects anything that isn't a bare
+    alphanumeric/underscore identifier, closing the injection route
+    even if a caller ever forgets that check."""
+    if not (_IDENTIFIER_RE.match(table_schema) and _IDENTIFIER_RE.match(table_name)):
+        raise ValueError(f"unsafe identifier: {table_schema}.{table_name}")
+    with _connect(customer) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"SELECT TOP {int(limit)} * FROM [{table_schema}].[{table_name}]")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("fetch_table_sample failed: %s", exc)
+            return None
+        cols = [d[0] for d in (cur.description or [])]
+        rows_raw = cur.fetchall()
+        rows = []
+        for r in rows_raw:
+            base = ({k: r.get(k) for k in cols} if isinstance(r, dict)
+                    else dict(zip(cols, r)))
             rows.append({k: _safe_value(v) for k, v in base.items()})
         return {"columns": cols, "rows": rows}
 
