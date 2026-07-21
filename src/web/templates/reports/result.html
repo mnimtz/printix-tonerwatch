@@ -226,6 +226,57 @@
   </section>
 {% endif %}
 
+{% if facts.active_users %}
+  {% set f = facts.active_users %}
+  <section class="rp-section">
+    <h2>👥 {{ _('reports.category.active_users', lang) }}</h2>
+    <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin: -8px 0 var(--sp-3);">
+      {{ _('reports.active_users.total_hint', lang) }} <strong>{{ f.total_active_users }}</strong>
+    </p>
+    {% if f.users_detail %}
+      <h3 style="font-size: 0.92rem; margin-bottom: var(--sp-2);">
+        {{ f.detail_customer_name }} — {{ f.users_detail|length }} {{ _('reports.active_users.users_label', lang) }}
+      </h3>
+      <table class="rp-table">
+        <thead><tr>
+          <th>{{ _('reports.col.name', lang) }}</th>
+          <th>{{ _('reports.col.email', lang) }}</th>
+          <th>{{ _('reports.col.department', lang) }}</th>
+        </tr></thead>
+        <tbody>
+          {% for u in f.users_detail %}
+          <tr>
+            <td>{{ u.name or '—' }}</td>
+            <td style="font-family: var(--font-mono); font-size: 0.85rem;">{{ u.email or '—' }}</td>
+            <td>{{ u.department or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% elif f.by_customer %}
+      <table class="rp-table">
+        <thead><tr>
+          <th>{{ _('reports.col.customer', lang) }}</th>
+          <th class="num">{{ _('reports.category.active_users', lang) }}</th>
+        </tr></thead>
+        <tbody>
+          {% for row in f.by_customer %}
+          <tr>
+            <td>{{ row.customer_name }}</td>
+            <td class="num">{{ row.active_users if row.active_users is not none else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="rp-empty" style="margin-top: var(--sp-3);">
+        {{ _('reports.active_users.pick_one_hint', lang) }}
+      </p>
+    {% else %}
+      <p class="rp-empty">{{ _('reports.empty', lang) }}</p>
+    {% endif %}
+  </section>
+{% endif %}
+
 <script>
 (function () {
   var btn = document.getElementById('rp-narrative-btn');

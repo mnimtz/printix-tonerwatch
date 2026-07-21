@@ -40,6 +40,10 @@
           <th style="text-align: left; padding: var(--sp-3) var(--sp-4);">
             {{ _('customer.table.tenant_url', lang) }}
           </th>
+          <th style="text-align: right; padding: var(--sp-3) var(--sp-4);
+                     width: 130px;">
+            {{ _('customer.table.active_users', lang) }}
+          </th>
           <th style="text-align: left; padding: var(--sp-3) var(--sp-4);
                      width: 140px;">
             {{ _('customer.table.status', lang) }}
@@ -71,6 +75,10 @@
                      font-family: var(--font-mono); font-size: 0.82rem;
                      color: var(--tw-muted-blue);">
             {{ c.tenant_url or '—' }}
+          </td>
+          <td style="padding: var(--sp-3) var(--sp-4); text-align: right;
+                     font-variant-numeric: tabular-nums;">
+            {{ c.active_users if c.active_users is not none else '—' }}
           </td>
           <td style="padding: var(--sp-3) var(--sp-4);">
             {% if c.active %}

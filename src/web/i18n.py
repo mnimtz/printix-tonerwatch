@@ -945,6 +945,21 @@ _EN: dict[str, str] = {
     "invite.submit_button": "Save password & sign in",
     "invite.error.invalid_or_expired": "This invitation link is invalid or has expired.",
     "invite.error.already_completed": "This invitation has already been completed. Please sign in normally.",
+
+    # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    "dashboard.stat.active_users": "Active users",
+    "customer.table.active_users": "Active users",
+    "reports.template.active_users": "Active users",
+    "reports.template.active_users.desc": "Active Printix user count per customer, or the full list for one.",
+    "reports.category.active_users": "Active users",
+    "reports.category.active_users.hint": "Active Printix user count per customer (pick one customer for the full name/email list).",
+    "reports.col.name": "Name",
+    "reports.col.email": "Email",
+    "reports.col.department": "Department",
+    "reports.col.customer": "Customer",
+    "reports.active_users.total_hint": "Total active users across the selected scope:",
+    "reports.active_users.users_label": "active users",
+    "reports.active_users.pick_one_hint": "Pick a single customer above to see the full name/email/department list.",
 }
 
 _FR: dict[str, str] = {
@@ -1855,6 +1870,21 @@ _FR: dict[str, str] = {
     "invite.submit_button": "Enregistrer & se connecter",
     "invite.error.invalid_or_expired": "Ce lien d'invitation est invalide ou a expiré.",
     "invite.error.already_completed": "Cette invitation a déjà été acceptée. Veuillez vous connecter normalement.",
+
+    # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    "dashboard.stat.active_users": "Utilisateurs actifs",
+    "customer.table.active_users": "Utilisateurs actifs",
+    "reports.template.active_users": "Utilisateurs actifs",
+    "reports.template.active_users.desc": "Nombre d'utilisateurs Printix actifs par client, ou la liste complète pour un seul.",
+    "reports.category.active_users": "Utilisateurs actifs",
+    "reports.category.active_users.hint": "Nombre d'utilisateurs Printix actifs par client (sélectionnez un client pour la liste complète nom/e-mail).",
+    "reports.col.name": "Nom",
+    "reports.col.email": "E-mail",
+    "reports.col.department": "Service",
+    "reports.col.customer": "Client",
+    "reports.active_users.total_hint": "Total des utilisateurs actifs dans le périmètre sélectionné :",
+    "reports.active_users.users_label": "utilisateurs actifs",
+    "reports.active_users.pick_one_hint": "Sélectionnez un seul client ci-dessus pour voir la liste complète nom/e-mail/service.",
 }
 
 _IT: dict[str, str] = {
@@ -2765,6 +2795,21 @@ _IT: dict[str, str] = {
     "invite.submit_button": "Salva & accedi",
     "invite.error.invalid_or_expired": "Questo link di invito non è valido o è scaduto.",
     "invite.error.already_completed": "Questo invito è già stato completato. Accedi normalmente.",
+
+    # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    "dashboard.stat.active_users": "Utenti attivi",
+    "customer.table.active_users": "Utenti attivi",
+    "reports.template.active_users": "Utenti attivi",
+    "reports.template.active_users.desc": "Numero di utenti Printix attivi per cliente, o l'elenco completo per uno solo.",
+    "reports.category.active_users": "Utenti attivi",
+    "reports.category.active_users.hint": "Numero di utenti Printix attivi per cliente (seleziona un cliente per l'elenco completo nome/email).",
+    "reports.col.name": "Nome",
+    "reports.col.email": "Email",
+    "reports.col.department": "Reparto",
+    "reports.col.customer": "Cliente",
+    "reports.active_users.total_hint": "Totale utenti attivi nell'ambito selezionato:",
+    "reports.active_users.users_label": "utenti attivi",
+    "reports.active_users.pick_one_hint": "Seleziona un singolo cliente qui sopra per vedere l'elenco completo nome/email/reparto.",
 }
 
 _DE: dict[str, str] = {
@@ -3675,6 +3720,21 @@ _DE: dict[str, str] = {
     "invite.submit_button": "Passwort speichern & anmelden",
     "invite.error.invalid_or_expired": "Dieser Einladungslink ist ungültig oder abgelaufen.",
     "invite.error.already_completed": "Diese Einladung wurde bereits abgeschlossen. Bitte melde dich normal an.",
+
+    # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    "dashboard.stat.active_users": "Aktive User",
+    "customer.table.active_users": "Aktive User",
+    "reports.template.active_users": "Aktive Benutzer",
+    "reports.template.active_users.desc": "Anzahl aktiver Printix-User pro Kunde, oder die vollständige Liste für einen einzelnen.",
+    "reports.category.active_users": "Aktive Benutzer",
+    "reports.category.active_users.hint": "Anzahl aktiver Printix-User pro Kunde (einen Kunden auswählen für die volle Namen-/E-Mail-Liste).",
+    "reports.col.name": "Name",
+    "reports.col.email": "E-Mail",
+    "reports.col.department": "Abteilung",
+    "reports.col.customer": "Kunde",
+    "reports.active_users.total_hint": "Aktive User insgesamt im gewählten Bereich:",
+    "reports.active_users.users_label": "aktive User",
+    "reports.active_users.pick_one_hint": "Oben einen einzelnen Kunden auswählen, um die vollständige Namen-/E-Mail-/Abteilungsliste zu sehen.",
 }
 
 _ES: dict[str, str] = {
@@ -4585,6 +4645,21 @@ _ES: dict[str, str] = {
     "invite.submit_button": "Guardar y acceder",
     "invite.error.invalid_or_expired": "Este enlace de invitación no es válido o ha caducado.",
     "invite.error.already_completed": "Esta invitación ya se ha completado. Inicia sesión normalmente.",
+
+    # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    "dashboard.stat.active_users": "Usuarios activos",
+    "customer.table.active_users": "Usuarios activos",
+    "reports.template.active_users": "Usuarios activos",
+    "reports.template.active_users.desc": "Número de usuarios activos de Printix por cliente, o la lista completa para uno.",
+    "reports.category.active_users": "Usuarios activos",
+    "reports.category.active_users.hint": "Número de usuarios activos de Printix por cliente (elige un cliente para la lista completa de nombre/correo).",
+    "reports.col.name": "Nombre",
+    "reports.col.email": "Correo electrónico",
+    "reports.col.department": "Departamento",
+    "reports.col.customer": "Cliente",
+    "reports.active_users.total_hint": "Total de usuarios activos en el ámbito seleccionado:",
+    "reports.active_users.users_label": "usuarios activos",
+    "reports.active_users.pick_one_hint": "Elige un solo cliente arriba para ver la lista completa de nombre/correo/departamento.",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {

@@ -31,10 +31,14 @@ async def dashboard(request: Request):
     critical_count = 0
     warn_count = 0
     unknown_count = 0
+    total_active_users = 0
 
     for c in customers:
         bi_customer = bi_client.customer_for_bi(c)
         printers = bi_client.fetch_all_printer_supplies_cached_only(bi_customer)
+        active_users = bi_client.fetch_active_users_cached_only(bi_customer)
+        if active_users is not None:
+            total_active_users += len(active_users)
         stats = {
             "id": c["id"], "name": c["name"], "tenant_url": c["tenant_url"],
             "printers": 0, "critical": 0, "warn": 0, "ok": 0, "unknown": 0,
@@ -179,6 +183,7 @@ async def dashboard(request: Request):
                 "warn":      warn_count,
                 "ok":        ok_count,
                 "unknown":   unknown_count,
+                "active_users": total_active_users,
             },
             "per_customer": per_customer_stats,
             "urgent_names": urgent_names,

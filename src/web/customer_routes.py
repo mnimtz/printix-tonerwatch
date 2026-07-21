@@ -93,13 +93,23 @@ def _visible_customers_for(user: dict) -> list[dict]:
 async def customers_list(request: Request):
     user = auth.require_user(request)
     templates = request.app.state.templates
+    customers = _visible_customers_for(user)
+    # v0.24.42 — active-user count per customer, cache-only (see
+    # bi_client.fetch_active_users_cached_only) so this list page never
+    # blocks on a live BI-DB round trip. None means "no cached data
+    # yet" (cold cache or no BI credentials) — the template shows a
+    # dash rather than 0.
+    for c in customers:
+        bi_customer = bi_client.customer_for_bi(c)
+        active_users = bi_client.fetch_active_users_cached_only(bi_customer)
+        c["active_users"] = len(active_users) if active_users is not None else None
     return templates.TemplateResponse(
         "customers/list.html",
         {
             "request": request,
             "lang": request.state.lang,
             "user": user,
-            "customers": _visible_customers_for(user),
+            "customers": customers,
         },
     )
 

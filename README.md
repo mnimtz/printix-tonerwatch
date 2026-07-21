@@ -24,6 +24,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   number; the shared runtime queries them all on a schedule and rolls the
   data up into cross-customer views. Customers, orders, and the supply
   library all have their own live freetext search box.
+- **Active user counts.** The same BI-DB connection used for toner data
+  also carries Printix's own `dbo.users` table — a background tick keeps
+  a 10-minute cache of each customer's active user count, surfaced as a
+  dashboard tile (sum across every visible customer) and a column on the
+  customer list. No extra credentials, no Partner API dependency — pure
+  read-only discovery of what the existing connection already exposes.
 - **Two views on the same data.** Card-based grid for quick triage or a
   sortable list view for spreadsheet-style scanning. Toggle persists per
   user in session.
@@ -140,14 +146,20 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 
 - **Flexible builder** (`/reports`) — any date range (presets for
   7/30/90 days, this quarter, this year, or a custom from/to), a single
-  customer or every customer this operator can see, and four
+  customer or every customer this operator can see, and five
   combinable categories: **orders** (volume, status breakdown, average
   fulfillment time), **consumption** (toner actually shipped —
   delivered/installed orders — by color, printer and customer, with
   spend), **device health** (toner-level anomalies flagged in the
   window, plus printers with unusually many orders as an order-based
-  proxy for "might need a look"), and **supplier performance**
-  (orders, spend and average fulfillment time per supplier).
+  proxy for "might need a look"), **supplier performance**
+  (orders, spend and average fulfillment time per supplier), and
+  **active users** (opt-in — a live BI-DB snapshot rather than a
+  date-windowed aggregate like the others: a per-customer summary
+  across every customer in scope, or the full name/email/department
+  list once exactly one customer is selected — a multi-customer report
+  deliberately never dumps every visible customer's user directory
+  into one table).
   "Consumption" is measured the honest way — cartridges that actually
   shipped — rather than a level curve; a level-over-time chart becomes
   possible once enough toner-level history (see Alerting) has

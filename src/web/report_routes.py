@@ -37,7 +37,12 @@ from ..db import customers as customers_tbl
 
 router = APIRouter()
 
-_ALL_CATEGORIES = ("orders", "consumption", "device_health", "supplier_performance")
+_ALL_CATEGORIES = ("orders", "consumption", "device_health",
+                   "supplier_performance", "active_users")
+# active_users is opt-in only — it's a live-ish BI-DB snapshot, not a
+# date-windowed historical aggregate like the others, so it shouldn't
+# silently ride along whenever an operator just wants "everything".
+_DEFAULT_CATEGORIES = ("orders", "consumption", "device_health", "supplier_performance")
 
 
 def _customer_choices(user: dict) -> list[tuple[int, str]]:
@@ -87,7 +92,7 @@ def _parse_date_range(request: Request) -> tuple[str, str]:
 def _parse_categories(request: Request) -> list[str]:
     raw = request.query_params.getlist("category")
     picked = [c for c in raw if c in _ALL_CATEGORIES]
-    return picked or list(_ALL_CATEGORIES)
+    return picked or list(_DEFAULT_CATEGORIES)
 
 
 def _compute(categories: list[str], customer_ids: list[int],
@@ -103,6 +108,9 @@ def _compute(categories: list[str], customer_ids: list[int],
             customer_ids, date_from, date_to)
     if "supplier_performance" in categories:
         facts["supplier_performance"] = reports.compute_supplier_performance_facts(
+            customer_ids, date_from, date_to)
+    if "active_users" in categories:
+        facts["active_users"] = reports.compute_active_users_facts(
             customer_ids, date_from, date_to)
     return facts
 
@@ -248,6 +256,23 @@ async def reports_run_export_csv(request: Request):
             w.writerow([row["supplier"], row["orders"], row["quantity"],
                         row["spend_cents"], row["avg_fulfillment_days"]])
         w.writerow([])
+
+    if "active_users" in facts:
+        f = facts["active_users"]
+        w.writerow(["ACTIVE USERS"])
+        w.writerow(["total_active_users", f["total_active_users"]])
+        w.writerow([])
+        w.writerow(["customer", "active_users"])
+        for row in f["by_customer"]:
+            w.writerow([row["customer_name"],
+                        row["active_users"] if row["active_users"] is not None else ""])
+        w.writerow([])
+        if f["users_detail"]:
+            w.writerow([f'USERS — {f["detail_customer_name"]}'])
+            w.writerow(["name", "email", "department"])
+            for u in f["users_detail"]:
+                w.writerow([u["name"], u["email"], u["department"]])
+            w.writerow([])
 
     csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM so Excel gets UTF-8 right
     filename = f"tonerwatch-report_{date_from}_{date_to}.csv"
