@@ -261,11 +261,13 @@ async def reports_run_export_csv(request: Request):
         f = facts["active_users"]
         w.writerow(["ACTIVE USERS"])
         w.writerow(["total_active_users", f["total_active_users"]])
+        w.writerow(["total_registered_users", f["total_registered_users"]])
         w.writerow([])
-        w.writerow(["customer", "active_users"])
+        w.writerow(["customer", "active_users", "registered_users"])
         for row in f["by_customer"]:
             w.writerow([row["customer_name"],
-                        row["active_users"] if row["active_users"] is not None else ""])
+                        row["active_users"] if row["active_users"] is not None else "",
+                        row["registered_users"] if row["registered_users"] is not None else ""])
         w.writerow([])
         if f["users_detail"]:
             w.writerow([f'USERS — {f["detail_customer_name"]}'])

@@ -351,24 +351,29 @@ def compute_supplier_performance_facts(customer_ids: list[int], date_from: str,
 
 def compute_active_users_facts(customer_ids: list[int], date_from: str,
                                date_to: str) -> dict[str, Any]:
-    """Active Printix users per customer, from the cached BI-DB
-    snapshot (bi_client.fetch_active_users_cached_only) — same
-    "no live BI-DB query inside a report" rule as every other
-    category here (see module docstring). ``date_from``/``date_to``
-    are accepted for signature consistency with the other compute_*
-    functions but unused: this is a live snapshot, not a
+    """Active + registered Printix users per customer, from the cached
+    BI-DB snapshots (bi_client.fetch_active_users_cached_only,
+    fetch_registered_users_cached_only) — same "no live BI-DB query
+    inside a report" rule as every other category here (see module
+    docstring). "Active" means genuine print activity in the last 30
+    days (dbo.jobs); "registered" means the account exists and isn't
+    disabled (dbo.users.meta_status) — see bi_client.py's module
+    comment for why these were split in v0.24.46. ``date_from``/
+    ``date_to`` are accepted for signature consistency with the other
+    compute_* functions but unused: this is a live snapshot, not a
     time-windowed aggregate.
 
-    Always returns a per-customer summary (name + count). The full
-    per-user list (name/email/department) is populated ONLY when
-    exactly one customer is in scope — a multi-customer report
-    deliberately never dumps every visible customer's user directory
-    into a single table."""
+    Always returns a per-customer summary (name + both counts). The
+    full per-user list (name/email/department, for the active-users
+    set) is populated ONLY when exactly one customer is in scope — a
+    multi-customer report deliberately never dumps every visible
+    customer's user directory into a single table."""
     from . import bi_client
 
     if not customer_ids:
-        return {"total_active_users": 0, "by_customer": [],
-                "users_detail": None, "detail_customer_name": None}
+        return {"total_active_users": 0, "total_registered_users": 0,
+                "by_customer": [], "users_detail": None,
+                "detail_customer_name": None}
 
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -380,6 +385,7 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
 
     by_customer: list[dict[str, Any]] = []
     total_active_users = 0
+    total_registered_users = 0
     users_detail: list[dict[str, Any]] | None = None
     detail_customer_name: str | None = None
     single_customer = len(customer_ids) == 1
@@ -389,10 +395,15 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
                 "sql_database": r.sql_database, "sql_username": r.sql_username}
         users = bi_client.fetch_active_users_cached_only(cust)
         count = len(users) if users is not None else None
+        registered = bi_client.fetch_registered_users_cached_only(cust)
+        reg_count = len(registered) if registered is not None else None
         by_customer.append({"customer_id": r.id, "customer_name": r.name,
-                            "active_users": count})
+                            "active_users": count,
+                            "registered_users": reg_count})
         if count:
             total_active_users += count
+        if reg_count:
+            total_registered_users += reg_count
         if single_customer and users is not None:
             users_detail = sorted(
                 users, key=lambda u: ((u.get("name") or "").lower(),
@@ -402,6 +413,7 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
     by_customer.sort(key=lambda x: x["customer_name"].lower())
     return {
         "total_active_users": total_active_users,
+        "total_registered_users": total_registered_users,
         "by_customer": by_customer,
         "users_detail": users_detail,
         "detail_customer_name": detail_customer_name,
@@ -428,7 +440,8 @@ def generate_report_narrative(scope_label: str, date_from: str, date_to: str,
         return None, None
 
     lang_name = {"de": "German", "en": "English", "fr": "French",
-                 "it": "Italian", "es": "Spanish"}.get(lang, "English")
+                 "it": "Italian", "es": "Spanish",
+                 "nl": "Dutch"}.get(lang, "English")
     system = (
         "You write short executive-summary paragraphs for an MSP's "
         "print-supply monitoring product, suitable for a quarterly "

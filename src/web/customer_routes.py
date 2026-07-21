@@ -98,11 +98,15 @@ async def customers_list(request: Request):
     # bi_client.fetch_active_users_cached_only) so this list page never
     # blocks on a live BI-DB round trip. None means "no cached data
     # yet" (cold cache or no BI credentials) — the template shows a
-    # dash rather than 0.
+    # dash rather than 0. v0.24.46: also show registered-user count
+    # (account status, not usage) alongside it.
     for c in customers:
         bi_customer = bi_client.customer_for_bi(c)
         active_users = bi_client.fetch_active_users_cached_only(bi_customer)
         c["active_users"] = len(active_users) if active_users is not None else None
+        registered_users = bi_client.fetch_registered_users_cached_only(bi_customer)
+        c["registered_users"] = (len(registered_users)
+                                  if registered_users is not None else None)
     return templates.TemplateResponse(
         "customers/list.html",
         {

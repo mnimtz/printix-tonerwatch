@@ -32,7 +32,7 @@
 
   /* ---------- Fleet health ---------- */
   .health-panel {
-    display: grid; grid-template-columns: repeat(5, 1fr) auto;
+    display: grid; grid-template-columns: repeat(6, 1fr) auto;
     gap: var(--sp-3); margin-bottom: var(--sp-6); align-items: stretch;
   }
   @media (max-width: 960px) { .health-panel { grid-template-columns: 1fr 1fr; } }
@@ -243,6 +243,10 @@
   <a href="/customers" class="stat-tile card" data-noloader>
     <div class="eyebrow">👥 {{ _('dashboard.stat.active_users', lang) }}</div>
     <div class="value">{{ counts.active_users }}</div>
+  </a>
+  <a href="/customers" class="stat-tile card" data-noloader>
+    <div class="eyebrow">🪪 {{ _('dashboard.stat.registered_users', lang) }}</div>
+    <div class="value">{{ counts.registered_users }}</div>
   </a>
   <a href="/toner" class="stat-tile card" data-noloader>
     <div class="eyebrow">🖨 {{ _('dashboard.stat.printers', lang) }}</div>

@@ -24,12 +24,18 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   number; the shared runtime queries them all on a schedule and rolls the
   data up into cross-customer views. Customers, orders, and the supply
   library all have their own live freetext search box.
-- **Active user counts.** The same BI-DB connection used for toner data
-  also carries Printix's own `dbo.users` table — a background tick keeps
-  a 10-minute cache of each customer's active user count, surfaced as a
-  dashboard tile (sum across every visible customer) and a column on the
-  customer list. No extra credentials, no Partner API dependency — pure
-  read-only discovery of what the existing connection already exposes.
+- **Active vs. registered user counts.** The same BI-DB connection used
+  for toner data also carries Printix's own `dbo.users` and `dbo.jobs`
+  tables — a background tick keeps a 10-minute cache of both, per
+  customer: **active users** are those who genuinely printed something
+  in the last 30 days (the number that actually correlates with billing/
+  licensing, confirmed against a real tenant's Printix Partner Portal
+  "Active users" graph), while **registered users** is the older,
+  much larger account-exists-and-isn't-disabled count. Both are
+  surfaced as dashboard tiles (summed across every visible customer)
+  and columns on the customer list. No extra credentials, no Partner
+  API dependency — pure read-only discovery of what the existing
+  connection already exposes.
 - **Two views on the same data.** Card-based grid for quick triage or a
   sortable list view for spreadsheet-style scanning. Toggle persists per
   user in session.
@@ -159,11 +165,12 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   proxy for "might need a look"), **supplier performance**
   (orders, spend and average fulfillment time per supplier), and
   **active users** (opt-in — a live BI-DB snapshot rather than a
-  date-windowed aggregate like the others: a per-customer summary
-  across every customer in scope, or the full name/email/department
-  list once exactly one customer is selected — a multi-customer report
-  deliberately never dumps every visible customer's user directory
-  into one table).
+  date-windowed aggregate like the others: a per-customer summary of
+  both genuinely active users — printed in the last 30 days — and
+  registered users, across every customer in scope, or the full
+  name/email/department list of active users once exactly one
+  customer is selected — a multi-customer report deliberately never
+  dumps every visible customer's user directory into one table).
   "Consumption" is measured the honest way — cartridges that actually
   shipped — rather than a level curve; a level-over-time chart becomes
   possible once enough toner-level history (see Alerting) has

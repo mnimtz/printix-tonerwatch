@@ -252,6 +252,7 @@
     <h2>👥 {{ _('reports.category.active_users', lang) }}</h2>
     <p style="color: var(--tw-muted-blue); font-size: 0.85rem; margin: -8px 0 var(--sp-3);">
       {{ _('reports.active_users.total_hint', lang) }} <strong>{{ f.total_active_users }}</strong>
+      · {{ _('reports.active_users.total_registered_hint', lang) }} <strong>{{ f.total_registered_users }}</strong>
     </p>
     {% if f.users_detail %}
       <h3 style="font-size: 0.92rem; margin-bottom: var(--sp-2);">
@@ -278,12 +279,14 @@
         <thead><tr>
           <th>{{ _('reports.col.customer', lang) }}</th>
           <th class="num">{{ _('reports.category.active_users', lang) }}</th>
+          <th class="num">{{ _('customer.table.registered_users', lang) }}</th>
         </tr></thead>
         <tbody>
           {% for row in f.by_customer %}
           <tr>
             <td>{{ row.customer_name }}</td>
             <td class="num">{{ row.active_users if row.active_users is not none else '—' }}</td>
+            <td class="num">{{ row.registered_users if row.registered_users is not none else '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>

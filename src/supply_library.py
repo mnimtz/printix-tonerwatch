@@ -459,7 +459,8 @@ def ai_suggest_order_mail(order: dict[str, Any], supply: dict[str, Any] | None,
                    "Y": "yellow"}.get((order.get("color") or "").upper(), "")
 
     lang_name = {"de": "German", "en": "English", "fr": "French",
-                 "it": "Italian", "es": "Spanish"}.get(lang, "English")
+                 "it": "Italian", "es": "Spanish",
+                 "nl": "Dutch"}.get(lang, "English")
     system = (
         "You draft short, professional B2B purchase-order emails to a "
         "print-supply distributor, sent by an MSP on behalf of one of "

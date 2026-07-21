@@ -603,17 +603,97 @@ def _query_all_supplies(customer: dict) -> Optional[list[dict]]:
 
 
 # ---------------------------------------------------------------------------
-# Active Printix users (dbo.users) — v0.24.42
+# Registered vs. genuinely active Printix users — v0.24.42, corrected v0.24.46
 # ---------------------------------------------------------------------------
+#
+# v0.24.46: "active" originally meant dbo.users.meta_status = 'ACTIVE',
+# which only means the account exists and isn't disabled — Marcus
+# found (his own test tenant, and confirmed again against Printix's
+# own Partner Portal "Active users" graph for a real customer: 131
+# registered accounts, 2-3 shown as genuinely active) that this
+# massively overcounts real usage. Split into two concepts now:
+#
+# * "registered" — dbo.users, meta_status = 'ACTIVE' (what the old
+#   "active users" used to mean; kept because license/seat counting
+#   still cares about it).
+# * "active" — users who actually submitted a print job recently
+#   (dbo.jobs.tenant_user_id, joined back to dbo.users for name/email/
+#   department), which is what genuinely reflects usage — and lines up
+#   with what Printix's own partner portal tracks.
+
+_REGISTERED_USERS_CACHE: dict[int, tuple[float, list]] = {}
+_REGISTERED_USERS_TTL_SEC = 600  # 10 min — same cadence as the printer-supply cache
 
 _ACTIVE_USERS_CACHE: dict[int, tuple[float, list]] = {}
-_ACTIVE_USERS_TTL_SEC = 600  # 10 min — same cadence as the printer-supply cache
+_ACTIVE_USERS_TTL_SEC = 600
+_ACTIVE_USERS_WINDOW_DAYS = 30
+
+
+def fetch_registered_users_cached_only(customer: dict) -> Optional[list[dict]]:
+    """Only read from the cache — return ``None`` if nothing is stored
+    or the entry is stale. Used by the dashboard/customer-list/reports,
+    which must never block on a live BI-DB round trip."""
+    if not _has_creds(customer):
+        return None
+    key = int(customer["id"])
+    now = time.time()
+    with _CACHE_LOCK:
+        entry = _REGISTERED_USERS_CACHE.get(key)
+        if entry and (now - entry[0]) < _REGISTERED_USERS_TTL_SEC:
+            return entry[1]
+    return None
+
+
+def fetch_registered_users(customer: dict) -> Optional[list[dict]]:
+    """Registered Printix users for one tenant (account exists, not
+    disabled) — email, name, department. Discovered via
+    /toner/bi_schema: dbo.users is RLS-scoped to just this customer's
+    own tenant, same as dbo.printers. Cached 10 min; the background
+    cache-refresh tick (toner_alerts._tick_cache_refresh) warms this
+    alongside the printer-supply cache so callers almost always hit
+    the cached-only path above."""
+    if not _has_creds(customer):
+        return None
+    key = int(customer["id"])
+    now = time.time()
+    with _CACHE_LOCK:
+        entry = _REGISTERED_USERS_CACHE.get(key)
+        if entry and (now - entry[0]) < _REGISTERED_USERS_TTL_SEC:
+            return entry[1]
+
+    result = _query_registered_users(customer)
+    if result is not None:
+        with _CACHE_LOCK:
+            _REGISTERED_USERS_CACHE[key] = (now, result)
+    return result
+
+
+def _query_registered_users(customer: dict) -> Optional[list[dict]]:
+    try:
+        import pymssql  # noqa
+    except ImportError:
+        return None
+    try:
+        with _connect(customer, login_timeout=30, timeout=60) as conn:
+            cur = conn.cursor(as_dict=True)
+            cur.execute("""SELECT email, name, department
+                             FROM dbo.users
+                            WHERE meta_status = 'ACTIVE'
+                            ORDER BY name, email""")
+            rows = cur.fetchall()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("_query_registered_users failed for customer %s: %s",
+                       customer.get("id"), exc)
+        return None
+    return [{"email": _safe_value(r.get("email")) or "",
+             "name": _safe_value(r.get("name")) or "",
+             "department": _safe_value(r.get("department")) or ""}
+            for r in rows]
 
 
 def fetch_active_users_cached_only(customer: dict) -> Optional[list[dict]]:
     """Only read from the cache — return ``None`` if nothing is stored
-    or the entry is stale. Used by the dashboard/customer-list/reports,
-    which must never block on a live BI-DB round trip."""
+    or the entry is stale."""
     if not _has_creds(customer):
         return None
     key = int(customer["id"])
@@ -626,12 +706,11 @@ def fetch_active_users_cached_only(customer: dict) -> Optional[list[dict]]:
 
 
 def fetch_active_users(customer: dict) -> Optional[list[dict]]:
-    """Active Printix users for one tenant — email, name, department.
-    Discovered via /toner/bi_schema: dbo.users is RLS-scoped to just
-    this customer's own tenant, same as dbo.printers. Cached 10 min;
-    the background cache-refresh tick (toner_alerts._tick_cache_refresh)
-    warms this alongside the printer-supply cache so callers almost
-    always hit the cached-only path above."""
+    """Genuinely active Printix users for one tenant — distinct users
+    who submitted at least one print job in the last
+    ``_ACTIVE_USERS_WINDOW_DAYS`` days — email, name, department.
+    Cached 10 min; warmed by the same background tick as
+    fetch_registered_users."""
     if not _has_creds(customer):
         return None
     key = int(customer["id"])
@@ -656,10 +735,12 @@ def _query_active_users(customer: dict) -> Optional[list[dict]]:
     try:
         with _connect(customer, login_timeout=30, timeout=60) as conn:
             cur = conn.cursor(as_dict=True)
-            cur.execute("""SELECT email, name, department
-                             FROM dbo.users
-                            WHERE meta_status = 'ACTIVE'
-                            ORDER BY name, email""")
+            cur.execute("""SELECT DISTINCT u.email, u.name, u.department
+                             FROM dbo.jobs j
+                             JOIN dbo.users u ON u.id = j.tenant_user_id
+                            WHERE j.submit_time >= DATEADD(day, %s, GETUTCDATE())
+                            ORDER BY u.name, u.email""",
+                        (-_ACTIVE_USERS_WINDOW_DAYS,))
             rows = cur.fetchall()
     except Exception as exc:  # noqa: BLE001
         logger.warning("_query_active_users failed for customer %s: %s",
@@ -769,6 +850,7 @@ def invalidate_customer_cache(customer_id: int) -> None:
     with _CACHE_LOCK:
         _ALL_SUPPLIES_CACHE.pop(int(customer_id), None)
         _ACTIVE_USERS_CACHE.pop(int(customer_id), None)
+        _REGISTERED_USERS_CACHE.pop(int(customer_id), None)
         for k in list(_PRINTER_SUPPLIES_CACHE.keys()):
             if k[0] == int(customer_id):
                 del _PRINTER_SUPPLIES_CACHE[k]

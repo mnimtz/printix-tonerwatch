@@ -951,17 +951,23 @@ _EN: dict[str, str] = {
     "invite.error.already_completed": "This invitation has already been completed. Please sign in normally.",
 
     # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    # v0.24.46: split into "active" (genuinely printed in the last 30
+    # days) vs. "registered" (account exists, not disabled) — see
+    # bi_client.py's module comment for why.
     "dashboard.stat.active_users": "Active users",
+    "dashboard.stat.registered_users": "Registered users",
     "customer.table.active_users": "Active users",
+    "customer.table.registered_users": "Registered users",
     "reports.template.active_users": "Active users",
-    "reports.template.active_users.desc": "Active Printix user count per customer, or the full list for one.",
+    "reports.template.active_users.desc": "Genuinely active Printix users per customer (printed in the last 30 days), or the full list for one.",
     "reports.category.active_users": "Active users",
-    "reports.category.active_users.hint": "Active Printix user count per customer (pick one customer for the full name/email list).",
+    "reports.category.active_users.hint": "Printix users who actually printed in the last 30 days, per customer (pick one customer for the full name/email list).",
     "reports.col.name": "Name",
     "reports.col.email": "Email",
     "reports.col.department": "Department",
     "reports.col.customer": "Customer",
     "reports.active_users.total_hint": "Total active users across the selected scope:",
+    "reports.active_users.total_registered_hint": "Total registered users across the selected scope:",
     "reports.active_users.users_label": "active users",
     "reports.active_users.pick_one_hint": "Pick a single customer above to see the full name/email/department list.",
 }
@@ -1879,17 +1885,23 @@ _FR: dict[str, str] = {
     "invite.error.already_completed": "Cette invitation a déjà été acceptée. Veuillez vous connecter normalement.",
 
     # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    # v0.24.46: split into "active" (genuinely printed in the last 30
+    # days) vs. "registered" (account exists, not disabled) — see
+    # bi_client.py's module comment for why.
     "dashboard.stat.active_users": "Utilisateurs actifs",
+    "dashboard.stat.registered_users": "Utilisateurs enregistrés",
     "customer.table.active_users": "Utilisateurs actifs",
+    "customer.table.registered_users": "Utilisateurs enregistrés",
     "reports.template.active_users": "Utilisateurs actifs",
-    "reports.template.active_users.desc": "Nombre d'utilisateurs Printix actifs par client, ou la liste complète pour un seul.",
+    "reports.template.active_users.desc": "Utilisateurs Printix réellement actifs par client (ayant imprimé au cours des 30 derniers jours), ou la liste complète pour un seul.",
     "reports.category.active_users": "Utilisateurs actifs",
-    "reports.category.active_users.hint": "Nombre d'utilisateurs Printix actifs par client (sélectionnez un client pour la liste complète nom/e-mail).",
+    "reports.category.active_users.hint": "Utilisateurs Printix ayant réellement imprimé au cours des 30 derniers jours, par client (sélectionnez un client pour la liste complète nom/e-mail).",
     "reports.col.name": "Nom",
     "reports.col.email": "E-mail",
     "reports.col.department": "Service",
     "reports.col.customer": "Client",
     "reports.active_users.total_hint": "Total des utilisateurs actifs dans le périmètre sélectionné :",
+    "reports.active_users.total_registered_hint": "Total des utilisateurs enregistrés dans le périmètre sélectionné :",
     "reports.active_users.users_label": "utilisateurs actifs",
     "reports.active_users.pick_one_hint": "Sélectionnez un seul client ci-dessus pour voir la liste complète nom/e-mail/service.",
 }
@@ -2807,17 +2819,23 @@ _IT: dict[str, str] = {
     "invite.error.already_completed": "Questo invito è già stato completato. Accedi normalmente.",
 
     # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    # v0.24.46: split into "active" (genuinely printed in the last 30
+    # days) vs. "registered" (account exists, not disabled) — see
+    # bi_client.py's module comment for why.
     "dashboard.stat.active_users": "Utenti attivi",
+    "dashboard.stat.registered_users": "Utenti registrati",
     "customer.table.active_users": "Utenti attivi",
+    "customer.table.registered_users": "Utenti registrati",
     "reports.template.active_users": "Utenti attivi",
-    "reports.template.active_users.desc": "Numero di utenti Printix attivi per cliente, o l'elenco completo per uno solo.",
+    "reports.template.active_users.desc": "Utenti Printix realmente attivi per cliente (che hanno stampato negli ultimi 30 giorni), o l'elenco completo per uno solo.",
     "reports.category.active_users": "Utenti attivi",
-    "reports.category.active_users.hint": "Numero di utenti Printix attivi per cliente (seleziona un cliente per l'elenco completo nome/email).",
+    "reports.category.active_users.hint": "Utenti Printix che hanno realmente stampato negli ultimi 30 giorni, per cliente (seleziona un cliente per l'elenco completo nome/email).",
     "reports.col.name": "Nome",
     "reports.col.email": "Email",
     "reports.col.department": "Reparto",
     "reports.col.customer": "Cliente",
     "reports.active_users.total_hint": "Totale utenti attivi nell'ambito selezionato:",
+    "reports.active_users.total_registered_hint": "Totale utenti registrati nell'ambito selezionato:",
     "reports.active_users.users_label": "utenti attivi",
     "reports.active_users.pick_one_hint": "Seleziona un singolo cliente qui sopra per vedere l'elenco completo nome/email/reparto.",
 }
@@ -3735,17 +3753,23 @@ _DE: dict[str, str] = {
     "invite.error.already_completed": "Diese Einladung wurde bereits abgeschlossen. Bitte melde dich normal an.",
 
     # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    # v0.24.46: aufgeteilt in "Aktive" (echte Druckaktivität in den
+    # letzten 30 Tagen) vs. "Registrierte" (Account existiert, nicht
+    # deaktiviert) — siehe Modul-Kommentar in bi_client.py.
     "dashboard.stat.active_users": "Aktive User",
+    "dashboard.stat.registered_users": "Registrierte User",
     "customer.table.active_users": "Aktive User",
+    "customer.table.registered_users": "Registrierte User",
     "reports.template.active_users": "Aktive Benutzer",
-    "reports.template.active_users.desc": "Anzahl aktiver Printix-User pro Kunde, oder die vollständige Liste für einen einzelnen.",
+    "reports.template.active_users.desc": "Wirklich aktive Printix-User pro Kunde (in den letzten 30 Tagen gedruckt), oder die vollständige Liste für einen einzelnen.",
     "reports.category.active_users": "Aktive Benutzer",
-    "reports.category.active_users.hint": "Anzahl aktiver Printix-User pro Kunde (einen Kunden auswählen für die volle Namen-/E-Mail-Liste).",
+    "reports.category.active_users.hint": "Printix-User, die in den letzten 30 Tagen wirklich gedruckt haben, pro Kunde (einen Kunden auswählen für die volle Namen-/E-Mail-Liste).",
     "reports.col.name": "Name",
     "reports.col.email": "E-Mail",
     "reports.col.department": "Abteilung",
     "reports.col.customer": "Kunde",
     "reports.active_users.total_hint": "Aktive User insgesamt im gewählten Bereich:",
+    "reports.active_users.total_registered_hint": "Registrierte User insgesamt im gewählten Bereich:",
     "reports.active_users.users_label": "aktive User",
     "reports.active_users.pick_one_hint": "Oben einen einzelnen Kunden auswählen, um die vollständige Namen-/E-Mail-/Abteilungsliste zu sehen.",
 }
@@ -4663,17 +4687,23 @@ _ES: dict[str, str] = {
     "invite.error.already_completed": "Esta invitación ya se ha completado. Inicia sesión normalmente.",
 
     # v0.24.42: aktive Printix-User (Dashboard/Kunden/Berichte)
+    # v0.24.46: split into "active" (genuinely printed in the last 30
+    # days) vs. "registered" (account exists, not disabled) — see
+    # bi_client.py's module comment for why.
     "dashboard.stat.active_users": "Usuarios activos",
+    "dashboard.stat.registered_users": "Usuarios registrados",
     "customer.table.active_users": "Usuarios activos",
+    "customer.table.registered_users": "Usuarios registrados",
     "reports.template.active_users": "Usuarios activos",
-    "reports.template.active_users.desc": "Número de usuarios activos de Printix por cliente, o la lista completa para uno.",
+    "reports.template.active_users.desc": "Usuarios de Printix realmente activos por cliente (que imprimieron en los últimos 30 días), o la lista completa para uno.",
     "reports.category.active_users": "Usuarios activos",
-    "reports.category.active_users.hint": "Número de usuarios activos de Printix por cliente (elige un cliente para la lista completa de nombre/correo).",
+    "reports.category.active_users.hint": "Usuarios de Printix que realmente imprimieron en los últimos 30 días, por cliente (elige un cliente para la lista completa de nombre/correo).",
     "reports.col.name": "Nombre",
     "reports.col.email": "Correo electrónico",
     "reports.col.department": "Departamento",
     "reports.col.customer": "Cliente",
     "reports.active_users.total_hint": "Total de usuarios activos en el ámbito seleccionado:",
+    "reports.active_users.total_registered_hint": "Total de usuarios registrados en el ámbito seleccionado:",
     "reports.active_users.users_label": "usuarios activos",
     "reports.active_users.pick_one_hint": "Elige un solo cliente arriba para ver la lista completa de nombre/correo/departamento.",
 }
@@ -5567,17 +5597,23 @@ _NL: dict[str, str] = {
     "invite.submit_button": "Wachtwoord opslaan & inloggen",
     "invite.error.invalid_or_expired": "Deze uitnodigingslink is ongeldig of verlopen.",
     "invite.error.already_completed": "Deze uitnodiging is al voltooid. Log gewoon in.",
+    # v0.24.46: opgesplitst in "actief" (echt geprint in de laatste 30
+    # dagen) vs. "geregistreerd" (account bestaat, niet gedeactiveerd)
+    # — zie de moduleopmerking in bi_client.py.
     "dashboard.stat.active_users": "Actieve gebruikers",
+    "dashboard.stat.registered_users": "Geregistreerde gebruikers",
     "customer.table.active_users": "Actieve gebruikers",
+    "customer.table.registered_users": "Geregistreerde gebruikers",
     "reports.template.active_users": "Actieve gebruikers",
-    "reports.template.active_users.desc": "Aantal actieve Printix-gebruikers per klant, of de volledige lijst voor één klant.",
+    "reports.template.active_users.desc": "Écht actieve Printix-gebruikers per klant (die in de laatste 30 dagen hebben geprint), of de volledige lijst voor één klant.",
     "reports.category.active_users": "Actieve gebruikers",
-    "reports.category.active_users.hint": "Aantal actieve Printix-gebruikers per klant (kies één klant voor de volledige naam-/e-maillijst).",
+    "reports.category.active_users.hint": "Printix-gebruikers die in de laatste 30 dagen echt hebben geprint, per klant (kies één klant voor de volledige naam-/e-maillijst).",
     "reports.col.name": "Naam",
     "reports.col.email": "E-mail",
     "reports.col.department": "Afdeling",
     "reports.col.customer": "Klant",
     "reports.active_users.total_hint": "Totaal actieve gebruikers binnen het gekozen bereik:",
+    "reports.active_users.total_registered_hint": "Totaal geregistreerde gebruikers binnen het gekozen bereik:",
     "reports.active_users.users_label": "actieve gebruikers",
     "reports.active_users.pick_one_hint": "Kies hierboven één klant om de volledige naam-/e-mail-/afdelingslijst te zien.",
 }

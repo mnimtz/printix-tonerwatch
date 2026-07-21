@@ -141,7 +141,8 @@ def generate_savings_narrative(customer_name: str, facts: dict[str, Any],
         return None, None
 
     lang_name = {"de": "German", "en": "English", "fr": "French",
-                 "it": "Italian", "es": "Spanish"}.get(lang, "English")
+                 "it": "Italian", "es": "Spanish",
+                 "nl": "Dutch"}.get(lang, "English")
     system = (
         "You write short cost-savings summaries for an MSP's print-"
         "supply monitoring product, to be read aloud by a sales rep in "
