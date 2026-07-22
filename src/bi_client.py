@@ -471,7 +471,7 @@ def fetch_all_printer_supplies_cached_only(customer: dict) -> Optional[list[dict
     return None
 
 
-def fetch_all_printer_supplies(customer: dict) -> Optional[list[dict]]:
+def fetch_all_printer_supplies(customer: dict, *, force: bool = False) -> Optional[list[dict]]:
     """Latest reading for every active printer in the customer's tenant.
 
     Returns::
@@ -490,16 +490,21 @@ def fetch_all_printer_supplies(customer: dict) -> Optional[list[dict]]:
 
     Cached for 10 minutes per customer. Returns ``None`` on error or when
     the customer has no BI credentials.
+
+    ``force=True`` — see fetch_registered_users' docstring in this
+    module (v0.24.48): always re-queries, but never blanks the cache
+    before the new result lands.
     """
     if not _has_creds(customer):
         return None
 
     key = int(customer["id"])
     now = time.time()
-    with _CACHE_LOCK:
-        entry = _ALL_SUPPLIES_CACHE.get(key)
-        if entry and (now - entry[0]) < _ALL_SUPPLIES_TTL_SEC:
-            return entry[1]
+    if not force:
+        with _CACHE_LOCK:
+            entry = _ALL_SUPPLIES_CACHE.get(key)
+            if entry and (now - entry[0]) < _ALL_SUPPLIES_TTL_SEC:
+                return entry[1]
 
     result = _query_all_supplies(customer)
     if result is not None:
@@ -644,22 +649,30 @@ def fetch_registered_users_cached_only(customer: dict) -> Optional[list[dict]]:
     return None
 
 
-def fetch_registered_users(customer: dict) -> Optional[list[dict]]:
+def fetch_registered_users(customer: dict, *, force: bool = False) -> Optional[list[dict]]:
     """Registered Printix users for one tenant (account exists, not
     disabled) — email, name, department. Discovered via
     /toner/bi_schema: dbo.users is RLS-scoped to just this customer's
     own tenant, same as dbo.printers. Cached 10 min; the background
     cache-refresh tick (toner_alerts._tick_cache_refresh) warms this
     alongside the printer-supply cache so callers almost always hit
-    the cached-only path above."""
+    the cached-only path above.
+
+    ``force=True`` (used by the background tick) skips the freshness
+    check and always does a live query, but — unlike calling
+    invalidate_customer_cache() first — never clears the existing
+    entry before the new one is ready. Cached-only readers keep
+    serving the last-known value throughout the query instead of
+    seeing a gap (v0.24.48)."""
     if not _has_creds(customer):
         return None
     key = int(customer["id"])
     now = time.time()
-    with _CACHE_LOCK:
-        entry = _REGISTERED_USERS_CACHE.get(key)
-        if entry and (now - entry[0]) < _REGISTERED_USERS_TTL_SEC:
-            return entry[1]
+    if not force:
+        with _CACHE_LOCK:
+            entry = _REGISTERED_USERS_CACHE.get(key)
+            if entry and (now - entry[0]) < _REGISTERED_USERS_TTL_SEC:
+                return entry[1]
 
     result = _query_registered_users(customer)
     if result is not None:
@@ -705,20 +718,23 @@ def fetch_active_users_cached_only(customer: dict) -> Optional[list[dict]]:
     return None
 
 
-def fetch_active_users(customer: dict) -> Optional[list[dict]]:
+def fetch_active_users(customer: dict, *, force: bool = False) -> Optional[list[dict]]:
     """Genuinely active Printix users for one tenant — distinct users
     who submitted at least one print job in the last
     ``_ACTIVE_USERS_WINDOW_DAYS`` days — email, name, department.
     Cached 10 min; warmed by the same background tick as
-    fetch_registered_users."""
+    fetch_registered_users.
+
+    ``force=True`` — see fetch_registered_users' docstring (v0.24.48)."""
     if not _has_creds(customer):
         return None
     key = int(customer["id"])
     now = time.time()
-    with _CACHE_LOCK:
-        entry = _ACTIVE_USERS_CACHE.get(key)
-        if entry and (now - entry[0]) < _ACTIVE_USERS_TTL_SEC:
-            return entry[1]
+    if not force:
+        with _CACHE_LOCK:
+            entry = _ACTIVE_USERS_CACHE.get(key)
+            if entry and (now - entry[0]) < _ACTIVE_USERS_TTL_SEC:
+                return entry[1]
 
     result = _query_active_users(customer)
     if result is not None:

@@ -879,18 +879,25 @@ def _tick_cache_refresh() -> None:
             continue
         try:
             bi = bi_client.customer_for_bi(c)
-            # force_refresh=False: normal cache-write; on cold cache
-            # this fetches, on warm cache it's a fast returning read
-            # (the fetch function no-ops if the entry is still fresh).
-            bi_client.invalidate_customer_cache(c["id"])
-            bi_client.fetch_all_printer_supplies(bi)
+            # v0.24.48 — force=True re-queries live on every tick
+            # (matching the admin-configured refresh cadence) WITHOUT
+            # calling invalidate_customer_cache() first. That used to
+            # pop the cache entry before the live fetch even started,
+            # so cached_only() readers (dashboard/customer list/
+            # reports) saw a blank gap for however long the BI-DB
+            # round trip took — visible as counts flickering to "—"
+            # every few minutes, staggered per tenant since customers
+            # are processed sequentially here. force=True still does
+            # a live query every time, it just only overwrites the
+            # cache entry once the new result is actually in hand.
+            bi_client.fetch_all_printer_supplies(bi, force=True)
             # v0.24.42 — warm the users caches on the same cadence so
             # the dashboard tile / customer list / reports category
             # never block on a live BI-DB round trip. v0.24.46: two
             # caches now — registered (account status) and active
             # (genuine print activity).
-            bi_client.fetch_registered_users(bi)
-            bi_client.fetch_active_users(bi)
+            bi_client.fetch_registered_users(bi, force=True)
+            bi_client.fetch_active_users(bi, force=True)
         except Exception as e:  # noqa: BLE001 — never let the tick die
             logger.info("cache refresh: customer %s failed: %s",
                         c.get("id"), str(e)[:120])
