@@ -70,6 +70,12 @@
     <div class="name">{{ _('reports.template.active_users', lang) }}</div>
     <div class="desc">{{ _('reports.template.active_users.desc', lang) }}</div>
   </a>
+  <a class="tpl-card" data-noloader
+     href="/reports/run?date_from={{ default_from }}&date_to={{ default_to }}&category=registered_users">
+    <div class="icon">🪪</div>
+    <div class="name">{{ _('reports.template.registered_users', lang) }}</div>
+    <div class="desc">{{ _('reports.template.registered_users.desc', lang) }}</div>
+  </a>
   {% if customer_choices %}
   <a class="tpl-card" data-noloader
      href="/customers/{{ customer_choices[0][0] }}/savings">
@@ -143,6 +149,13 @@
         <span>
           <div class="lbl">{{ _('reports.category.active_users', lang) }}</div>
           <div class="hint">{{ _('reports.category.active_users.hint', lang) }}</div>
+        </span>
+      </label>
+      <label class="cat-option">
+        <input type="checkbox" name="category" value="registered_users">
+        <span>
+          <div class="lbl">{{ _('reports.category.registered_users', lang) }}</div>
+          <div class="hint">{{ _('reports.category.registered_users.hint', lang) }}</div>
         </span>
       </label>
     </div>

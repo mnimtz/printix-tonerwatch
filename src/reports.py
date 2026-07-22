@@ -346,33 +346,24 @@ def compute_supplier_performance_facts(customer_ids: list[int], date_from: str,
 
 
 # ---------------------------------------------------------------------------
-# Active Printix users — v0.24.42
+# Active + registered Printix users — v0.24.42, split into two reports v0.24.46/47
 # ---------------------------------------------------------------------------
 
-def compute_active_users_facts(customer_ids: list[int], date_from: str,
-                               date_to: str) -> dict[str, Any]:
-    """Active + registered Printix users per customer, from the cached
-    BI-DB snapshots (bi_client.fetch_active_users_cached_only,
-    fetch_registered_users_cached_only) — same "no live BI-DB query
-    inside a report" rule as every other category here (see module
-    docstring). "Active" means genuine print activity in the last 30
-    days (dbo.jobs); "registered" means the account exists and isn't
-    disabled (dbo.users.meta_status) — see bi_client.py's module
-    comment for why these were split in v0.24.46. ``date_from``/
-    ``date_to`` are accepted for signature consistency with the other
-    compute_* functions but unused: this is a live snapshot, not a
-    time-windowed aggregate.
+def _compute_users_facts(customer_ids: list[int], *, fetch, count_key: str) -> dict[str, Any]:
+    """Shared shape for the active-users and registered-users reports —
+    both read a cached per-customer user list (``fetch``) and reduce
+    it to a per-customer summary + (single-customer-only) detail list.
+    ``count_key`` is the field name used in each by_customer row
+    ("active_users" or "registered_users") so the two reports don't
+    collide when both are requested in the same run.
 
-    Always returns a per-customer summary (name + both counts). The
-    full per-user list (name/email/department, for the active-users
-    set) is populated ONLY when exactly one customer is in scope — a
-    multi-customer report deliberately never dumps every visible
-    customer's user directory into a single table."""
-    from . import bi_client
-
+    Always returns a per-customer summary (name + count). The full
+    per-user list (name/email/department) is populated ONLY when
+    exactly one customer is in scope — a multi-customer report
+    deliberately never dumps every visible customer's user directory
+    into a single table."""
     if not customer_ids:
-        return {"total_active_users": 0, "total_registered_users": 0,
-                "by_customer": [], "users_detail": None,
+        return {"total": 0, "by_customer": [], "users_detail": None,
                 "detail_customer_name": None}
 
     with db.get_conn() as conn:
@@ -384,8 +375,7 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
         ).all()
 
     by_customer: list[dict[str, Any]] = []
-    total_active_users = 0
-    total_registered_users = 0
+    total = 0
     users_detail: list[dict[str, Any]] | None = None
     detail_customer_name: str | None = None
     single_customer = len(customer_ids) == 1
@@ -393,17 +383,12 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
     for r in rows:
         cust = {"id": r.id, "sql_server": r.sql_server,
                 "sql_database": r.sql_database, "sql_username": r.sql_username}
-        users = bi_client.fetch_active_users_cached_only(cust)
+        users = fetch(cust)
         count = len(users) if users is not None else None
-        registered = bi_client.fetch_registered_users_cached_only(cust)
-        reg_count = len(registered) if registered is not None else None
         by_customer.append({"customer_id": r.id, "customer_name": r.name,
-                            "active_users": count,
-                            "registered_users": reg_count})
+                            count_key: count})
         if count:
-            total_active_users += count
-        if reg_count:
-            total_registered_users += reg_count
+            total += count
         if single_customer and users is not None:
             users_detail = sorted(
                 users, key=lambda u: ((u.get("name") or "").lower(),
@@ -411,13 +396,45 @@ def compute_active_users_facts(customer_ids: list[int], date_from: str,
             detail_customer_name = r.name
 
     by_customer.sort(key=lambda x: x["customer_name"].lower())
-    return {
-        "total_active_users": total_active_users,
-        "total_registered_users": total_registered_users,
-        "by_customer": by_customer,
-        "users_detail": users_detail,
-        "detail_customer_name": detail_customer_name,
-    }
+    return {"total": total, "by_customer": by_customer,
+            "users_detail": users_detail, "detail_customer_name": detail_customer_name}
+
+
+def compute_active_users_facts(customer_ids: list[int], date_from: str,
+                               date_to: str) -> dict[str, Any]:
+    """Genuinely active Printix users per customer — printed at least
+    once in the last 30 days (bi_client.fetch_active_users_cached_only)
+    — same "no live BI-DB query inside a report" rule as every other
+    category here (see module docstring). ``date_from``/``date_to``
+    are accepted for signature consistency with the other compute_*
+    functions but unused: this is a live snapshot, not a time-windowed
+    aggregate. See bi_client.py's module comment for why this is kept
+    separate from compute_registered_users_facts (v0.24.46)."""
+    from . import bi_client
+    result = _compute_users_facts(
+        customer_ids, fetch=bi_client.fetch_active_users_cached_only,
+        count_key="active_users")
+    return {"total_active_users": result["total"],
+            "by_customer": result["by_customer"],
+            "users_detail": result["users_detail"],
+            "detail_customer_name": result["detail_customer_name"]}
+
+
+def compute_registered_users_facts(customer_ids: list[int], date_from: str,
+                                   date_to: str) -> dict[str, Any]:
+    """Registered Printix users per customer — account exists, not
+    disabled (bi_client.fetch_registered_users_cached_only). Mirrors
+    compute_active_users_facts exactly, just against the other cache
+    — a much larger number since it doesn't require any actual print
+    activity (v0.24.46)."""
+    from . import bi_client
+    result = _compute_users_facts(
+        customer_ids, fetch=bi_client.fetch_registered_users_cached_only,
+        count_key="registered_users")
+    return {"total_registered_users": result["total"],
+            "by_customer": result["by_customer"],
+            "users_detail": result["users_detail"],
+            "detail_customer_name": result["detail_customer_name"]}
 
 
 # ---------------------------------------------------------------------------
