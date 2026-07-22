@@ -976,6 +976,18 @@ _EN: dict[str, str] = {
     "reports.registered_users.total_hint": "Total registered users across the selected scope:",
     "reports.registered_users.users_label": "registered users",
     "reports.registered_users.pick_one_hint": "Pick a single customer above to see the full name/email/department list.",
+    "reports.template.user_comparison": "Active vs. registered users",
+    "reports.template.user_comparison.desc": "Side-by-side comparison per customer: how many registered users actually print.",
+    "reports.category.user_comparison": "Active vs. registered users",
+    "reports.category.user_comparison.hint": "Registered and active users compared per customer, with an active share (pick one customer for the full per-user list with status).",
+    "reports.user_comparison.registered_label": "Registered",
+    "reports.user_comparison.active_label": "Active",
+    "reports.user_comparison.gap_label": "Not active",
+    "reports.user_comparison.pct_label": "Active share",
+    "reports.user_comparison.col.status": "Status",
+    "reports.user_comparison.status.active": "Active",
+    "reports.user_comparison.status.inactive": "Registered only",
+    "reports.user_comparison.pick_one_hint": "Pick a single customer above to see the full per-user list with status.",
 }
 
 _FR: dict[str, str] = {
@@ -1916,6 +1928,18 @@ _FR: dict[str, str] = {
     "reports.registered_users.total_hint": "Total des utilisateurs enregistrés dans le périmètre sélectionné :",
     "reports.registered_users.users_label": "utilisateurs enregistrés",
     "reports.registered_users.pick_one_hint": "Sélectionnez un seul client ci-dessus pour voir la liste complète nom/e-mail/service.",
+    "reports.template.user_comparison": "Utilisateurs actifs vs. enregistrés",
+    "reports.template.user_comparison.desc": "Comparaison côte à côte par client : combien d'utilisateurs enregistrés impriment réellement.",
+    "reports.category.user_comparison": "Utilisateurs actifs vs. enregistrés",
+    "reports.category.user_comparison.hint": "Utilisateurs enregistrés et actifs comparés par client, avec la part active (sélectionnez un client pour la liste complète par utilisateur avec statut).",
+    "reports.user_comparison.registered_label": "Enregistrés",
+    "reports.user_comparison.active_label": "Actifs",
+    "reports.user_comparison.gap_label": "Non actifs",
+    "reports.user_comparison.pct_label": "Part active",
+    "reports.user_comparison.col.status": "Statut",
+    "reports.user_comparison.status.active": "Actif",
+    "reports.user_comparison.status.inactive": "Enregistré seulement",
+    "reports.user_comparison.pick_one_hint": "Sélectionnez un seul client ci-dessus pour voir la liste complète par utilisateur avec statut.",
 }
 
 _IT: dict[str, str] = {
@@ -2856,6 +2880,18 @@ _IT: dict[str, str] = {
     "reports.registered_users.total_hint": "Totale utenti registrati nell'ambito selezionato:",
     "reports.registered_users.users_label": "utenti registrati",
     "reports.registered_users.pick_one_hint": "Seleziona un singolo cliente qui sopra per vedere l'elenco completo nome/email/reparto.",
+    "reports.template.user_comparison": "Utenti attivi vs. registrati",
+    "reports.template.user_comparison.desc": "Confronto affiancato per cliente: quanti utenti registrati stampano davvero.",
+    "reports.category.user_comparison": "Utenti attivi vs. registrati",
+    "reports.category.user_comparison.hint": "Utenti registrati e attivi a confronto per cliente, con la quota attiva (seleziona un cliente per l'elenco completo per utente con stato).",
+    "reports.user_comparison.registered_label": "Registrati",
+    "reports.user_comparison.active_label": "Attivi",
+    "reports.user_comparison.gap_label": "Non attivi",
+    "reports.user_comparison.pct_label": "Quota attiva",
+    "reports.user_comparison.col.status": "Stato",
+    "reports.user_comparison.status.active": "Attivo",
+    "reports.user_comparison.status.inactive": "Solo registrato",
+    "reports.user_comparison.pick_one_hint": "Seleziona un singolo cliente qui sopra per vedere l'elenco completo per utente con stato.",
 }
 
 _DE: dict[str, str] = {
@@ -3796,6 +3832,18 @@ _DE: dict[str, str] = {
     "reports.registered_users.total_hint": "Registrierte User insgesamt im gewählten Bereich:",
     "reports.registered_users.users_label": "registrierte User",
     "reports.registered_users.pick_one_hint": "Oben einen einzelnen Kunden auswählen, um die vollständige Namen-/E-Mail-/Abteilungsliste zu sehen.",
+    "reports.template.user_comparison": "Aktive vs. Registrierte User",
+    "reports.template.user_comparison.desc": "Gegenüberstellung pro Kunde: wie viele der registrierten User auch wirklich drucken.",
+    "reports.category.user_comparison": "Aktive vs. Registrierte User",
+    "reports.category.user_comparison.hint": "Registrierte und aktive User pro Kunde gegenübergestellt, mit Aktivquote (einen Kunden auswählen für die vollständige Liste je User mit Status).",
+    "reports.user_comparison.registered_label": "Registriert",
+    "reports.user_comparison.active_label": "Aktiv",
+    "reports.user_comparison.gap_label": "Ohne Aktivität",
+    "reports.user_comparison.pct_label": "Aktivquote",
+    "reports.user_comparison.col.status": "Status",
+    "reports.user_comparison.status.active": "Aktiv",
+    "reports.user_comparison.status.inactive": "Nur registriert",
+    "reports.user_comparison.pick_one_hint": "Oben einen einzelnen Kunden auswählen, um die vollständige Liste je User mit Status zu sehen.",
 }
 
 _ES: dict[str, str] = {
@@ -4736,6 +4784,18 @@ _ES: dict[str, str] = {
     "reports.registered_users.total_hint": "Total de usuarios registrados en el ámbito seleccionado:",
     "reports.registered_users.users_label": "usuarios registrados",
     "reports.registered_users.pick_one_hint": "Elige un solo cliente arriba para ver la lista completa de nombre/correo/departamento.",
+    "reports.template.user_comparison": "Usuarios activos vs. registrados",
+    "reports.template.user_comparison.desc": "Comparación lado a lado por cliente: cuántos usuarios registrados imprimen realmente.",
+    "reports.category.user_comparison": "Usuarios activos vs. registrados",
+    "reports.category.user_comparison.hint": "Usuarios registrados y activos comparados por cliente, con la cuota activa (elige un cliente para la lista completa por usuario con estado).",
+    "reports.user_comparison.registered_label": "Registrados",
+    "reports.user_comparison.active_label": "Activos",
+    "reports.user_comparison.gap_label": "Sin actividad",
+    "reports.user_comparison.pct_label": "Cuota activa",
+    "reports.user_comparison.col.status": "Estado",
+    "reports.user_comparison.status.active": "Activo",
+    "reports.user_comparison.status.inactive": "Solo registrado",
+    "reports.user_comparison.pick_one_hint": "Elige un solo cliente arriba para ver la lista completa por usuario con estado.",
 }
 
 _NL: dict[str, str] = {
@@ -5652,6 +5712,18 @@ _NL: dict[str, str] = {
     "reports.registered_users.total_hint": "Totaal geregistreerde gebruikers binnen het gekozen bereik:",
     "reports.registered_users.users_label": "geregistreerde gebruikers",
     "reports.registered_users.pick_one_hint": "Kies hierboven één klant om de volledige naam-/e-mail-/afdelingslijst te zien.",
+    "reports.template.user_comparison": "Actieve vs. geregistreerde gebruikers",
+    "reports.template.user_comparison.desc": "Vergelijking naast elkaar per klant: hoeveel geregistreerde gebruikers ook echt printen.",
+    "reports.category.user_comparison": "Actieve vs. geregistreerde gebruikers",
+    "reports.category.user_comparison.hint": "Geregistreerde en actieve gebruikers per klant vergeleken, met actief-aandeel (kies één klant voor de volledige lijst per gebruiker met status).",
+    "reports.user_comparison.registered_label": "Geregistreerd",
+    "reports.user_comparison.active_label": "Actief",
+    "reports.user_comparison.gap_label": "Niet actief",
+    "reports.user_comparison.pct_label": "Actief-aandeel",
+    "reports.user_comparison.col.status": "Status",
+    "reports.user_comparison.status.active": "Actief",
+    "reports.user_comparison.status.inactive": "Alleen geregistreerd",
+    "reports.user_comparison.pick_one_hint": "Kies hierboven één klant om de volledige lijst per gebruiker met status te zien.",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {

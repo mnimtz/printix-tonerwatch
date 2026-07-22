@@ -38,11 +38,12 @@ from ..db import customers as customers_tbl
 router = APIRouter()
 
 _ALL_CATEGORIES = ("orders", "consumption", "device_health",
-                   "supplier_performance", "active_users", "registered_users")
-# active_users / registered_users are opt-in only — they're a live-ish
-# BI-DB snapshot, not a date-windowed historical aggregate like the
-# others, so they shouldn't silently ride along whenever an operator
-# just wants "everything".
+                   "supplier_performance", "active_users",
+                   "registered_users", "user_comparison")
+# active_users / registered_users / user_comparison are opt-in only —
+# they're a live-ish BI-DB snapshot, not a date-windowed historical
+# aggregate like the others, so they shouldn't silently ride along
+# whenever an operator just wants "everything".
 _DEFAULT_CATEGORIES = ("orders", "consumption", "device_health", "supplier_performance")
 
 
@@ -115,6 +116,9 @@ def _compute(categories: list[str], customer_ids: list[int],
             customer_ids, date_from, date_to)
     if "registered_users" in categories:
         facts["registered_users"] = reports.compute_registered_users_facts(
+            customer_ids, date_from, date_to)
+    if "user_comparison" in categories:
+        facts["user_comparison"] = reports.compute_user_comparison_facts(
             customer_ids, date_from, date_to)
     return facts
 
@@ -293,6 +297,31 @@ async def reports_run_export_csv(request: Request):
             w.writerow(["name", "email", "department"])
             for u in f["users_detail"]:
                 w.writerow([u["name"], u["email"], u["department"]])
+            w.writerow([])
+
+    if "user_comparison" in facts:
+        f = facts["user_comparison"]
+        w.writerow(["ACTIVE VS REGISTERED USERS"])
+        w.writerow(["total_active_users", f["total_active_users"]])
+        w.writerow(["total_registered_users", f["total_registered_users"]])
+        w.writerow(["total_gap", f["total_gap"]])
+        w.writerow(["overall_active_pct", f["overall_active_pct"]
+                    if f["overall_active_pct"] is not None else ""])
+        w.writerow([])
+        w.writerow(["customer", "registered_users", "active_users", "gap", "active_pct"])
+        for row in f["by_customer"]:
+            w.writerow([row["customer_name"],
+                        row["registered_users"] if row["registered_users"] is not None else "",
+                        row["active_users"] if row["active_users"] is not None else "",
+                        row["gap"] if row["gap"] is not None else "",
+                        row["active_pct"] if row["active_pct"] is not None else ""])
+        w.writerow([])
+        if f["users_detail"]:
+            w.writerow([f'USERS — {f["detail_customer_name"]}'])
+            w.writerow(["name", "email", "department", "status"])
+            for u in f["users_detail"]:
+                w.writerow([u["name"], u["email"], u["department"],
+                            "active" if u["is_active"] else "registered_only"])
             w.writerow([])
 
     csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM so Excel gets UTF-8 right

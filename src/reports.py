@@ -35,7 +35,8 @@ from . import db
 logger = logging.getLogger(__name__)
 
 REPORT_CATEGORIES = ("orders", "consumption", "device_health",
-                     "supplier_performance", "active_users")
+                     "supplier_performance", "active_users",
+                     "registered_users", "user_comparison")
 
 # Orders in these statuses represent toner that actually left the
 # shelf — the honest proxy for "consumed" without a level time series.
@@ -435,6 +436,105 @@ def compute_registered_users_facts(customer_ids: list[int], date_from: str,
             "by_customer": result["by_customer"],
             "users_detail": result["users_detail"],
             "detail_customer_name": result["detail_customer_name"]}
+
+
+def compute_user_comparison_facts(customer_ids: list[int], date_from: str,
+                                  date_to: str) -> dict[str, Any]:
+    """Active vs. registered Printix users, side by side, per customer
+    — the direct juxtaposition of the two single-metric reports above.
+    Requested after Marcus saw the gap on a real tenant's Partner
+    Portal (131 registered, 2-3 shown as active) and wanted it made
+    explicit rather than having to cross-reference two reports
+    (v0.24.49).
+
+    Always returns a per-customer summary: registered count, active
+    count, the gap between them, and what share of registered users
+    are actually active. When exactly one customer is in scope, also
+    returns a unified per-user list — every registered user, each
+    marked active or not — inactive-first so the "who might not need
+    a seat" list is immediately visible. Same privacy rule as the
+    other two reports: no per-user list across multiple customers."""
+    from . import bi_client
+
+    if not customer_ids:
+        return {"total_active_users": 0, "total_registered_users": 0,
+                "total_gap": 0, "overall_active_pct": None,
+                "by_customer": [], "users_detail": None,
+                "detail_customer_name": None}
+
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            select(db.customers.c.id, db.customers.c.name,
+                   db.customers.c.sql_server, db.customers.c.sql_database,
+                   db.customers.c.sql_username)
+            .where(db.customers.c.id.in_(customer_ids))
+        ).all()
+
+    by_customer: list[dict[str, Any]] = []
+    total_active = 0
+    total_registered = 0
+    users_detail: list[dict[str, Any]] | None = None
+    detail_customer_name: str | None = None
+    single_customer = len(customer_ids) == 1
+
+    for r in rows:
+        cust = {"id": r.id, "sql_server": r.sql_server,
+                "sql_database": r.sql_database, "sql_username": r.sql_username}
+        active = bi_client.fetch_active_users_cached_only(cust)
+        registered = bi_client.fetch_registered_users_cached_only(cust)
+        active_count = len(active) if active is not None else None
+        registered_count = len(registered) if registered is not None else None
+        gap = (registered_count - active_count
+               if active_count is not None and registered_count is not None
+               else None)
+        pct = (round(100 * active_count / registered_count)
+               if registered_count else None)
+        by_customer.append({
+            "customer_id": r.id, "customer_name": r.name,
+            "active_users": active_count, "registered_users": registered_count,
+            "gap": gap, "active_pct": pct,
+        })
+        if active_count:
+            total_active += active_count
+        if registered_count:
+            total_registered += registered_count
+        if single_customer and active is not None and registered is not None:
+            active_keys = {(u.get("email") or u.get("name") or "").lower()
+                           for u in active}
+            combined: dict[str, dict[str, Any]] = {}
+            for u in registered:
+                k = (u.get("email") or u.get("name") or "").lower()
+                combined[k] = {"name": u.get("name") or "",
+                               "email": u.get("email") or "",
+                               "department": u.get("department") or "",
+                               "is_active": k in active_keys}
+            for u in active:
+                k = (u.get("email") or u.get("name") or "").lower()
+                if k not in combined:
+                    # Printed but the account isn't in the registered
+                    # snapshot (e.g. deactivated after printing) —
+                    # an edge case, but real, so still surface it.
+                    combined[k] = {"name": u.get("name") or "",
+                                   "email": u.get("email") or "",
+                                   "department": u.get("department") or "",
+                                   "is_active": True}
+            users_detail = sorted(
+                combined.values(),
+                key=lambda u: (u["is_active"], u["name"].lower(), u["email"].lower()))
+            detail_customer_name = r.name
+
+    by_customer.sort(key=lambda x: x["customer_name"].lower())
+    overall_pct = (round(100 * total_active / total_registered)
+                   if total_registered else None)
+    return {
+        "total_active_users": total_active,
+        "total_registered_users": total_registered,
+        "total_gap": total_registered - total_active,
+        "overall_active_pct": overall_pct,
+        "by_customer": by_customer,
+        "users_detail": users_detail,
+        "detail_customer_name": detail_customer_name,
+    }
 
 
 # ---------------------------------------------------------------------------

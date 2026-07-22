@@ -156,7 +156,7 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
 
 - **Flexible builder** (`/reports`) — any date range (presets for
   7/30/90 days, this quarter, this year, or a custom from/to), a single
-  customer or every customer this operator can see, and six
+  customer or every customer this operator can see, and seven
   combinable categories: **orders** (volume, status breakdown, average
   fulfillment time), **consumption** (toner actually shipped —
   delivered/installed orders — by color, printer and customer, with
@@ -164,14 +164,17 @@ with Entra ID, Microsoft 365 Copilot and any major LLM provider.
   window, plus printers with unusually many orders as an order-based
   proxy for "might need a look"), **supplier performance**
   (orders, spend and average fulfillment time per supplier), **active
-  users**, and **registered users** — two separate opt-in reports
-  (live BI-DB snapshots rather than date-windowed aggregates like the
-  others): "active" is genuine print activity in the last 30 days,
-  "registered" is the much larger account-exists-and-isn't-disabled
-  count — each a per-customer summary across every customer in scope,
-  or its own full name/email/department list once exactly one customer
-  is selected — a multi-customer report deliberately never dumps every
-  visible customer's user directory into one table.
+  users**, **registered users**, and **active vs. registered users** —
+  three separate opt-in reports (live BI-DB snapshots rather than
+  date-windowed aggregates like the others): "active" is genuine print
+  activity in the last 30 days, "registered" is the much larger
+  account-exists-and-isn't-disabled count, and the comparison report
+  puts the two side by side per customer (count, gap, active share) —
+  each a per-customer summary across every customer in scope, or its
+  own full name/email/department list once exactly one customer is
+  selected (the comparison report marks each registered user active
+  or not, inactive-first) — a multi-customer report deliberately never
+  dumps every visible customer's user directory into one table.
   "Consumption" is measured the honest way — cartridges that actually
   shipped — rather than a level curve; a level-over-time chart becomes
   possible once enough toner-level history (see Alerting) has
