@@ -16,6 +16,12 @@ the UI language kept showing the greeting generated in whatever
 language happened to hit the LLM first, for up to an hour. Any
 failure (LLM disabled, call error, timeout) falls back to the static
 sentence — the greeting is decoration, never a dependency.
+
+v0.24.50 — the generated text is rendered directly under a static
+"Hallo <name>" heading (dashboard.html), so the prompt now forbids
+re-greeting/re-naming the operator; earlier prompts asked for "a
+brief warm greeting" as the opening sentence, which routinely
+produced a second "Hallo Marcus, ..." right under the first one.
 """
 
 from __future__ import annotations
@@ -82,21 +88,26 @@ def generate_greeting(user_id: int, user_name: str, counts: dict,
                  "it": "Italian", "es": "Spanish",
                  "nl": "Dutch"}.get(lang, "English")
     system = (
-        "You write a short, warm greeting for the top of a print-"
-        "supply monitoring dashboard, addressed to the logged-in "
-        f"operator by name. Write in {lang_name}. Use ONLY the facts "
-        "given below — never invent a number, a customer name, or an "
-        "event that isn't listed. "
+        "You write the second line of a two-line dashboard header for "
+        "a print-supply monitoring product. The first line, already "
+        "shown above yours, is a static heading that already greets "
+        "the operator by name (e.g. 'Hallo Marcus Nimtz'). Your line "
+        "continues directly below it, so do NOT repeat the operator's "
+        "name and do NOT start with a greeting word (Hallo/Hi/Hello/"
+        "Bonjour/Ciao/Hola/Hoi or similar in any language) — the "
+        f"reader already saw that greeting once. Write in {lang_name}. "
+        "Use ONLY the facts given below — never invent a number, a "
+        "customer name, or an event that isn't listed. "
         "If there's nothing wrong (no critical, no warn, no "
         "anomalies), say so plainly and warmly in ONE sentence — "
         "don't invent tension. "
-        "If there IS something wrong, write TWO short sentences: the "
-        "first a brief warm greeting, the second naming the specific "
-        "customers with problems and their exact critical/warn counts "
-        "from 'problem_customers' (not just a total) — e.g. 'Acme has "
-        "3 critical and 1 warn, Beta has 2 warn.' If 'recent_anomalies' "
-        "has a notable entry (an unusual jump, not a normal cartridge "
-        "swap), you may fold that in too if it fits naturally. "
+        "If there IS something wrong, write ONE OR TWO short "
+        "sentences naming the specific customers with problems and "
+        "their exact critical/warn counts from 'problem_customers' "
+        "(not just a total) — e.g. 'Acme has 3 critical and 1 warn, "
+        "Beta has 2 warn.' If 'recent_anomalies' has a notable entry "
+        "(an unusual jump, not a normal cartridge swap), you may fold "
+        "that in too if it fits naturally. "
         "Plain prose, no markdown, no emoji, no sign-off, no bullet "
         "list — flowing sentences only."
     )
